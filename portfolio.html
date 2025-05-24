@@ -1,0 +1,1679 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keith Kadima (Digital FootPrint)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Orbitron', monospace;
+            background: #D0E7FF;
+            overflow: hidden;
+            cursor: none;
+        }
+        
+        #gameContainer {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            color: #005544;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(0, 119, 85, 0.3);
+            box-shadow: 0 8px 32px rgba(0, 119, 85, 0.1);
+            animation: pulse-glow 3s infinite;
+        }
+        
+        @keyframes pulse-glow {
+            0%, 100% {box-shadow: 0 8px 32px rgba(0, 119, 85, 0.1);}
+            50% {box-shadow: 0 8px 32px rgba(0, 119, 85, 0.3);}
+        }
+        
+        #instructions {
+            margin-bottom: 15px;
+            font-size: 14px;
+            line-height: 1.6;
+            text-shadow: 0 0 5px rgba(0, 119, 85, 0.3);
+        }
+        
+        #speed {
+            font-size: 20px;
+            font-weight: 700;
+            text-shadow: 0 0 5px rgba(0, 119, 85, 0.5);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.8; }
+        }
+        
+        #modal {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(230, 245, 255, 0.95) 100%);
+            color: #222;
+            padding: 40px;
+            border-radius: 20px;
+            max-width: 700px;
+            max-height: 80vh;
+            overflow-y: auto;
+            z-index: 200;
+            display: none;
+            backdrop-filter: blur(25px);
+            border: 3px solid #007755;
+            box-shadow: 0 20px 60px rgba(0, 119, 85, 0.3), inset 0 0 30px rgba(0, 119, 85, 0.1);
+            animation: modalAppear 0.3s ease-out;
+        }
+        
+        @keyframes modalAppear {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+        
+        #modal h2 {
+            color: #006644;
+            margin-bottom: 20px;
+            text-align: center;
+            font-size: 28px;
+            font-weight: 900;
+            text-shadow: 0 0 10px rgba(0, 119, 85, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        
+        #modal p {
+            line-height: 1.8;
+            margin-bottom: 15px;
+            font-size: 16px;
+            color: #333;
+        }
+        
+        #closeModal {
+            background: linear-gradient(45deg, #007755, #005544);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            font-family: 'Orbitron', monospace;
+            display: block;
+            margin: 30px auto 0;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 119, 85, 0.4);
+        }
+        
+        #closeModal:hover {
+            background: linear-gradient(45deg, #006644, #004433);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 119, 85, 0.6);
+        }
+        
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 220px;
+            height: 220px;
+            background: rgba(255, 255, 255, 0.7);
+            border: 3px solid #007755;
+            border-radius: 15px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 119, 85, 0.2);
+        }
+        
+        .section-indicator {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(45deg, rgba(255, 255, 255, 0.85), rgba(220, 245, 240, 0.9));
+            color: #006644;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-family: 'Orbitron', monospace;
+            display: none;
+            z-index: 100;
+            font-size: 16px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 2px solid #007755;
+            box-shadow: 0 10px 30px rgba(0, 119, 85, 0.4);
+            animation: pulse-border 2s infinite;
+        }
+        
+        @keyframes pulse-border {
+            0%, 100% { border-color: rgba(0, 119, 85, 0.8); }
+            50% { border-color: rgba(0, 119, 85, 0.3); }
+        }
+        
+        #customCursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            background: radial-gradient(circle, #007755, transparent);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px #007755;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #007755;
+            font-size: 24px;
+            font-weight: 700;
+            z-index: 1000;
+            text-shadow: 0 0 20px rgba(0, 119, 85, 0.8);
+        }
+        
+        #loadingBar {
+            position: absolute;
+            top: 58%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            height: 4px;
+            background: rgba(0, 119, 85, 0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        #loadingBarFill {
+            height: 100%;
+            width: 0%;
+            background: #007755;
+            box-shadow: 0 0 10px #007755;
+            transition: width 0.5s ease;
+        }
+        
+        .fps-counter {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: #007755;
+            font-size: 12px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 5px 10px;
+            border-radius: 10px;
+        }
+
+        #settingsMenu {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            color: #006644;
+            padding: 15px;
+            border-radius: 10px;
+            z-index: 100;
+            border: 2px solid rgba(0, 119, 85, 0.3);
+            display: none;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        #settingsMenu h3 {
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        #settingsMenu label {
+            display: block;
+            margin: 8px 0;
+        }
+
+        #settingsMenu select {
+            background: #e8f8f0;
+            color: #006644;
+            border: 1px solid #007755;
+            padding: 5px;
+            width: 100%;
+        }
+
+        #settingsMenu button {
+            background: #007755;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        #settingsBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            color: #006644;
+            border: 1px solid #007755;
+            border-radius: 5px;
+            padding: 5px 10px;
+            z-index: 101;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="customCursor"></div>
+    <div id="gameContainer">
+        <div class="loading" id="loading">INITIALIZING KADIMA'S DIGITAL FOOTPRINT</div>
+        <div id="loadingBar"><div id="loadingBarFill"></div></div>
+        
+        <div id="ui">
+            <div id="instructions">
+                🚗 <strong>WASD/Arrow Keys:</strong> Drive<br>
+                🎯 <strong>Drive near buildings</strong> to explore<br>
+                🚀 <strong>SPACE:</strong> Enter section<br>
+                ⚡ <strong>SHIFT:</strong> Boost<br>
+                🚶 <strong>E:</strong> Enter/Exit Vehicle<br>
+                📷 <strong>C:</strong> Change Camera<br>
+                🔍 <strong>MOUSE WHEEL:</strong> Zoom
+            </div>
+            <div id="speed">Speed: 0 km/h</div>
+        </div>
+        
+        <div id="modal">
+            <h2 id="modalTitle"></h2>
+            <div id="modalContent"></div>
+            <button id="closeModal">Close Interface</button>
+        </div>
+        
+        <div class="section-indicator" id="sectionIndicator"></div>
+        
+        <canvas id="minimap"></canvas>
+        <div class="fps-counter" id="fpsCounter">FPS: 60</div>
+
+        <button id="settingsBtn">⚙️ Settings</button>
+        <div id="settingsMenu">
+            <h3>VISUAL SETTINGS</h3>
+            <label>Quality:
+                <select id="qualitySelect">
+                    <option value="low">Low</option>
+                    <option value="medium" selected>Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </label>
+            <label>Effects:
+                <select id="effectsSelect">
+                    <option value="minimal">Minimal</option>
+                    <option value="balanced" selected>Balanced</option>
+                    <option value="ultra">Ultra</option>
+                </select>
+            </label>
+            <button id="applySettings">Apply</button>
+        </div>
+    </div>
+       <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.153.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.153.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+       // Update the imports to use the importmap
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { Sky } from 'three/addons/objects/Sky.js';
+        // Enhanced portfolio data with cyberpunk descriptions
+        const portfolioData = {
+            'About Me': {
+                content: `<strong>🚀 IDENTITY: DIGITAL ARCHITECT</strong><br><br>
+                Neural-integrated developer operating at the intersection of code and creativity within the digital realm.<br><br>
+                
+                <strong>CORE PROTOCOLS:</strong><br>
+                • Neural-interface experience design for maximum user immersion<br>
+                • Quantum-accelerated code optimization<br>
+                • Wetware-compatible digital solutions<br>
+                • Continuous neural-uplink learning streams<br><br>
+                
+                When disconnected from the mainframe, I explore innovative AI concepts, contribute to open-source projects, and optimize my personal development algorithms.<br><br>
+                
+                <em>// Welcome to my neural portfolio projection - explore my digital footprint in daylight //</em>`,
+                position: { x: 0, z: 0 },
+                color: 0x007755
+            },
+            'Neural Augments': {
+                content: `<strong>🎓 COGNITIVE UPGRADES</strong><br><br>
+                
+                <strong>NEURAL SUBNET: Advanced Computation</strong><br>
+                Neo-Tokyo Institute of Technology (2076-2078)<br>
+                <em>Specialization: Quantum Neural Interfaces & Holographic Rendering</em><br><br>
+                
+                <strong>SUBNET: Software Architecture</strong><br>
+                Techno-Organic University (2072-2076)<br>
+                <em>Graduated with Neural Distinction</em><br><br>
+                
+                <strong>🏆 ACHIEVEMENT METRICS:</strong><br>
+                • Grid Master - 6 consecutive network cycles<br>
+                • Singularity Award for Neural Engine Development<br>
+                • CyberCode Championship - 2nd Node<br>
+                • Published research on Quantum Holographic Interfaces<br><br>
+                
+                <strong>📚 RELEVANT NEURAL IMPRINTS:</strong><br>
+                Quantum Algorithm Design, Holographic Computation, Neural-Machine Integration, Wetware Programming, Digital Consciousness Architecture, Human-AI Symbiosis`,
+                position: { x: -60, z: -40 },
+                color: 0x3355AA
+            },
+            'Tech Implants': {
+                content: `<strong>💻 INTEGRATED TECH STACK</strong><br><br>
+                
+                <strong>CORE PROTOCOLS:</strong><br>
+                • NeuroScript/TypeSynapse (Neural-Level)<br>
+                • Quantum Python (Advanced)<br>
+                • ReactVR/HoloNext.js (Neural-Level)<br>
+                • NodeCore/Synaptic Express (Advanced)<br>
+                • HoloThree.js/NeuroGL (Neural-Level)<br>
+                • C++/BioGL (Intermediate)<br><br>
+                
+                <strong>🎨 SENSORY AUGMENTATIONS:</strong><br>
+                • 4D Sensory Modeling & Neural Animation<br>
+                • Synesthetic Shader Programming<br>
+                • Neuro-Response UI/UX Design<br>
+                • Thought-Motion Synthesis<br><br>
+                
+                <strong>☁️ NETWORK INTEGRATION:</strong><br>
+                • Quantum Cloud Architecture (Certified)<br>
+                • Neural Container Management<br>
+                • Thought-Sync Deployment Pipelines<br>
+                • Distributed Consciousness Architecture<br><br>
+                
+                <strong>🧠 AI SYMBIOSIS:</strong><br>
+                • Neural Network/Human Integration<br>
+                • Synthetic Vision Systems<br>
+                • Natural Language Matrix<br>
+                • Data Consciousness Visualization`,
+                position: { x: 60, z: -40 },
+                color: 0xBB4422
+            },
+            'Digital Artifacts': {
+                content: `<strong>🚀 MANIFESTED CONSTRUCTS</strong><br><br>
+                
+                <strong>1. NeuroVerse - Bio-Digital Reality Matrix</strong><br>
+                Neural-generated immersive universe with synthetic consciousness interactions<br>
+                <em>Tech: Neural Three.js, TensorCore.js, Quantum Shaders</em><br><br>
+                
+                <strong>2. HoloCommerce Platform</strong><br>
+                Full-sensory commercial experience with neural-haptic feedback<br>
+                <em>Tech: NeuroReact, Synapse.js, Quantum Cloud</em><br><br>
+                
+                <strong>3. MindSage - Thought Optimization Engine</strong><br>
+                AI-symbiotic code analysis and neural enhancement system<br>
+                <em>Tech: Quantum Python, OpenMind API, Neural Core</em><br><br>
+                
+                <strong>4. CyberDrive</strong><br>
+                This immersive neural-interface driving experience you're jacked into<br>
+                <em>Tech: Three.js, Neural WebGL, Advanced BioCyber Shaders</em><br><br>
+                
+                <strong>5. NeuraMesh</strong><br>
+                Decentralized thought-sync platform for distributed consciousness<br>
+                <em>Tech: Neural WebRTC, Synapse.io, Quantum Cloud, Thought Containers</em>`,
+                position: { x: 0, z: -80 },
+                color: 0x992266
+            },
+            'Neural Timeline': {
+                content: `<strong>💼 CORPORATE INTEGRATION HISTORY</strong><br><br>
+                
+                <strong>Senior Neural Engineer</strong><br>
+                CyberCore Industries (2079-Present)<br>
+                • Architected next-gen neural interfaces with 300% efficiency increase<br>
+                • Implemented thought-based system architecture used by 1.5M+ users<br>
+                • Mentored junior engineers in neural integration techniques<br>
+                • Designed microsynaptic services handling 10M+ thought-requests daily<br><br>
+                
+                <strong>Holographic Developer</strong><br>
+                Digital Dreamscape Collective (2077-2079)<br>
+                • Created immersive neural-WebGL experiences<br>
+                • Developed proprietary thought-rendering components<br>
+                • Optimized neural-interfaces for biological compatibility<br>
+                • Collaborated with neuro-designers on award-winning projections<br><br>
+                
+                <strong>Code Jockey Intern</strong><br>
+                NeuroCorp (Summer 2076)<br>
+                • Enhanced neural-chrome WebGL integration<br>
+                • Implemented thought-based performance optimizations<br>
+                • Contributed to internal neural-sync tools<br><br>
+                
+                <strong>Independent NetRunner</strong><br>
+                The Free Grid (2075-Present)<br>
+                • 50+ neural imprint projects successfully deployed<br>
+                • Specialized in synaptic interface design<br>
+                • Maintained 98% bio-compatibility rating`,
+                position: { x: -60, z: 40 },
+                color: 0x227744
+            },
+            'Neural Link': {
+                content: `<strong>📡 ESTABLISH CONNECTION</strong><br><br>
+                
+                Ready to initiate a neural handshake for potential collaboration? My connection ports are always open for interesting data packets.<br><br>
+                
+                <strong>📧 Neural-Mail:</strong> keithkadima@gmail.com<br>
+                <strong>💼 Neural-Link:</strong> linkedin.com/in/kadimakeith<br>
+                <strong>🐙 CodeRepository:</strong> github.com/tufstraka<br>
+                <strong>📱 Direct Uplink:</strong> +254701746774<br><br>
+                
+                <strong>🏠 Physical Terminal:</strong> Nairobi, Kenya<br>
+                <strong>🌍 Remote Connection:</strong> Available across all timezones<br><br>
+                
+                <strong>💡 Current Interest Vectors:</strong><br>
+                • Decentralized neural networks<br>
+                • Synthetic consciousness interfaces<br>
+                • Immersive holographic experiences<br>
+                • Open-source neural augmentations<br><br>
+                
+                <em>// Initiate handshake protocol to begin data exchange //</em>`,
+                position: { x: 60, z: 40 },
+                color: 0x665599
+            }
+        };
+
+        // Detect device capabilities
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const isLowEndDevice = () => {
+            if (navigator.deviceMemory && navigator.deviceMemory < 4) return true;
+            if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) return true;
+            return false;
+        };
+        
+        // Default quality settings
+        let qualitySettings = {
+            quality: isMobile ? 'low' : isLowEndDevice() ? 'medium' : 'high',
+            effectsLevel: isMobile ? 'minimal' : isLowEndDevice() ? 'balanced' : 'ultra',
+            shadowsEnabled: !isMobile && !isLowEndDevice(),
+            drawDistance: isMobile ? 200 : isLowEndDevice() ? 400 : 800
+        };
+
+        // Global variables
+        const caches = {
+            textures: new Map(),
+            materials: new Map(),
+            geometries: new Map()
+        };
+        
+        let scene, camera, renderer, composer;
+        let clock = new THREE.Clock();
+        let controls, car, character;
+        let sections = [], buildings = [], drones = [];
+        let bloomPass, sky, ground;
+        
+        // Game state
+        let playerMode = 'driving';
+        let cameraMode = 'follow';
+        let cameraDistance = 15;
+        let cameraHeight = 10;
+        let carSpeed = 0;
+        let maxSpeed = 2.5;
+        let acceleration = 0.12;
+        let friction = 0.06;
+        let currentSection = null;
+        let keys = {};
+        
+        // Performance monitoring
+        let fps = 60;
+        let frameCount = 0;
+        let lastTime = performance.now();
+
+        // Initialize the application
+        init();
+
+        function init() {
+            setupEventListeners();
+            initRenderer();
+            createScene();
+            loadEssentialAssets().then(() => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('loadingBar').style.display = 'none';
+                animate();
+                
+                // Load remaining assets progressively
+                setTimeout(() => {
+                    loadRemainingAssets();
+                }, 1000);
+            });
+        }
+
+        function initRenderer() {
+            // Create renderer with optimized settings
+            renderer = new THREE.WebGLRenderer({
+                antialias: !isMobile,
+                powerPreference: "high-performance",
+                precision: isMobile ? "mediump" : "highp",
+                stencil: false
+            });
+            
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1 : 2));
+            renderer.shadowMap.enabled = qualitySettings.shadowsEnabled;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.8;
+            renderer.setClearColor(0xD0E7FF);
+            
+            document.getElementById('gameContainer').appendChild(renderer.domElement);
+
+            // Set up post-processing
+            composer = new EffectComposer(renderer);
+            
+            const renderPass = new RenderPass(scene = new THREE.Scene(), 
+                                           camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, qualitySettings.drawDistance));
+            composer.addPass(renderPass);
+
+            // Only add FXAA on non-mobile
+            if (!isMobile) {
+                const fxaaPass = new ShaderPass(FXAAShader);
+                const pixelRatio = renderer.getPixelRatio();
+                fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
+                fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
+                composer.addPass(fxaaPass);
+            }
+
+            // Optimized bloom settings
+            bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                0.15, // Reduced strength
+                0.3,  // Reduced radius
+                0.95  // Increased threshold to reduce bloom on bright areas
+            );
+            composer.addPass(bloomPass);
+        }
+
+        function createScene() {
+            // Scene setup with optimized fog
+            scene.fog = new THREE.FogExp2(0xE6F0FF, 0.002);
+            
+            // Basic lighting - will be enhanced later
+            const ambientLight = new THREE.AmbientLight(0xCCDDFF, 0.5);
+            scene.add(ambientLight);
+            
+            const directionalLight = new THREE.DirectionalLight(0xFFFAF0, 1.0);
+            directionalLight.position.set(50, 100, 50);
+            
+            if (qualitySettings.shadowsEnabled) {
+                directionalLight.castShadow = true;
+                directionalLight.shadow.mapSize.width = 1024;
+                directionalLight.shadow.mapSize.height = 1024;
+                
+                // Optimize shadow camera
+                const d = 100;
+                directionalLight.shadow.camera.left = -d;
+                directionalLight.shadow.camera.right = d;
+                directionalLight.shadow.camera.top = d;
+                directionalLight.shadow.camera.bottom = -d;
+                directionalLight.shadow.camera.near = 1;
+                directionalLight.shadow.camera.far = 300;
+            }
+            
+            scene.add(directionalLight);
+        }
+
+        async function loadEssentialAssets() {
+            return new Promise(async (resolve) => {
+                // Create ground
+                const groundGeometry = new THREE.PlaneGeometry(1000, 1000);
+                const groundMaterial = new THREE.MeshStandardMaterial({ 
+                    color: 0x88AA77,
+                    roughness: 0.8,
+                    metalness: 0.2
+                });
+                
+                ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.position.y = -0.1;
+                ground.receiveShadow = qualitySettings.shadowsEnabled;
+                scene.add(ground);
+
+                // Create car model
+                await createVehicle();
+                
+                // Create character (hidden initially)
+                createCharacter();
+                
+                // Position camera
+                camera.position.set(0, 10, -15);
+                camera.lookAt(0, 0, 0);
+
+                updateLoadingBar(1);
+                
+                resolve();
+            });
+        }
+
+        function updateLoadingBar(progress) {
+            document.getElementById('loadingBarFill').style.width = `${progress * 100}%`;
+        }
+
+        async function loadRemainingAssets() {
+            // Create environment
+            if (qualitySettings.quality !== 'low') {
+                createSky();
+            }
+            
+            // Create portfolio buildings
+            createPortfolioSections();
+            
+            // Create environment elements based on quality settings
+            if (qualitySettings.quality !== 'low') {
+                createTrees(30);
+                createAtmosphericParticles();
+            }
+
+            // Create entity for tracking cursor position
+            createCursorTracker();
+            
+            // Position car at start
+            car.position.set(0, 0, 50);
+            camera.position.set(0, 10, 30);
+            
+            // Initialize cursor
+            initCustomCursor();
+            
+            // Initialize minimap
+            initMinimap();
+            
+            // Set up events after everything is loaded
+            setupControls();
+        }
+
+        function createSky() {
+            sky = new Sky();
+            sky.scale.setScalar(10000);
+            scene.add(sky);
+            
+            const sun = new THREE.Vector3();
+            const skyUniforms = sky.material.uniforms;
+            
+            skyUniforms['turbidity'].value = 6;
+            skyUniforms['rayleigh'].value = 1;
+            skyUniforms['mieCoefficient'].value = 0.003;
+            skyUniforms['mieDirectionalG'].value = 0.7;
+            
+            const phi = THREE.MathUtils.degToRad(50);
+            const theta = THREE.MathUtils.degToRad(160);
+            
+            sun.setFromSphericalCoords(1, phi, theta);
+            skyUniforms['sunPosition'].value.copy(sun);
+        }
+
+        function createPortfolioSections() {
+            // Create buildings for each portfolio section
+            Object.entries(portfolioData).forEach(([title, data]) => {
+                const sectionGroup = new THREE.Group();
+                
+                // Create a building with unique appearance
+                const buildingGeometry = new THREE.BoxGeometry(10, 20, 10);
+                const buildingMaterial = new THREE.MeshStandardMaterial({ 
+                    color: data.color,
+                    roughness: 0.7,
+                    metalness: 0.3
+                });
+                
+                const building = new THREE.Mesh(buildingGeometry, buildingMaterial);
+                building.position.y = 10; // Half height
+                building.castShadow = qualitySettings.shadowsEnabled;
+                building.receiveShadow = qualitySettings.shadowsEnabled;
+                sectionGroup.add(building);
+                
+                // Add floating text above
+                const textCanvas = document.createElement('canvas');
+                textCanvas.width = 512;
+                textCanvas.height = 128;
+                const ctx = textCanvas.getContext('2d');
+                
+                // Draw transparent background
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                ctx.fillRect(0, 0, 512, 128);
+                
+                // Draw text
+                ctx.fillStyle = '#' + new THREE.Color(data.color).getHexString();
+                ctx.font = 'bold 64px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(title, 256, 64);
+                
+                const textTexture = new THREE.CanvasTexture(textCanvas);
+                const textMaterial = new THREE.MeshBasicMaterial({
+                    map: textTexture,
+                    side: THREE.DoubleSide,
+                    transparent: true
+                });
+                
+                const textGeometry = new THREE.PlaneGeometry(6, 1.5);
+                const text = new THREE.Mesh(textGeometry, textMaterial);
+                text.position.set(0, 22, 0);
+                text.rotation.y = Math.PI / 4; // Slight angle for better visibility
+                sectionGroup.add(text);
+                
+                // Add entrance portal
+                const portalGeometry = new THREE.BoxGeometry(4, 6, 0.5);
+                const portalMaterial = new THREE.MeshStandardMaterial({
+                    color: data.color,
+                    transparent: true,
+                    opacity: 0.7,
+                    emissive: data.color,
+                    emissiveIntensity: 0.2
+                });
+                
+                const portal = new THREE.Mesh(portalGeometry, portalMaterial);
+                portal.position.set(0, 3, 5.25);
+                sectionGroup.add(portal);
+                
+                // Position the section
+                sectionGroup.position.set(data.position.x, 0, data.position.z);
+                
+                // Store data for interaction
+                sectionGroup.userData = { 
+                    title, 
+                    content: data.content,
+                    color: data.color
+                };
+                
+                sections.push(sectionGroup);
+                buildings.push(sectionGroup);
+                scene.add(sectionGroup);
+            });
+        }
+
+        async function createVehicle() {
+            // Create a simple car model
+            const carGroup = new THREE.Group();
+            
+            // Car body
+            const bodyGeometry = new THREE.BoxGeometry(2.2, 0.8, 5);
+            const bodyMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0xDD0044,
+                metalness: 0.8,
+                roughness: 0.2
+            });
+            
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.5;
+            body.castShadow = qualitySettings.shadowsEnabled;
+            carGroup.add(body);
+            
+            // Car roof
+            const roofGeometry = new THREE.BoxGeometry(2, 0.8, 2.6);
+            const roof = new THREE.Mesh(roofGeometry, bodyMaterial);
+            roof.position.set(0, 1.3, 0.1);
+            roof.castShadow = qualitySettings.shadowsEnabled;
+            carGroup.add(roof);
+            
+            // Wheels
+            const wheelPositions = [
+                { x: -1.2, y: 0.4, z: 1.6 },
+                { x: 1.2, y: 0.4, z: 1.6 },
+                { x: -1.2, y: 0.4, z: -1.6 },
+                { x: 1.2, y: 0.4, z: -1.6 }
+            ];
+            
+            const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+            const wheelMaterial = new THREE.MeshStandardMaterial({ 
+                color: 0x111111,
+                roughness: 0.9
+            });
+            
+            wheelPositions.forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeometry, wheelMaterial);
+                wheel.position.set(pos.x, pos.y, pos.z);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.castShadow = qualitySettings.shadowsEnabled;
+                wheel.userData.isWheel = true;
+                carGroup.add(wheel);
+            });
+            
+            // Windshield
+            const glassGeometry = new THREE.PlaneGeometry(1.8, 0.9);
+            const glassMaterial = new THREE.MeshStandardMaterial({
+                color: 0x88AACC,
+                transparent: true,
+                opacity: 0.7,
+                side: THREE.DoubleSide
+            });
+            
+            // Front windshield
+            const frontGlass = new THREE.Mesh(glassGeometry, glassMaterial);
+            frontGlass.position.set(0, 1.15, 1.25);
+            frontGlass.rotation.x = Math.PI / 4;
+            carGroup.add(frontGlass);
+            
+            // Rear windshield
+            const rearGlass = new THREE.Mesh(glassGeometry, glassMaterial);
+            rearGlass.position.set(0, 1.15, -1.25);
+            rearGlass.rotation.x = -Math.PI / 4;
+            carGroup.add(rearGlass);
+            
+            // Headlights
+            const headlightGeometry = new THREE.CylinderGeometry(0.15, 0.15, 0.1, 12);
+            const headlightMaterial = new THREE.MeshStandardMaterial({
+                color: 0xFFFFCC,
+                emissive: 0xFFFFCC,
+                emissiveIntensity: 0.2
+            });
+            
+            [-0.8, 0.8].forEach(x => {
+                const headlight = new THREE.Mesh(headlightGeometry, headlightMaterial);
+                headlight.position.set(x, 0.6, 2.55);
+                headlight.rotation.x = Math.PI / 2;
+                carGroup.add(headlight);
+            });
+            
+            // Add car to scene
+            car = carGroup;
+            scene.add(car);
+            
+            return Promise.resolve();
+        }
+
+        function createCharacter() {
+            const characterGroup = new THREE.Group();
+            
+            // Body
+            const bodyGeometry = new THREE.CylinderGeometry(0.3, 0.25, 1.2, 8);
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                color: 0x3366AA,
+                metalness: 0.2,
+                roughness: 0.8
+            });
+            
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.position.y = 0.9;
+            body.castShadow = qualitySettings.shadowsEnabled;
+            characterGroup.add(body);
+            
+            // Head
+            const headGeometry = new THREE.SphereGeometry(0.25, 16, 8);
+            const head = new THREE.Mesh(headGeometry, bodyMaterial);
+            head.position.y = 1.7;
+            head.castShadow = qualitySettings.shadowsEnabled;
+            characterGroup.add(head);
+            
+            // Limbs
+            const limbGeometry = new THREE.CylinderGeometry(0.08, 0.08, 0.8, 8);
+            
+            // Arms
+            [-0.4, 0.4].forEach(x => {
+                const arm = new THREE.Mesh(limbGeometry, bodyMaterial);
+                arm.position.set(x, 1.1, 0);
+                arm.rotation.z = x < 0 ? Math.PI / 6 : -Math.PI / 6;
+                arm.castShadow = qualitySettings.shadowsEnabled;
+                characterGroup.add(arm);
+            });
+            
+            // Legs
+            [-0.2, 0.2].forEach(x => {
+                const leg = new THREE.Mesh(limbGeometry, bodyMaterial);
+                leg.position.set(x, 0.4, 0);
+                leg.castShadow = qualitySettings.shadowsEnabled;
+                characterGroup.add(leg);
+            });
+            
+            character = characterGroup;
+            character.visible = false;
+            scene.add(character);
+        }
+
+        function createTrees(count) {
+            // Simple tree creation
+            for (let i = 0; i < count; i++) {
+                // Random position away from road
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 30 + Math.random() * 150;
+                
+                // Skip if too close to road
+                if (Math.abs(Math.sin(angle) * radius) < 10) continue;
+                
+                const x = Math.sin(angle) * radius;
+                const z = Math.cos(angle) * radius;
+                
+                const treeGroup = new THREE.Group();
+                
+                // Trunk
+                const trunkGeometry = new THREE.CylinderGeometry(0.5, 0.8, 5 + Math.random() * 3, 8);
+                const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+                
+                const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
+                trunk.position.y = trunk.geometry.parameters.height / 2;
+                trunk.castShadow = qualitySettings.shadowsEnabled;
+                treeGroup.add(trunk);
+                
+                // Foliage
+                const foliageGeometry = new THREE.SphereGeometry(3 + Math.random() * 2, 8, 8);
+                const foliageMaterial = new THREE.MeshStandardMaterial({ color: 0x2E8B57 });
+                
+                const foliage = new THREE.Mesh(foliageGeometry, foliageMaterial);
+                foliage.position.y = trunk.geometry.parameters.height + 1;
+                foliage.castShadow = qualitySettings.shadowsEnabled;
+                treeGroup.add(foliage);
+                
+                treeGroup.position.set(x, 0, z);
+                scene.add(treeGroup);
+            }
+        }
+
+        function createAtmosphericParticles() {
+            // Simple particles for atmosphere - reduced count for performance
+            const particleCount = isMobile ? 200 : 500;
+            
+            const particleGeometry = new THREE.BufferGeometry();
+            const particlePositions = new Float32Array(particleCount * 3);
+            
+            for (let i = 0; i < particleCount; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = Math.random() * 150;
+                const height = Math.random() * 40;
+                
+                particlePositions[i * 3] = Math.sin(angle) * radius;
+                particlePositions[i * 3 + 1] = height;
+                particlePositions[i * 3 + 2] = Math.cos(angle) * radius;
+            }
+            
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+            
+            const particleMaterial = new THREE.PointsMaterial({
+                color: 0xFFFFFF,
+                size: 0.2,
+                transparent: true,
+                opacity: 0.4
+            });
+            
+            const particles = new THREE.Points(particleGeometry, particleMaterial);
+            scene.add(particles);
+        }
+
+        function createCursorTracker() {
+            // Create invisible object to track mouse position in 3D space
+            const trackerGeometry = new THREE.SphereGeometry(0.1, 4, 4);
+            const trackerMaterial = new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: 0,
+                depthWrite: false
+            });
+            
+            window.cursorTracker = new THREE.Mesh(trackerGeometry, trackerMaterial);
+            scene.add(window.cursorTracker);
+        }
+
+        function initCustomCursor() {
+            const customCursor = document.getElementById('customCursor');
+            
+            document.addEventListener('mousemove', (e) => {
+                customCursor.style.left = `${e.clientX}px`;
+                customCursor.style.top = `${e.clientY}px`;
+            });
+            
+            document.querySelectorAll('button, a').forEach(el => {
+                el.addEventListener('mouseenter', () => {
+                    customCursor.style.transform = 'translate(-50%, -50%) scale(1.5)';
+                    customCursor.style.backgroundColor = 'rgba(0, 119, 85, 0.4)';
+                });
+                
+                el.addEventListener('mouseleave', () => {
+                    customCursor.style.transform = 'translate(-50%, -50%) scale(1)';
+                    customCursor.style.backgroundColor = 'rgba(0, 119, 85, 0.2)';
+                });
+            });
+            
+            document.body.style.cursor = 'none';
+        }
+
+        function setupEventListeners() {
+            // Settings menu
+            document.getElementById('settingsBtn').addEventListener('click', () => {
+                const menu = document.getElementById('settingsMenu');
+                menu.style.display = menu.style.display === 'none' || menu.style.display === '' ? 'block' : 'none';
+            });
+            
+            document.getElementById('applySettings').addEventListener('click', applySettings);
+            
+            // Initialize settings
+            document.getElementById('qualitySelect').value = qualitySettings.quality;
+            document.getElementById('effectsSelect').value = qualitySettings.effectsLevel;
+            
+            // Window resize - use efficient event handler
+            window.addEventListener('resize', debounce(() => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                composer.setSize(window.innerWidth, window.innerHeight);
+                
+                // Update FXAA if present
+                const passes = composer.passes;
+                for (let i = 0; i < passes.length; i++) {
+                    const pass = passes[i];
+                    if (pass.material && pass.material.uniforms && pass.material.uniforms.resolution) {
+                        const pixelRatio = renderer.getPixelRatio();
+                        pass.material.uniforms.resolution.value.x = 1 / (window.innerWidth * pixelRatio);
+                        pass.material.uniforms.resolution.value.y = 1 / (window.innerHeight * pixelRatio);
+                    }
+                }
+            }, 250));
+            
+            // Prevent context menu
+            document.addEventListener('contextmenu', event => event.preventDefault());
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function() {
+                const context = this, args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
+        }
+
+        function applySettings() {
+            const newQuality = document.getElementById('qualitySelect').value;
+            const newEffects = document.getElementById('effectsSelect').value;
+            
+            if (newQuality !== qualitySettings.quality || newEffects !== qualitySettings.effectsLevel) {
+                qualitySettings.quality = newQuality;
+                qualitySettings.effectsLevel = newEffects;
+                
+                // Update shadow settings
+                qualitySettings.shadowsEnabled = newQuality !== 'low';
+                renderer.shadowMap.enabled = qualitySettings.shadowsEnabled;
+                
+                // Update bloom settings
+                if (bloomPass) {
+                    switch(newEffects) {
+                        case 'minimal':
+                            bloomPass.strength = 0.1;
+                            bloomPass.radius = 0.3;
+                            bloomPass.threshold = 0.98;
+                            break;
+                        case 'balanced':
+                            bloomPass.strength = 0.15;
+                            bloomPass.radius = 0.25;
+                            bloomPass.threshold = 0.95;
+                            break;
+                        case 'ultra':
+                            bloomPass.strength = 0.18;
+                            bloomPass.radius = 0.2;
+                            bloomPass.threshold = 0.9;
+                            break;
+                    }
+                }
+                
+                // Update draw distance
+                qualitySettings.drawDistance = newQuality === 'low' ? 200 : 
+                                              newQuality === 'medium' ? 400 : 800;
+                camera.far = qualitySettings.drawDistance;
+                camera.updateProjectionMatrix();
+                
+                // Hide settings menu
+                document.getElementById('settingsMenu').style.display = 'none';
+                
+                // Show confirmation
+                const sectionIndicator = document.getElementById('sectionIndicator');
+                sectionIndicator.innerHTML = `<span style="color: #006644;">●</span> SETTINGS APPLIED: ${newQuality.toUpperCase()} QUALITY, ${newEffects.toUpperCase()} EFFECTS`;
+                sectionIndicator.style.display = 'block';
+                
+                setTimeout(() => {
+                    sectionIndicator.style.display = 'none';
+                }, 3000);
+            }
+        }
+
+        function initMinimap() {
+            const minimap = document.getElementById('minimap');
+            minimap.width = minimap.offsetWidth;
+            minimap.height = minimap.offsetHeight;
+        }
+
+        function updateMinimap() {
+            const minimap = document.getElementById('minimap');
+            const ctx = minimap.getContext('2d');
+            
+            // Clear minimap
+            ctx.fillStyle = 'rgba(245, 250, 250, 0.85)';
+            ctx.fillRect(0, 0, minimap.width, minimap.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(0, 119, 85, 0.15)';
+            ctx.lineWidth = 1;
+            
+            const gridSize = 20;
+            for (let i = 0; i <= minimap.width; i += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, minimap.height);
+                ctx.stroke();
+            }
+            
+            for (let i = 0; i <= minimap.height; i += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(minimap.width, i);
+                ctx.stroke();
+            }
+            
+            // Center and scale
+            const centerX = minimap.width / 2;
+            const centerY = minimap.height / 2;
+            const scale = 1.5;
+            
+            // Draw buildings
+            sections.forEach(section => {
+                const x = centerX + section.position.x / scale;
+                const y = centerY + section.position.z / scale;
+                
+                const colorHex = section.userData.color.toString(16).padStart(6, '0');
+                ctx.fillStyle = '#' + colorHex;
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.arc(x, y, 8, 0, Math.PI * 2);
+                ctx.stroke();
+            });
+            
+            // Draw player
+            const playerPosition = playerMode === 'driving' ? car.position : character.position;
+            const playerX = centerX + playerPosition.x / scale;
+            const playerY = centerY + playerPosition.z / scale;
+            const angle = playerMode === 'driving' ? car.rotation.y : character.rotation.y;
+            
+            ctx.save();
+            ctx.translate(playerX, playerY);
+            ctx.rotate(-angle);
+            
+            if (playerMode === 'driving') {
+                ctx.fillStyle = 'rgba(204, 0, 68, 0.9)';
+                ctx.beginPath();
+                ctx.moveTo(0, -6);
+                ctx.lineTo(-4, 4);
+                ctx.lineTo(4, 4);
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            } else {
+                ctx.fillStyle = 'rgba(0, 102, 204, 0.9)';
+                ctx.beginPath();
+                ctx.arc(0, 0, 5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            
+            ctx.restore();
+        }
+
+        function setupControls() {
+            // Keyboard controls
+            document.addEventListener('keydown', (event) => {
+                keys[event.code] = true;
+                
+                // Handle SPACE key for entering section
+                if (event.code === 'Space' && currentSection) {
+                    showModal(currentSection.userData.title, currentSection.userData.content);
+                }
+                
+                // Toggle player mode with "E" key
+                if (event.code === 'KeyE') {
+                    togglePlayerMode();
+                }
+                
+                // Toggle camera mode with "C" key
+                if (event.code === 'KeyC') {
+                    toggleCameraMode();
+                }
+                
+                // Prevent default for game controls
+                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 
+                     'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
+                    event.preventDefault();
+                }
+            });
+
+            document.addEventListener('keyup', (event) => {
+                keys[event.code] = false;
+            });
+
+            // Close modal with button
+            document.getElementById('closeModal').addEventListener('click', () => {
+                document.getElementById('modal').style.display = 'none';
+            });
+
+            // Close modal with ESC
+            document.addEventListener('keydown', (event) => {
+                if (event.code === 'Escape') {
+                    document.getElementById('modal').style.display = 'none';
+                }
+            });
+            
+            // Mouse wheel for camera zoom
+            document.addEventListener('wheel', (event) => {
+                // Adjust camera distance
+                cameraDistance += event.deltaY * 0.01;
+                cameraDistance = Math.max(5, Math.min(cameraDistance, 30));
+            });
+        }
+
+        function togglePlayerMode() {
+            if (playerMode === 'driving') {
+                // Exit vehicle
+                playerMode = 'walking';
+                
+                // Position character near car
+                character.position.set(
+                    car.position.x + Math.sin(car.rotation.y + Math.PI/2) * 3,
+                    0,
+                    car.position.z + Math.cos(car.rotation.y + Math.PI/2) * 3
+                );
+                character.rotation.y = car.rotation.y;
+                character.visible = true;
+                
+                // Show notification
+                const sectionIndicator = document.getElementById('sectionIndicator');
+                sectionIndicator.innerHTML = `<span style="color: #006644;">●</span> EXITED VEHICLE <span style="opacity: 0.7; font-size: 0.9em;">[E TO RETURN]</span>`;
+                sectionIndicator.style.display = 'block';
+                setTimeout(() => {
+                    if (playerMode === 'walking') {
+                        sectionIndicator.style.display = 'none';
+                    }
+                }, 3000);
+                
+            } else {
+                // Check if close enough to car
+                const distanceToCar = character.position.distanceTo(car.position);
+                if (distanceToCar < 5) {
+                    // Enter vehicle
+                    playerMode = 'driving';
+                    character.visible = false;
+                    
+                    // Show notification
+                    const sectionIndicator = document.getElementById('sectionIndicator');
+                    sectionIndicator.innerHTML = `<span style="color: #006644;">●</span> ENTERED VEHICLE`;
+                    sectionIndicator.style.display = 'block';
+                    setTimeout(() => { sectionIndicator.style.display = 'none'; }, 3000);
+                } else {
+                    // Too far away
+                    const sectionIndicator = document.getElementById('sectionIndicator');
+                    sectionIndicator.innerHTML = `<span style="color: #cc0000;">●</span> TOO FAR FROM VEHICLE`;
+                    sectionIndicator.style.display = 'block';
+                    setTimeout(() => { sectionIndicator.style.display = 'none'; }, 3000);
+                }
+            }
+        }
+
+        function toggleCameraMode() {
+            switch(cameraMode) {
+                case 'follow':
+                    cameraMode = 'orbit';
+                    break;
+                case 'orbit':
+                    cameraMode = 'first-person';
+                    break;
+                case 'first-person':
+                    cameraMode = 'follow';
+                    break;
+            }
+            
+            // Show notification
+            const sectionIndicator = document.getElementById('sectionIndicator');
+            sectionIndicator.innerHTML = `<span style="color: #0066aa;">●</span> CAMERA: ${cameraMode.toUpperCase()}`;
+            sectionIndicator.style.display = 'block';
+            setTimeout(() => { sectionIndicator.style.display = 'none'; }, 2000);
+        }
+
+        function showModal(title, content) {
+            document.getElementById('modalTitle').textContent = title;
+            document.getElementById('modalContent').innerHTML = content;
+            document.getElementById('modal').style.display = 'block';
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const deltaTime = clock.getDelta();
+            
+            // Update vehicle movement
+            updateVehicleMovement(deltaTime);
+            
+            // Update camera
+            updateCamera();
+            
+            // Check if near any sections
+            checkSectionProximity();
+            
+            // Update minimap every few frames
+            frameCount++;
+            if (frameCount % 5 === 0) {
+                updateMinimap();
+            }
+            
+            // Update FPS counter
+            if (frameCount % 30 === 0) {
+                updateFPSCounter();
+            }
+            
+            // Render scene with post-processing
+            composer.render();
+        }
+
+        function updateVehicleMovement(deltaTime) {
+            if (playerMode === 'driving') {
+                updateCar(deltaTime);
+            } else {
+                updateCharacterMovement(deltaTime);
+            }
+        }
+
+        function updateCar(deltaTime) {
+            // Track whether car is moving
+            let moving = false;
+            
+            // Calculate boost multiplier when shift is pressed
+            const boostMultiplier = keys['ShiftLeft'] || keys['ShiftRight'] ? 2 : 1;
+            const currentMaxSpeed = maxSpeed * boostMultiplier;
+            const currentAcceleration = acceleration * boostMultiplier;
+
+            // Forward movement
+            if (keys['KeyW'] || keys['ArrowUp']) {
+                carSpeed = Math.min(carSpeed + currentAcceleration, currentMaxSpeed);
+                moving = true;
+            } 
+            // Backward movement
+            else if (keys['KeyS'] || keys['ArrowDown']) {
+                carSpeed = Math.max(carSpeed - currentAcceleration, -currentMaxSpeed * 0.6);
+                moving = true;
+            }
+
+            // Steering
+            if (Math.abs(carSpeed) > 0.1) {
+                const turnSpeed = 0.03 * (Math.abs(carSpeed) / maxSpeed);
+                
+                // Left turn
+                if (keys['KeyA'] || keys['ArrowLeft']) {
+                    car.rotation.y += turnSpeed;
+                    car.rotation.z = THREE.MathUtils.lerp(car.rotation.z, Math.min(0.1, turnSpeed * 2), 0.1);
+                } 
+                // Right turn
+                else if (keys['KeyD'] || keys['ArrowRight']) {
+                    car.rotation.y -= turnSpeed;
+                    car.rotation.z = THREE.MathUtils.lerp(car.rotation.z, Math.max(-0.1, -turnSpeed * 2), 0.1);
+                } 
+                // Reset tilt
+                else {
+                    car.rotation.z = THREE.MathUtils.lerp(car.rotation.z, 0, 0.1);
+                }
+            }
+
+            // Apply friction
+            if (!moving) {
+                carSpeed *= (1 - friction);
+                if (Math.abs(carSpeed) < 0.02) carSpeed = 0;
+            }
+
+            // Move car
+            const moveVector = new THREE.Vector3(
+                Math.sin(car.rotation.y) * carSpeed,
+                0,
+                Math.cos(car.rotation.y) * carSpeed
+            );
+            
+            car.position.add(moveVector);
+
+            // Car tilt for acceleration/braking
+            car.rotation.x = THREE.MathUtils.lerp(car.rotation.x, carSpeed * 0.05, 0.1);
+
+            // Update speed display
+            const speedKmh = Math.round(Math.abs(carSpeed) * 50);
+            let speedText = `Speed: ${speedKmh} km/h`;
+            
+            // Add boost indicator
+            if (boostMultiplier > 1) {
+                speedText += " <span style='color:#cc4400'>🚀 BOOST</span>";
+            }
+            
+            // Add reverse indicator
+            if (carSpeed < -0.1) {
+                speedText += " <span style='color:#cc0000'>◄ REV</span>";
+            }
+            
+            document.getElementById('speed').innerHTML = speedText;
+        }
+
+        function updateCharacterMovement(deltaTime) {
+            let moving = false;
+            const walkSpeed = 0.1;
+            let moveX = 0;
+            let moveZ = 0;
+            
+            // Forward
+            if (keys['KeyW'] || keys['ArrowUp']) {
+                moveZ += walkSpeed;
+                moving = true;
+            }
+            
+            // Backward
+            if (keys['KeyS'] || keys['ArrowDown']) {
+                moveZ -= walkSpeed;
+                moving = true;
+            }
+            
+            // Left
+            if (keys['KeyA'] || keys['ArrowLeft']) {
+                moveX += walkSpeed;
+                moving = true;
+            }
+            
+            // Right
+            if (keys['KeyD'] || keys['ArrowRight']) {
+                moveX -= walkSpeed;
+                moving = true;
+            }
+            
+            if (moving) {
+                // Set rotation based on movement direction
+                if (moveZ !== 0 || moveX !== 0) {
+                    character.rotation.y = Math.atan2(moveX, moveZ);
+                }
+                
+                // Apply movement in the direction character is facing
+                character.position.x += Math.sin(character.rotation.y) * walkSpeed;
+                character.position.z += Math.cos(character.rotation.y) * walkSpeed;
+            }
+        }
+
+        function updateCamera() {
+            const targetObject = playerMode === 'driving' ? car : character;
+            if (!targetObject) return;
+            
+            let targetPosition = new THREE.Vector3();
+            let lookPosition = new THREE.Vector3();
+            
+            switch(cameraMode) {
+                case 'follow':
+                    // Third-person follow camera
+                    const distance = cameraDistance;
+                    const height = cameraHeight;
+                    
+                    // Position behind the target
+                    targetPosition.set(
+                        targetObject.position.x - Math.sin(targetObject.rotation.y) * distance,
+                        targetObject.position.y + height,
+                        targetObject.position.z - Math.cos(targetObject.rotation.y) * distance
+                    );
+                    
+                    // Look at target
+                    lookPosition.copy(targetObject.position).add(new THREE.Vector3(0, 2, 0));
+                    break;
+                    
+                case 'orbit':
+                    // Orbit camera slowly around the target
+                    const angle = performance.now() * 0.0005;
+                    const orbitDistance = cameraDistance;
+                    
+                    targetPosition.set(
+                        targetObject.position.x + Math.sin(angle) * orbitDistance,
+                        targetObject.position.y + cameraHeight,
+                        targetObject.position.z + Math.cos(angle) * orbitDistance
+                    );
+                    
+                    lookPosition.copy(targetObject.position);
+                    break;
+                    
+                case 'first-person':
+                    if (playerMode === 'driving') {
+                        // Position camera in driver's seat
+                        targetPosition.copy(car.position).add(
+                            new THREE.Vector3(
+                                Math.sin(car.rotation.y) * 0.5,
+                                1.8,
+                                Math.cos(car.rotation.y) * 0.5
+                            )
+                        );
+                        
+                        // Look forward
+                        lookPosition.copy(targetPosition).add(
+                            new THREE.Vector3(
+                                Math.sin(car.rotation.y) * 10,
+                                0,
+                                Math.cos(car.rotation.y) * 10
+                            )
+                        );
+                    } else {
+                        // Position camera at character's eye level
+                        targetPosition.copy(character.position).add(new THREE.Vector3(0, 1.7, 0));
+                        
+                        // Look in character's direction
+                        lookPosition.copy(targetPosition).add(
+                            new THREE.Vector3(
+                                Math.sin(character.rotation.y) * 10,
+                                0,
+                                Math.cos(character.rotation.y) * 10
+                            )
+                        );
+                    }
+                    break;
+            }
+            
+            // Apply smooth camera movement
+            camera.position.lerp(targetPosition, 0.1);
+            
+            // Create a temporary look vector that lerps to the target
+            const currentLookAt = new THREE.Vector3();
+            camera.getWorldDirection(currentLookAt);
+            
+            const targetLookAt = new THREE.Vector3().subVectors(lookPosition, camera.position).normalize();
+            currentLookAt.lerp(targetLookAt, 0.1);
+            
+            // Update camera direction
+            camera.lookAt(camera.position.clone().add(currentLookAt));
+        }
+
+        function checkSectionProximity() {
+            // Skip if modal is open
+            if (document.getElementById('modal').style.display === 'block') return;
+            
+            const activePosition = playerMode === 'driving' ? car.position : character.position;
+            
+            let closestSection = null;
+            let closestDistance = 20;
+            
+            sections.forEach(section => {
+                const distance = activePosition.distanceTo(section.position);
+                
+                if (distance < closestDistance) {
+                    closestSection = section;
+                    closestDistance = distance;
+                }
+            });
+            
+            if (closestSection !== currentSection) {
+                currentSection = closestSection;
+                
+                const sectionIndicator = document.getElementById('sectionIndicator');
+                
+                if (currentSection) {
+                    const title = currentSection.userData.title;
+                    const hexColor = '#' + currentSection.userData.color.toString(16).padStart(6, '0');
+                    
+                    sectionIndicator.innerHTML = `<span style="color: ${hexColor};">●</span> ${title} <span style="opacity: 0.7; font-size: 0.9em;">[SPACE TO ENTER]</span>`;
+                    sectionIndicator.style.display = 'block';
+                } else {
+                    sectionIndicator.style.display = 'none';
+                }
+            }
+        }
+
+        function updateFPSCounter() {
+            const now = performance.now();
+            const delta = now - lastTime;
+            fps = Math.round(30 * 1000 / delta);
+            lastTime = now;
+            document.getElementById('fpsCounter').textContent = `FPS: ${fps}`;
+            
+            // Auto-adjust quality if FPS is too low
+            if (fps < 30 && qualitySettings.quality !== 'low') {
+                // Automatically reduce quality
+                const currentQuality = document.getElementById('qualitySelect').value;
+                
+                if (currentQuality === 'high') {
+                    document.getElementById('qualitySelect').value = 'medium';
+                    applySettings();
+                } else if (currentQuality === 'medium' && fps < 20) {
+                    document.getElementById('qualitySelect').value = 'low';
+                    document.getElementById('effectsSelect').value = 'minimal';
+                    applySettings();
+                }
+            }
+        }
+    </script>
+</body>
+</html>

@@ -2711,37 +2711,30 @@
             }
             
             async createTerrain() {
-                // Main ground plane with procedural material
+                // Main ground plane with realistic grass texture
                 const groundSize = 2000;
                 const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, 64, 64);
                 
-                // No geometry height variation - keeps ground flat for proper road rendering
-                // Visual terrain variation is handled by the shader
                 groundGeometry.computeVertexNormals();
                 
-                // Use shader material for realistic terrain
-                let groundMaterial;
+                // Load realistic grass texture
+                const textureLoader = new THREE.TextureLoader();
+                const grassTexture = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/terrain/grasslight-big.jpg');
+                grassTexture.wrapS = THREE.RepeatWrapping;
+                grassTexture.wrapT = THREE.RepeatWrapping;
+                grassTexture.repeat.set(200, 200);
                 
-                if (this.state.quality === 'ultra' || this.state.quality === 'high') {
-                    groundMaterial = new THREE.ShaderMaterial({
-                        uniforms: THREE.UniformsUtils.clone(TerrainShader.uniforms),
-                        vertexShader: TerrainShader.vertexShader,
-                        fragmentShader: TerrainShader.fragmentShader
-                    });
-                } else {
-                    // Fallback to standard material for lower quality
-                    groundMaterial = new THREE.MeshStandardMaterial({
-                        color: 0x4A7C3F,
-                        roughness: 0.9,
-                        metalness: 0.0
-                    });
-                }
+                const groundMaterial = new THREE.MeshStandardMaterial({
+                    map: grassTexture,
+                    roughness: 0.9,
+                    metalness: 0.0
+                });
                 
                 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
                 ground.rotation.x = -Math.PI / 2;
-                ground.position.y = -0.05; // Slightly below zero to prevent z-fighting
-                ground.receiveShadow = this.state.quality !== 'low';
-                ground.renderOrder = 0; // Render first
+                ground.position.y = -0.05;
+                ground.receiveShadow = true;
+                ground.renderOrder = 0;
                 this.scene.add(ground);
                 
                 // Store ground reference
@@ -2752,20 +2745,24 @@
             }
             
             createRoads() {
-                // Create textured road segments
+                // Create textured road segments with realistic asphalt
                 const roadWidth = 12;
-                const roadHeight = 0.15; // Thick enough to avoid z-fighting
+                const roadHeight = 0.15;
                 
                 // Get all positions including start point
                 const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
                 const startPos = { x: 0, z: 60 };
                 
-                // Create road texture
-                const roadTexture = this.createRoadTexture();
+                // Load realistic asphalt texture
+                const textureLoader = new THREE.TextureLoader();
+                const asphaltTexture = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/terrain/backgrounddetailed6.jpg');
+                asphaltTexture.wrapS = THREE.RepeatWrapping;
+                asphaltTexture.wrapT = THREE.RepeatWrapping;
+                asphaltTexture.repeat.set(4, 20);
                 
                 const roadMaterial = new THREE.MeshStandardMaterial({
-                    map: roadTexture,
-                    roughness: 0.9,
+                    map: asphaltTexture,
+                    roughness: 0.95,
                     metalness: 0.0
                 });
                 
@@ -3349,19 +3346,27 @@
             }
             
             createPortfolioSections() {
+                const textureLoader = new THREE.TextureLoader();
+                
+                // Load realistic building textures from free CDN sources
+                const concreteTexture = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/brick_diffuse.jpg');
+                concreteTexture.wrapS = THREE.RepeatWrapping;
+                concreteTexture.wrapT = THREE.RepeatWrapping;
+                concreteTexture.repeat.set(2, 4);
+                
                 Object.entries(PORTFOLIO_DATA).forEach(([title, data]) => {
                     const sectionGroup = new THREE.Group();
                     
                     // Realistic modern building design
                     const buildingHeight = 30 + Math.random() * 10;
                     
-                    // Main building structure with detailed facade
+                    // Main building structure with realistic texture
                     const buildingGeom = new THREE.BoxGeometry(16, buildingHeight, 16);
                     const buildingMaterial = new THREE.MeshStandardMaterial({
+                        map: concreteTexture,
                         color: data.color,
-                        metalness: 0.4,
-                        roughness: 0.6,
-                        envMapIntensity: 1.2
+                        metalness: 0.2,
+                        roughness: 0.8
                     });
                     
                     const building = new THREE.Mesh(buildingGeom, buildingMaterial);

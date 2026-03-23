@@ -2832,15 +2832,9 @@
                     const progress = (startOffset + i * (dashLength + gapLength) + dashLength / 2) / length;
                     
                     const dashGeom = new THREE.BoxGeometry(0.15, 0.015, dashLength);
-                    const dash = new THREE.Mesh(dashGeom, lineMaterial);
+                                        const dash = new THREE.Mesh(dashGeom, lineMaterial);
                     
                     dash.position.set(
-                        from.x + dx * progress,
-                        0.13, // Just above road surface
-                        from.z + dz * progress
-                    );
-                    dash.rotation.y = -angle;
-                    
                         from.x + dx * progress,
                         0.11,
                         from.z + dz * progress

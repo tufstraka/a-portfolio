@@ -446,24 +446,6 @@
             50% { transform: scale(1.05); }
         }
         
-        /* Minimap - Stylized */
-        #minimapContainer {
-            position: fixed;
-            bottom: var(--space-4);
-            right: var(--space-4);
-            z-index: 100;
-        }
-        
-        #minimap {
-            width: 180px;
-            height: 180px;
-            background: var(--color-bg-glass);
-            backdrop-filter: blur(20px);
-            border-radius: var(--radius-2xl);
-            box-shadow: var(--shadow-xl);
-            border: 2px solid rgba(99, 102, 241, 0.2);
-        }
-        
         /* Section Indicator - Playful Pill */
         #sectionIndicator {
             position: fixed;
@@ -913,11 +895,6 @@
                 display: flex;
             }
             
-            #minimap {
-                width: 120px;
-                height: 120px;
-            }
-            
             #modal {
                 max-height: 90vh;
                 margin: var(--space-2);
@@ -1357,11 +1334,6 @@
             <span class="section-indicator-title" id="indicatorTitle"></span>
             <span class="section-indicator-hint">SPACE to enter</span>
         </div>
-    </div>
-    
-    <!-- Minimap -->
-    <div id="minimapContainer">
-        <canvas id="minimap" width="180" height="180"></canvas>
     </div>
     
     <!-- FPS Counter -->
@@ -2673,81 +2645,106 @@
             }
             
             createRoads() {
-                // Create a single road mesh using ExtrudeGeometry for clean connections
+                // Create road segments with proper z-ordering
                 const roadWidth = 12;
-                const roadHeight = 0.05;
+                const roadHeight = 0.1; // Thicker for visibility
                 
                 // Get all positions including start point
                 const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
                 const startPos = { x: 0, z: 60 };
                 
-                // Create road texture
-                const roadTexture = this.createRoadTexture();
-                roadTexture.wrapS = THREE.RepeatWrapping;
-                roadTexture.wrapT = THREE.RepeatWrapping;
-                
+                // Simple dark asphalt material (no texture to avoid glitches)
                 const roadMaterial = new THREE.MeshStandardMaterial({
-                    map: roadTexture,
-                    roughness: 0.9,
-                    metalness: 0.0,
-                    side: THREE.DoubleSide
+                    color: 0x333338,
+                    roughness: 0.95,
+                    metalness: 0.0
                 });
                 
-                // Create individual road segments without overlap
-                // Connect start to each section and sections to each other in a star pattern
-                const roadSegments = [];
+                // Road segments - hub and spoke layout
+                const roadSegments = [
+                    { from: startPos, to: positions[0] }, // Start to center
+                ];
                 
-                // Connect start point to center (About Me)
-                roadSegments.push({ from: startPos, to: positions[0] });
-                
-                // Connect center to all other sections (hub and spoke)
+                // Connect center to all other sections
                 for (let i = 1; i < positions.length; i++) {
                     roadSegments.push({ from: positions[0], to: positions[i] });
                 }
                 
-                // Create each road segment
+                // Create each road segment as a raised box
                 roadSegments.forEach(segment => {
                     const dx = segment.to.x - segment.from.x;
                     const dz = segment.to.z - segment.from.z;
                     const length = Math.sqrt(dx * dx + dz * dz);
                     const angle = Math.atan2(dx, dz);
                     
-                    // Create road as a box for better depth
-                    const roadGeometry = new THREE.BoxGeometry(roadWidth, roadHeight, length);
+                    // Road as a box sitting on ground
+                    const roadGeometry = new THREE.BoxGeometry(roadWidth, roadHeight, length - 10);
                     const road = new THREE.Mesh(roadGeometry, roadMaterial);
                     
                     road.position.set(
                         segment.from.x + dx / 2,
-                        roadHeight / 2,
+                        roadHeight / 2, // Sits on ground level
                         segment.from.z + dz / 2
                     );
                     road.rotation.y = -angle;
                     road.receiveShadow = true;
-                    road.castShadow = false;
+                    road.castShadow = true;
                     
                     this.scene.add(road);
+                    
+                    // Add lane markings
+                    this.addLaneMarking(segment.from, segment.to, length, angle);
                 });
                 
-                // Add circular intersections at each point
+                // Add circular intersections at each point (raised)
                 positions.forEach(pos => {
-                    this.createIntersection(pos.x, pos.z, 8);
+                    this.createIntersection(pos.x, pos.z, 9);
                 });
                 
                 // Intersection at start
-                this.createIntersection(startPos.x, startPos.z, 6);
+                this.createIntersection(startPos.x, startPos.z, 7);
+            }
+            
+            addLaneMarking(from, to, length, angle) {
+                const dx = to.x - from.x;
+                const dz = to.z - from.z;
+                
+                // Dashed center line
+                const dashLength = 4;
+                const gapLength = 3;
+                const numDashes = Math.floor((length - 10) / (dashLength + gapLength));
+                
+                const lineMaterial = new THREE.MeshBasicMaterial({ color: 0xFFFFFF });
+                
+                for (let i = 0; i < numDashes; i++) {
+                    const progress = (i * (dashLength + gapLength) + dashLength / 2 + 5) / length;
+                    
+                    const dashGeom = new THREE.BoxGeometry(0.3, 0.02, dashLength);
+                    const dash = new THREE.Mesh(dashGeom, lineMaterial);
+                    
+                    dash.position.set(
+                        from.x + dx * progress,
+                        0.11, // Just above road surface
+                        from.z + dz * progress
+                    );
+                    dash.rotation.y = -angle;
+                    
+                    this.scene.add(dash);
+                }
             }
             
             createIntersection(x, z, radius) {
-                const geometry = new THREE.CylinderGeometry(radius, radius, 0.06, 32);
+                const geometry = new THREE.CylinderGeometry(radius, radius, 0.1, 32);
                 const material = new THREE.MeshStandardMaterial({
-                    color: 0x2a2a30,
-                    roughness: 0.9,
+                    color: 0x333338,
+                    roughness: 0.95,
                     metalness: 0.0
                 });
                 
                 const intersection = new THREE.Mesh(geometry, material);
-                intersection.position.set(x, 0.03, z);
+                intersection.position.set(x, 0.05, z);
                 intersection.receiveShadow = true;
+                intersection.castShadow = true;
                 this.scene.add(intersection);
             }
             
@@ -2840,14 +2837,6 @@
                         ctx.stroke();
                     }
                 }
-                
-                const texture = new THREE.CanvasTexture(canvas);
-                texture.wrapS = THREE.RepeatWrapping;
-                texture.wrapT = THREE.RepeatWrapping;
-                texture.repeat.set(1, 6);
-                texture.anisotropy = 16;
-                
-                return texture;
             }
             
             async createVehicle() {
@@ -3228,9 +3217,6 @@
                 // Decorative elements
                 this.createDecorations();
                 
-                // Ramps for jumping! (Bruno Simon inspired)
-                this.createRamps();
-                
                 // Interactive objects (cones, barrels)
                 this.createInteractiveObjects();
                 
@@ -3240,95 +3226,6 @@
                 }
             }
             
-            createRamps() {
-                const rampMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xE17055,
-                    roughness: 0.6,
-                    metalness: 0.2
-                });
-                
-                const stripeMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xFDCB6E,
-                    roughness: 0.5
-                });
-                
-                // Ramp positions - place them along roads for fun jumps
-                const rampPositions = [
-                    { x: 0, z: 30, rotation: 0 },           // Near start
-                    { x: 35, z: -25, rotation: Math.PI / 4 },   // Between sections
-                    { x: -35, z: -25, rotation: -Math.PI / 4 },
-                    { x: 0, z: -50, rotation: 0 },          // Halfway to Projects
-                    { x: 35, z: 25, rotation: Math.PI / 4 },
-                    { x: -35, z: 25, rotation: -Math.PI / 4 }
-                ];
-                
-                rampPositions.forEach(pos => {
-                    const rampGroup = new THREE.Group();
-                    
-                    // Main ramp surface
-                    const rampGeom = new THREE.BoxGeometry(8, 0.5, 12);
-                    const ramp = new THREE.Mesh(rampGeom, rampMaterial);
-                    ramp.rotation.x = -Math.PI / 12; // 15 degree incline
-                    ramp.position.y = 1.5;
-                    ramp.position.z = -2;
-                    ramp.castShadow = true;
-                    ramp.receiveShadow = true;
-                    rampGroup.add(ramp);
-                    
-                    // Support structure
-                    const supportGeom = new THREE.BoxGeometry(7.5, 3, 0.5);
-                    const support = new THREE.Mesh(supportGeom, rampMaterial);
-                    support.position.y = 1.5;
-                    support.position.z = -7.5;
-                    support.castShadow = true;
-                    rampGroup.add(support);
-                    
-                    // Warning stripes on front
-                    for (let i = 0; i < 4; i++) {
-                        const stripeGeom = new THREE.BoxGeometry(1.5, 0.6, 0.1);
-                        const stripe = new THREE.Mesh(stripeGeom, stripeMaterial);
-                        stripe.position.set(-3 + i * 2, 0.3, -7.7);
-                        rampGroup.add(stripe);
-                    }
-                    
-                    // Arrow indicator on ramp surface
-                    const arrowGroup = new THREE.Group();
-                    const arrowShaft = new THREE.Mesh(
-                        new THREE.BoxGeometry(1, 0.1, 4),
-                        stripeMaterial
-                    );
-                    arrowShaft.position.z = -1;
-                    arrowGroup.add(arrowShaft);
-                    
-                    const arrowHead = new THREE.Mesh(
-                        new THREE.ConeGeometry(1.2, 2, 3),
-                        stripeMaterial
-                    );
-                    arrowHead.rotation.x = -Math.PI / 2;
-                    arrowHead.position.z = -4;
-                    arrowGroup.add(arrowHead);
-                    
-                    arrowGroup.rotation.x = -Math.PI / 12;
-                    arrowGroup.position.y = 1.8;
-                    arrowGroup.position.z = -2;
-                    rampGroup.add(arrowGroup);
-                    
-                    // Position the ramp
-                    rampGroup.position.set(pos.x, 0, pos.z);
-                    rampGroup.rotation.y = pos.rotation;
-                    
-                    this.scene.add(rampGroup);
-                    
-                    // Store ramp info for collision detection
-                    if (!this.ramps) this.ramps = [];
-                    this.ramps.push({
-                        x: pos.x,
-                        z: pos.z,
-                        rotation: pos.rotation,
-                        width: 8,
-                        length: 12
-                    });
-                });
             }
             
             createTrees(count) {
@@ -4183,9 +4080,6 @@
                 if (keys['KeyD'] || keys['ArrowRight']) steer = -1;
                 this.state.input.steer = steer;
                 
-                // Check for ramp collision (before physics update)
-                this.checkRampCollision();
-                
                 // Update physics
                 const physicsState = this.vehiclePhysics.update(delta, this.state.input, this.collisionSystem);
                 
@@ -4238,41 +4132,6 @@
                             this.car.position.z - Math.cos(this.car.rotation.y) * 2,
                             0.3
                         );
-                    }
-                }
-            }
-            
-            checkRampCollision() {
-                if (!this.ramps || !this.vehiclePhysics.isGrounded) return;
-                
-                const carX = this.vehiclePhysics.x;
-                const carZ = this.vehiclePhysics.z;
-                const speed = Math.abs(this.vehiclePhysics.speed);
-                
-                for (const ramp of this.ramps) {
-                    // Simple distance check
-                    const dx = carX - ramp.x;
-                    const dz = carZ - ramp.z;
-                    const dist = Math.sqrt(dx * dx + dz * dz);
-                    
-                    // If on ramp and moving fast enough
-                    if (dist < 8 && speed > 8) {
-                        // Check if approaching from the correct angle (front of ramp)
-                        const approachAngle = Math.atan2(dx, dz);
-                        const angleDiff = Math.abs(approachAngle - ramp.rotation);
-                        
-                        if (angleDiff < Math.PI / 3 || angleDiff > Math.PI * 5/3) {
-                            // Launch!
-                            const launchPower = Math.min(speed / 15, 1.5);
-                            this.vehiclePhysics.velocityY = 8 * launchPower;
-                            this.vehiclePhysics.isGrounded = false;
-                            this.vehiclePhysics.y = 0.5; // Lift slightly
-                            
-                            // Subtle shake only
-                            this.triggerScreenShake(0.15);
-                            this.showToast('🚀', 'RAMP!', '');
-                            break;
-                        }
                     }
                 }
             }

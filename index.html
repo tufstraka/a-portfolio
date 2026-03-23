@@ -1437,6 +1437,190 @@
             TARGET_FPS: 60,
             AUTO_QUALITY_THRESHOLD: 30
         };
+
+        // ============================================
+        // PORTFOLIO DATA - Fun & Engaging
+        // ============================================
+        
+        const PORTFOLIO_DATA = {
+            'About Me': {
+                color: 0xE17055,  // Terracotta
+                icon: '👋',
+                position: { x: 0, z: 0 },
+                content: {
+                    intro: "Hey there! I'm Keith — a software engineer who loves building things that make people go 'woah, that's cool!' Based in the vibrant city of Nairobi, Kenya 🇰🇪",
+                    sections: [
+                        {
+                            title: "What I'm About",
+                            items: [
+                                "Building delightful web experiences that spark joy ✨",
+                                "Crafting mobile apps that feel native and smooth",
+                                "Creating 3D worlds (like this one!) for the web",
+                                "Making complex systems that just... work"
+                            ]
+                        },
+                        {
+                            title: "Fun Facts",
+                            items: [
+                                "I built this portfolio because regular ones are boring 🎮",
+                                "Coffee is my compiler fuel ☕",
+                                "I believe code should be art",
+                                "Always learning, always shipping"
+                            ]
+                        }
+                    ]
+                }
+            },
+            'Education': {
+                color: 0x0984E3,  // Ocean Blue
+                icon: '🎓',
+                position: { x: -70, z: -50 },
+                content: {
+                    intro: "My learning journey — from curious student to code craftsman. Education never stops!",
+                    sections: [
+                        {
+                            title: "Academic Path",
+                            items: [
+                                "Bachelor's in Computer Science 🖥️",
+                                "Specialized in Software Engineering",
+                                "Deep dive into algorithms & distributed systems",
+                                "Graduated with distinction"
+                            ]
+                        },
+                        {
+                            title: "Always Learning",
+                            items: [
+                                "AWS Certified Developer ☁️",
+                                "Advanced React & Next.js patterns",
+                                "System Design mastery",
+                                "Currently exploring: Rust 🦀 & AI/ML 🤖"
+                            ]
+                        }
+                    ]
+                }
+            },
+            'Tech Stack': {
+                color: 0x00B894,  // Mint Green
+                icon: '⚡',
+                position: { x: 70, z: -50 },
+                content: {
+                    intro: "My weapons of choice — the tools I use to turn ideas into reality. Always picking the right tool for the job!",
+                    sections: [
+                        {
+                            title: "Languages I Speak",
+                            items: [
+                                "TypeScript / JavaScript — My native tongue 💬",
+                                "Python — For AI/ML adventures 🐍",
+                                "Go — When speed matters 🏃",
+                                "Rust — The new love 🦀"
+                            ]
+                        },
+                        {
+                            title: "Frontend Magic",
+                            items: [
+                                "React, Next.js, Vue — Building UIs that pop",
+                                "Three.js, WebGL — 3D on the web (like this!)",
+                                "Tailwind, Framer Motion — Making it pretty",
+                                "React Native — Mobile wizardry 📱"
+                            ]
+                        },
+                        {
+                            title: "Backend & Beyond",
+                            items: [
+                                "Node.js, Express, Fastify — Server-side power",
+                                "PostgreSQL, MongoDB, Redis — Data everywhere",
+                                "AWS, GCP, Vercel — Cloud native",
+                                "Docker, K8s — Container orchestration 🐳"
+                            ]
+                        }
+                    ]
+                }
+            },
+            'Projects': {
+                color: 0xFDCB6E,  // Warm Yellow
+                icon: '🚀',
+                position: { x: 0, z: -100 },
+                content: {
+                    intro: "Things I've built that I'm proud of — from side projects to production apps serving thousands!",
+                    sections: [
+                        {
+                            title: "Featured Creations",
+                            items: [
+                                "🎮 This Portfolio — Because why be boring?",
+                                "🏪 E-commerce Platform — Handling real transactions",
+                                "🤖 AI Assistant — Making devs more productive",
+                                "📹 Real-time Collab — Like Google Docs, but cooler"
+                            ]
+                        },
+                        {
+                            title: "Open Source Love",
+                            items: [
+                                "Contributing to React ecosystem 💙",
+                                "Maintaining WebGL utility packages",
+                                "Active in developer communities",
+                                "Always happy to help newcomers!"
+                            ]
+                        }
+                    ]
+                }
+            },
+            'Experience': {
+                color: 0x636E72,  // Slate Gray
+                icon: '💼',
+                position: { x: -70, z: 50 },
+                content: {
+                    intro: "Where I've been, what I've built, and the teams I've grown with. Every role taught me something new!",
+                    sections: [
+                        {
+                            title: "Current Adventure",
+                            items: [
+                                "Software Engineer — Building at scale 📈",
+                                "Leading frontend architecture decisions",
+                                "Mentoring the next generation of devs",
+                                "Championing best practices & code quality"
+                            ]
+                        },
+                        {
+                            title: "Previous Quests",
+                            items: [
+                                "Full-stack dev at a growing startup 🌱",
+                                "Freelance consultant for various clients",
+                                "Teaching assistant — sharing knowledge",
+                                "50+ projects delivered successfully"
+                            ]
+                        }
+                    ]
+                }
+            },
+            'Contact': {
+                color: 0xD63031,  // Deep Red/Coral
+                icon: '💬',
+                position: { x: 70, z: 50 },
+                content: {
+                    intro: "Let's connect! Whether it's a project, job opportunity, or just to say hi — I'd love to hear from you! 🤝",
+                    sections: [
+                        {
+                            title: "Reach Out",
+                            items: [
+                                "📧 keithkadima@gmail.com",
+                                "💼 linkedin.com/in/kadimakeith",
+                                "🐙 github.com/tufstraka/",
+                                "📱 +254 701 746 774"
+                            ]
+                        },
+                        {
+                            title: "Location & Availability",
+                            items: [
+                                "📍 Based in Nairobi, Kenya",
+                                "🌍 Available for remote work globally",
+                                "✈️ Open to relocation for the right fit",
+                                "⏰ Usually respond within 24 hours!"
+                            ]
+                        }
+                    ]
+                }
+            }
+        };
         
         // ============================================
         // COLLISION SYSTEM
@@ -1719,190 +1903,6 @@
                 };
             }
         }
-
-        // ============================================
-        // PORTFOLIO DATA - Fun & Engaging
-        // ============================================
-        
-        const PORTFOLIO_DATA = {
-            'About Me': {
-                color: 0xE17055,  // Terracotta
-                icon: '👋',
-                position: { x: 0, z: 0 },
-                content: {
-                    intro: "Hey there! I'm Keith — a software engineer who loves building things that make people go 'woah, that's cool!' Based in the vibrant city of Nairobi, Kenya 🇰🇪",
-                    sections: [
-                        {
-                            title: "What I'm About",
-                            items: [
-                                "Building delightful web experiences that spark joy ✨",
-                                "Crafting mobile apps that feel native and smooth",
-                                "Creating 3D worlds (like this one!) for the web",
-                                "Making complex systems that just... work"
-                            ]
-                        },
-                        {
-                            title: "Fun Facts",
-                            items: [
-                                "I built this portfolio because regular ones are boring 🎮",
-                                "Coffee is my compiler fuel ☕",
-                                "I believe code should be art",
-                                "Always learning, always shipping"
-                            ]
-                        }
-                    ]
-                }
-            },
-            'Education': {
-                color: 0x0984E3,  // Ocean Blue
-                icon: '🎓',
-                position: { x: -70, z: -50 },
-                content: {
-                    intro: "My learning journey — from curious student to code craftsman. Education never stops!",
-                    sections: [
-                        {
-                            title: "Academic Path",
-                            items: [
-                                "Bachelor's in Computer Science 🖥️",
-                                "Specialized in Software Engineering",
-                                "Deep dive into algorithms & distributed systems",
-                                "Graduated with distinction"
-                            ]
-                        },
-                        {
-                            title: "Always Learning",
-                            items: [
-                                "AWS Certified Developer ☁️",
-                                "Advanced React & Next.js patterns",
-                                "System Design mastery",
-                                "Currently exploring: Rust 🦀 & AI/ML 🤖"
-                            ]
-                        }
-                    ]
-                }
-            },
-            'Tech Stack': {
-                color: 0x00B894,  // Mint Green
-                icon: '⚡',
-                position: { x: 70, z: -50 },
-                content: {
-                    intro: "My weapons of choice — the tools I use to turn ideas into reality. Always picking the right tool for the job!",
-                    sections: [
-                        {
-                            title: "Languages I Speak",
-                            items: [
-                                "TypeScript / JavaScript — My native tongue 💬",
-                                "Python — For AI/ML adventures 🐍",
-                                "Go — When speed matters 🏃",
-                                "Rust — The new love 🦀"
-                            ]
-                        },
-                        {
-                            title: "Frontend Magic",
-                            items: [
-                                "React, Next.js, Vue — Building UIs that pop",
-                                "Three.js, WebGL — 3D on the web (like this!)",
-                                "Tailwind, Framer Motion — Making it pretty",
-                                "React Native — Mobile wizardry 📱"
-                            ]
-                        },
-                        {
-                            title: "Backend & Beyond",
-                            items: [
-                                "Node.js, Express, Fastify — Server-side power",
-                                "PostgreSQL, MongoDB, Redis — Data everywhere",
-                                "AWS, GCP, Vercel — Cloud native",
-                                "Docker, K8s — Container orchestration 🐳"
-                            ]
-                        }
-                    ]
-                }
-            },
-            'Projects': {
-                color: 0xFDCB6E,  // Warm Yellow
-                icon: '🚀',
-                position: { x: 0, z: -100 },
-                content: {
-                    intro: "Things I've built that I'm proud of — from side projects to production apps serving thousands!",
-                    sections: [
-                        {
-                            title: "Featured Creations",
-                            items: [
-                                "🎮 This Portfolio — Because why be boring?",
-                                "🏪 E-commerce Platform — Handling real transactions",
-                                "🤖 AI Assistant — Making devs more productive",
-                                "📹 Real-time Collab — Like Google Docs, but cooler"
-                            ]
-                        },
-                        {
-                            title: "Open Source Love",
-                            items: [
-                                "Contributing to React ecosystem 💙",
-                                "Maintaining WebGL utility packages",
-                                "Active in developer communities",
-                                "Always happy to help newcomers!"
-                            ]
-                        }
-                    ]
-                }
-            },
-            'Experience': {
-                color: 0x636E72,  // Slate Gray
-                icon: '💼',
-                position: { x: -70, z: 50 },
-                content: {
-                    intro: "Where I've been, what I've built, and the teams I've grown with. Every role taught me something new!",
-                    sections: [
-                        {
-                            title: "Current Adventure",
-                            items: [
-                                "Software Engineer — Building at scale 📈",
-                                "Leading frontend architecture decisions",
-                                "Mentoring the next generation of devs",
-                                "Championing best practices & code quality"
-                            ]
-                        },
-                        {
-                            title: "Previous Quests",
-                            items: [
-                                "Full-stack dev at a growing startup 🌱",
-                                "Freelance consultant for various clients",
-                                "Teaching assistant — sharing knowledge",
-                                "50+ projects delivered successfully"
-                            ]
-                        }
-                    ]
-                }
-            },
-            'Contact': {
-                color: 0xD63031,  // Deep Red/Coral
-                icon: '💬',
-                position: { x: 70, z: 50 },
-                content: {
-                    intro: "Let's connect! Whether it's a project, job opportunity, or just to say hi — I'd love to hear from you! 🤝",
-                    sections: [
-                        {
-                            title: "Reach Out",
-                            items: [
-                                "📧 keithkadima@gmail.com",
-                                "💼 linkedin.com/in/kadimakeith",
-                                "🐙 github.com/tufstraka",
-                                "📱 +254 701 746 774"
-                            ]
-                        },
-                        {
-                            title: "Location & Availability",
-                            items: [
-                                "📍 Based in Nairobi, Kenya",
-                                "🌍 Available for remote work globally",
-                                "✈️ Open to relocation for the right fit",
-                                "⏰ Usually respond within 24 hours!"
-                            ]
-                        }
-                    ]
-                }
-            }
-        };
 
         // ============================================
         // SHADERS - PUBG-Style Realistic

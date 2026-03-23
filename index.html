@@ -2927,47 +2927,6 @@
                     }
                 }
             }
-                    color: 0x333333
-                });
-                
-                const intersection = new THREE.Mesh(geometry, material);
-                intersection.position.set(x, 0.06, z);
-                intersection.receiveShadow = true;
-                this.scene.add(intersection);
-                
-                // Add zebra crossing / crosswalk at intersections
-                this.addCrosswalk(x, z, radius);
-            }
-            
-            addCrosswalk(x, z, radius) {
-                const stripeMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0xFFFFFF,
-                    transparent: true,
-                    opacity: 0.9
-                });
-                
-                // Add 6 white stripes in 4 directions
-                for (let direction = 0; direction < 4; direction++) {
-                    const angle = direction * Math.PI / 2;
-                    
-                    for (let i = 0; i < 6; i++) {
-                        const stripeGeom = new THREE.BoxGeometry(0.8, 0.03, 3);
-                        const stripe = new THREE.Mesh(stripeGeom, stripeMaterial);
-                        
-                        const offset = (i - 2.5) * 1.2;
-                        const distance = radius - 2;
-                        
-                        stripe.position.set(
-                            x + Math.sin(angle) * distance + Math.cos(angle) * offset,
-                            0.13,
-                            z + Math.cos(angle) * distance - Math.sin(angle) * offset
-                        );
-                        stripe.rotation.y = angle;
-                        
-                        this.scene.add(stripe);
-                    }
-                }
-            }
             
             createRoadTexture() {
                 const canvas = document.createElement('canvas');

@@ -1848,12 +1848,11 @@
                 this.landingImpact = 0;
             }
             
-            // Get terrain height at position (matches the terrain shader)
+            // Get terrain height at position
             getTerrainHeight(x, z) {
-                // Match the terrain geometry height calculation
-                const h1 = Math.sin(x * 0.01) * Math.cos(z * 0.01) * 3;
-                const h2 = Math.sin(x * 0.02 + z * 0.02) * 1.5;
-                return Math.max(0, (h1 + h2) * 0.3); // Scaled down, minimum 0
+                // Flat ground - no height variation
+                // Visual variation is handled by the shader only
+                return 0;
             }
             
             jump() {
@@ -2438,7 +2437,7 @@
                     !localStorage.getItem('achievement_speedDemon')) {
                     localStorage.setItem('achievement_speedDemon', 'true');
                     this.showToast('🔥', 'Speed Demon!', 'Boosted for 3 seconds straight');
-                    this.triggerScreenShake(0.5);
+                    // Achievement unlocked - subtle celebration
                 }
                 
                 // Explorer achievement (visit all sections)
@@ -2446,7 +2445,7 @@
                     !localStorage.getItem('achievement_explorer')) {
                     localStorage.setItem('achievement_explorer', 'true');
                     this.showToast('🏆', 'Explorer!', 'You\'ve visited every section');
-                    this.triggerScreenShake(0.3);
+                    // Achievement unlocked - subtle celebration
                 }
                 
                 // Track distance for road warrior achievement
@@ -2596,17 +2595,10 @@
             async createTerrain() {
                 // Main ground plane with procedural material
                 const groundSize = 2000;
-                const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, 256, 256);
+                const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, 64, 64);
                 
-                // Apply height variation
-                const vertices = groundGeometry.attributes.position.array;
-                for (let i = 0; i < vertices.length; i += 3) {
-                    const x = vertices[i];
-                    const z = vertices[i + 1];
-                    // Gentle hills
-                    vertices[i + 2] = Math.sin(x * 0.01) * Math.cos(z * 0.01) * 3 +
-                                     Math.sin(x * 0.02 + z * 0.02) * 1.5;
-                }
+                // No geometry height variation - keeps ground flat for proper road rendering
+                // Visual terrain variation is handled by the shader
                 groundGeometry.computeVertexNormals();
                 
                 // Use shader material for realistic terrain
@@ -2629,10 +2621,13 @@
                 
                 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
                 ground.rotation.x = -Math.PI / 2;
-                ground.position.y = 0; // At base level
+                ground.position.y = -0.05; // Slightly below zero to prevent z-fighting
                 ground.receiveShadow = this.state.quality !== 'low';
                 ground.renderOrder = 0; // Render first
                 this.scene.add(ground);
+                
+                // Store ground reference
+                this.ground = ground;
                 
                 // Road
                 this.createRoads();
@@ -2646,8 +2641,9 @@
                     roughness: 0.85,
                     metalness: 0.05,
                     polygonOffset: true,
-                    polygonOffsetFactor: -1,
-                    polygonOffsetUnits: -1
+                    polygonOffsetFactor: -4,
+                    polygonOffsetUnits: -4,
+                    depthWrite: true
                 });
                 
                 // Create road segments connecting buildings
@@ -2668,7 +2664,7 @@
                     
                     road.position.set(
                         pos.x + dx / 2,
-                        0.08, // Raised slightly higher
+                        0.02, // Very slightly above ground
                         pos.z + dz / 2
                     );
                     road.rotation.x = -Math.PI / 2;
@@ -2686,13 +2682,13 @@
                     roughness: 0.85,
                     metalness: 0.05,
                     polygonOffset: true,
-                    polygonOffsetFactor: -2,
-                    polygonOffsetUnits: -2
+                    polygonOffsetFactor: -6,
+                    polygonOffsetUnits: -6
                 });
                 
                 positions.forEach(pos => {
                     const intersection = new THREE.Mesh(intersectionGeometry, intersectionMaterial);
-                    intersection.position.set(pos.x, 0.09, pos.z);
+                    intersection.position.set(pos.x, 0.03, pos.z);
                     intersection.rotation.x = -Math.PI / 2;
                     intersection.renderOrder = 2;
                     this.scene.add(intersection);
@@ -4020,8 +4016,8 @@
                 document.getElementById('modalContent').innerHTML = html;
                 document.getElementById('modalOverlay').classList.add('active');
                 
-                // Screen shake on modal open (satisfying feedback)
-                this.triggerScreenShake(0.3);
+                // Subtle feedback on modal open
+                this.triggerScreenShake(0.1);
             }
             
             closeModal() {
@@ -4116,11 +4112,11 @@
                 this.state.input.brake = (keys['KeyS'] || keys['ArrowDown']) ? 1 : 0;
                 this.state.input.boost = keys['ShiftLeft'] || keys['ShiftRight'];
                 
-                // Jump! (Space key - but not when entering buildings)
+                // Jump! (J key)
                 if (keys['KeyJ'] && this.state.playerMode === 'driving') {
                     const jumped = this.vehiclePhysics.jump();
                     if (jumped) {
-                        this.triggerScreenShake(0.3);
+                        // No screen shake on jump - only on landing
                         this.showToast('🦘', 'Jump!', '');
                     }
                 }
@@ -4163,23 +4159,23 @@
                 // Visual feedback
                 this.setBoostLines(this.state.isBoosting && physicsState.speedKmh > 60);
                 
-                // Collision feedback
-                if (physicsState.isColliding) {
-                    this.triggerScreenShake(0.4);
-                    this.spawnDustBurst(this.car.position.x, 0.2, this.car.position.z, 0.5);
+                // Collision feedback - only on significant collisions
+                if (physicsState.isColliding && Math.abs(physicsState.speed) > 10) {
+                    this.triggerScreenShake(0.2);
+                    this.spawnDustBurst(this.car.position.x, 0.2, this.car.position.z, 0.3);
                 }
                 
-                // Landing impact with dust burst
-                if (this.state.wasAirborne && physicsState.isGrounded) {
-                    const intensity = Math.min(physicsState.landingImpact / 5, 2);
-                    this.triggerScreenShake(0.3 + intensity * 0.3);
+                // Landing impact with dust burst - only on hard landings
+                if (this.state.wasAirborne && physicsState.isGrounded && physicsState.landingImpact > 3) {
+                    const intensity = Math.min(physicsState.landingImpact / 8, 1);
+                    this.triggerScreenShake(0.15 * intensity);
                     this.spawnDustBurst(this.car.position.x, 0.1, this.car.position.z, intensity);
                 }
                 this.state.wasAirborne = physicsState.isAirborne;
                 
-                // Spawn dust when drifting/skidding on grass
-                if (physicsState.isGrounded && !physicsState.isOnRoad && Math.abs(physicsState.speed) > 5) {
-                    if (Math.random() < 0.3) {
+                // Spawn dust when drifting/skidding on grass - less frequent
+                if (physicsState.isGrounded && !physicsState.isOnRoad && Math.abs(physicsState.speed) > 10) {
+                    if (Math.random() < 0.1) {
                         this.spawnDustBurst(
                             this.car.position.x - Math.sin(this.car.rotation.y) * 2,
                             0.1,
@@ -4216,7 +4212,8 @@
                             this.vehiclePhysics.isGrounded = false;
                             this.vehiclePhysics.y = 0.5; // Lift slightly
                             
-                            this.triggerScreenShake(0.4);
+                            // Subtle shake only
+                            this.triggerScreenShake(0.15);
                             this.showToast('🚀', 'RAMP!', '');
                             break;
                         }

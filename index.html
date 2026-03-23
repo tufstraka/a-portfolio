@@ -347,6 +347,46 @@
             display: none;
         }
         
+        /* Mini Map */
+        #miniMap {
+            position: fixed;
+            top: var(--space-4);
+            right: var(--space-4);
+            width: 180px;
+            height: 180px;
+            background: var(--color-bg-glass);
+            backdrop-filter: blur(20px);
+            border-radius: var(--radius-xl);
+            box-shadow: var(--shadow-xl);
+            z-index: 100;
+            border: 2px solid rgba(99, 102, 241, 0.2);
+            padding: var(--space-2);
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+        
+        #miniMap.hidden {
+            opacity: 0;
+            transform: scale(0.9);
+            pointer-events: none;
+        }
+        
+        #miniMapCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: var(--radius-lg);
+        }
+        
+        .minimap-label {
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.65rem;
+            color: var(--color-text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
         /* Speed Display - Racing Style */
         #speedDisplay {
             position: fixed;
@@ -381,7 +421,7 @@
             font-weight: 600;
         }
         
-        .speed-boost {
+        .speed-boost, .speed-airborne {
             display: inline-flex;
             align-items: center;
             gap: var(--space-1);
@@ -395,6 +435,10 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
             animation: pulse 0.5s ease-in-out infinite;
+        }
+        
+        .speed-airborne {
+            background: linear-gradient(135deg, #00B894, #00CEC9);
         }
         
         @keyframes pulse {
@@ -1281,7 +1325,21 @@
                 <span class="control-key">C</span>
                 <span>Camera view</span>
             </div>
+            <div class="control-item">
+                <span class="control-key">H</span>
+                <span>Honk! 📢</span>
+            </div>
+            <div class="control-item">
+                <span class="control-key">M</span>
+                <span>Toggle map</span>
+            </div>
         </div>
+    </div>
+    
+    <!-- Mini Map (Bruno Simon inspired) -->
+    <div id="miniMap">
+        <canvas id="miniMapCanvas" width="180" height="180"></canvas>
+        <div class="minimap-label">M to toggle</div>
     </div>
     
     <!-- Speed Display -->
@@ -1289,6 +1347,7 @@
         <span class="speed-value" id="speedValue">0</span>
         <span class="speed-unit">km/h</span>
         <span class="speed-boost" id="speedBoost" style="display: none;">🔥 TURBO</span>
+        <span class="speed-airborne" id="speedAirborne" style="display: none;">🦘 AIR</span>
     </div>
     
     <!-- Section Indicator -->
@@ -1786,6 +1845,15 @@
                 // State
                 this.isOnRoad = true;
                 this.isColliding = false;
+                this.landingImpact = 0;
+            }
+            
+            // Get terrain height at position (matches the terrain shader)
+            getTerrainHeight(x, z) {
+                // Match the terrain geometry height calculation
+                const h1 = Math.sin(x * 0.01) * Math.cos(z * 0.01) * 3;
+                const h2 = Math.sin(x * 0.02 + z * 0.02) * 1.5;
+                return Math.max(0, (h1 + h2) * 0.3); // Scaled down, minimum 0
             }
             
             jump() {
@@ -1893,20 +1961,29 @@
                 // Update vertical position
                 this.y += this.velocityY * delta;
                 
-                // Ground collision
-                if (this.y <= 0) {
-                    this.y = 0;
+                // Ground collision - STRICT enforcement
+                // The ground has slight height variation from terrain
+                const terrainHeight = this.getTerrainHeight(this.x, this.z);
+                
+                if (this.y <= terrainHeight) {
+                    this.y = terrainHeight;
                     if (this.velocityY < -2) {
                         // Hard landing - bounce slightly and lose some speed
-                        this.velocityY = -this.velocityY * 0.2;
-                        this.speed *= 0.95;
+                        this.velocityY = Math.abs(this.velocityY) * 0.15;
+                        this.speed *= 0.9;
+                        this.landingImpact = Math.abs(this.velocityY);
                     } else {
                         this.velocityY = 0;
+                        this.landingImpact = 0;
                     }
                     this.isGrounded = true;
-                } else if (this.y > 0.1) {
+                } else {
                     this.isGrounded = false;
+                    this.landingImpact = 0;
                 }
+                
+                // SAFETY: Absolutely never go below 0
+                if (this.y < 0) this.y = 0;
                 
                 // --- UPDATE HORIZONTAL POSITION ---
                 const prevX = this.x;
@@ -1967,7 +2044,8 @@
                     isOnRoad: this.isOnRoad,
                     isColliding: this.isColliding,
                     isGrounded: this.isGrounded,
-                    isAirborne: !this.isGrounded
+                    isAirborne: !this.isGrounded,
+                    landingImpact: this.landingImpact
                 };
             }
         }
@@ -3097,6 +3175,9 @@
                 // Ramps for jumping! (Bruno Simon inspired)
                 this.createRamps();
                 
+                // Interactive objects (cones, barrels)
+                this.createInteractiveObjects();
+                
                 // Particles (only on high/ultra)
                 if (this.state.quality === 'ultra' || this.state.quality === 'high') {
                     this.createParticles();
@@ -3352,6 +3433,288 @@
                 
                 this.particles = new THREE.Points(geometry, material);
                 this.scene.add(this.particles);
+                
+                // Dust particle system for car (landing/drifting)
+                this.createDustParticles();
+            }
+            
+            createDustParticles() {
+                // Pool of dust particles for landing/drifting effects
+                const dustCount = 100;
+                const dustPositions = new Float32Array(dustCount * 3);
+                const dustVelocities = new Float32Array(dustCount * 3);
+                const dustLifetimes = new Float32Array(dustCount);
+                
+                for (let i = 0; i < dustCount; i++) {
+                    dustPositions[i * 3] = 0;
+                    dustPositions[i * 3 + 1] = -100; // Hidden below ground
+                    dustPositions[i * 3 + 2] = 0;
+                    dustLifetimes[i] = 0;
+                }
+                
+                const dustGeometry = new THREE.BufferGeometry();
+                dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+                
+                const dustMaterial = new THREE.PointsMaterial({
+                    color: 0xC4A76C, // Sandy/dusty color
+                    size: 0.8,
+                    transparent: true,
+                    opacity: 0.6,
+                    sizeAttenuation: true
+                });
+                
+                this.dustParticles = new THREE.Points(dustGeometry, dustMaterial);
+                this.dustVelocities = dustVelocities;
+                this.dustLifetimes = dustLifetimes;
+                this.dustIndex = 0;
+                this.scene.add(this.dustParticles);
+            }
+            
+            spawnDustBurst(x, y, z, intensity = 1) {
+                if (!this.dustParticles) return;
+                
+                const positions = this.dustParticles.geometry.attributes.position.array;
+                const count = Math.floor(10 * intensity);
+                
+                for (let i = 0; i < count; i++) {
+                    const idx = (this.dustIndex % 100) * 3;
+                    
+                    // Random position around spawn point
+                    positions[idx] = x + (Math.random() - 0.5) * 3;
+                    positions[idx + 1] = y + Math.random() * 0.5;
+                    positions[idx + 2] = z + (Math.random() - 0.5) * 3;
+                    
+                    // Random velocity (outward and up)
+                    this.dustVelocities[idx] = (Math.random() - 0.5) * 8;
+                    this.dustVelocities[idx + 1] = Math.random() * 5 + 2;
+                    this.dustVelocities[idx + 2] = (Math.random() - 0.5) * 8;
+                    
+                    this.dustLifetimes[this.dustIndex % 100] = 1.0;
+                    this.dustIndex++;
+                }
+                
+                this.dustParticles.geometry.attributes.position.needsUpdate = true;
+            }
+            
+            updateDustParticles(delta) {
+                if (!this.dustParticles) return;
+                
+                const positions = this.dustParticles.geometry.attributes.position.array;
+                
+                for (let i = 0; i < 100; i++) {
+                    if (this.dustLifetimes[i] > 0) {
+                        const idx = i * 3;
+                        
+                        // Update position
+                        positions[idx] += this.dustVelocities[idx] * delta;
+                        positions[idx + 1] += this.dustVelocities[idx + 1] * delta;
+                        positions[idx + 2] += this.dustVelocities[idx + 2] * delta;
+                        
+                        // Apply gravity
+                        this.dustVelocities[idx + 1] -= 15 * delta;
+                        
+                        // Fade lifetime
+                        this.dustLifetimes[i] -= delta * 2;
+                        
+                        // Hide when dead
+                        if (this.dustLifetimes[i] <= 0) {
+                            positions[idx + 1] = -100;
+                        }
+                    }
+                }
+                
+                this.dustParticles.geometry.attributes.position.needsUpdate = true;
+            }
+            
+            createInteractiveObjects() {
+                // Traffic cones
+                const coneMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xFF6B35,
+                    roughness: 0.7
+                });
+                const coneStripeMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xFFFFFF,
+                    roughness: 0.7
+                });
+                
+                this.interactiveObjects = [];
+                
+                // Place cones around the map
+                const conePositions = [
+                    { x: 10, z: 55 }, { x: -10, z: 55 },
+                    { x: 15, z: 50 }, { x: -15, z: 50 },
+                    { x: 50, z: 0 }, { x: -50, z: 0 },
+                    { x: 0, z: -30 }, { x: 5, z: -30 }, { x: -5, z: -30 },
+                ];
+                
+                conePositions.forEach(pos => {
+                    const coneGroup = new THREE.Group();
+                    
+                    // Cone body
+                    const coneGeom = new THREE.ConeGeometry(0.4, 1.2, 8);
+                    const cone = new THREE.Mesh(coneGeom, coneMaterial);
+                    cone.position.y = 0.6;
+                    coneGroup.add(cone);
+                    
+                    // White stripes
+                    const stripe1 = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.28, 0.06, 8, 16),
+                        coneStripeMaterial
+                    );
+                    stripe1.rotation.x = Math.PI / 2;
+                    stripe1.position.y = 0.4;
+                    coneGroup.add(stripe1);
+                    
+                    const stripe2 = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.18, 0.05, 8, 16),
+                        coneStripeMaterial
+                    );
+                    stripe2.rotation.x = Math.PI / 2;
+                    stripe2.position.y = 0.8;
+                    coneGroup.add(stripe2);
+                    
+                    // Base
+                    const base = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.8, 0.1, 0.8),
+                        coneMaterial
+                    );
+                    base.position.y = 0.05;
+                    coneGroup.add(base);
+                    
+                    coneGroup.position.set(pos.x, 0, pos.z);
+                    coneGroup.userData = {
+                        type: 'cone',
+                        velocityX: 0,
+                        velocityZ: 0,
+                        velocityY: 0,
+                        angularVel: 0,
+                        grounded: true
+                    };
+                    
+                    this.scene.add(coneGroup);
+                    this.interactiveObjects.push(coneGroup);
+                });
+                
+                // Barrels
+                const barrelMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x2D3436,
+                    roughness: 0.8,
+                    metalness: 0.3
+                });
+                const barrelRingMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xFDCB6E,
+                    roughness: 0.6,
+                    metalness: 0.4
+                });
+                
+                const barrelPositions = [
+                    { x: 25, z: 40 }, { x: 27, z: 40 },
+                    { x: -25, z: 40 }, { x: -27, z: 40 },
+                    { x: 40, z: -20 }, { x: -40, z: -20 },
+                ];
+                
+                barrelPositions.forEach(pos => {
+                    const barrelGroup = new THREE.Group();
+                    
+                    // Main barrel
+                    const barrelGeom = new THREE.CylinderGeometry(0.6, 0.6, 1.5, 16);
+                    const barrel = new THREE.Mesh(barrelGeom, barrelMaterial);
+                    barrel.position.y = 0.75;
+                    barrelGroup.add(barrel);
+                    
+                    // Yellow warning rings
+                    const ring1 = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.62, 0.08, 8, 16),
+                        barrelRingMaterial
+                    );
+                    ring1.rotation.x = Math.PI / 2;
+                    ring1.position.y = 0.3;
+                    barrelGroup.add(ring1);
+                    
+                    const ring2 = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.62, 0.08, 8, 16),
+                        barrelRingMaterial
+                    );
+                    ring2.rotation.x = Math.PI / 2;
+                    ring2.position.y = 1.2;
+                    barrelGroup.add(ring2);
+                    
+                    barrelGroup.position.set(pos.x, 0, pos.z);
+                    barrelGroup.userData = {
+                        type: 'barrel',
+                        velocityX: 0,
+                        velocityZ: 0,
+                        velocityY: 0,
+                        angularVel: 0,
+                        grounded: true,
+                        mass: 2 // Heavier than cones
+                    };
+                    
+                    this.scene.add(barrelGroup);
+                    this.interactiveObjects.push(barrelGroup);
+                });
+            }
+            
+            updateInteractiveObjects(delta, carX, carZ, carSpeed, carRotation) {
+                if (!this.interactiveObjects) return;
+                
+                const carRadius = CONFIG.CAR_COLLISION_RADIUS;
+                
+                this.interactiveObjects.forEach(obj => {
+                    const data = obj.userData;
+                    
+                    // Check collision with car
+                    const dx = obj.position.x - carX;
+                    const dz = obj.position.z - carZ;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    const objRadius = data.type === 'barrel' ? 0.8 : 0.5;
+                    
+                    if (dist < carRadius + objRadius && Math.abs(carSpeed) > 1) {
+                        // Hit! Apply force
+                        const force = Math.abs(carSpeed) * (data.mass || 1) * 0.5;
+                        const nx = dx / dist;
+                        const nz = dz / dist;
+                        
+                        data.velocityX = nx * force + Math.sin(carRotation) * carSpeed * 0.3;
+                        data.velocityZ = nz * force + Math.cos(carRotation) * carSpeed * 0.3;
+                        data.velocityY = Math.random() * 3 + 1;
+                        data.angularVel = (Math.random() - 0.5) * 10;
+                        data.grounded = false;
+                        
+                        // Spawn dust
+                        this.spawnDustBurst(obj.position.x, 0.2, obj.position.z, 0.5);
+                    }
+                    
+                    // Physics update
+                    if (!data.grounded || Math.abs(data.velocityX) > 0.1 || Math.abs(data.velocityZ) > 0.1) {
+                        // Apply velocity
+                        obj.position.x += data.velocityX * delta;
+                        obj.position.z += data.velocityZ * delta;
+                        obj.position.y += data.velocityY * delta;
+                        
+                        // Gravity
+                        data.velocityY -= 15 * delta;
+                        
+                        // Ground collision
+                        if (obj.position.y <= 0) {
+                            obj.position.y = 0;
+                            data.velocityY = -data.velocityY * 0.3;
+                            if (Math.abs(data.velocityY) < 0.5) {
+                                data.velocityY = 0;
+                                data.grounded = true;
+                            }
+                        }
+                        
+                        // Friction
+                        data.velocityX *= 0.98;
+                        data.velocityZ *= 0.98;
+                        
+                        // Rotation
+                        obj.rotation.x += data.angularVel * delta;
+                        obj.rotation.z += data.angularVel * delta * 0.5;
+                        data.angularVel *= 0.98;
+                    }
+                });
             }
             
             setupEventListeners() {
@@ -3491,6 +3854,8 @@
                 
                 if (e.code === 'KeyE') this.togglePlayerMode();
                 if (e.code === 'KeyC') this.toggleCamera();
+                if (e.code === 'KeyH') this.honk();
+                if (e.code === 'KeyM') this.toggleMinimap();
                 
                 if (e.code === 'Escape') {
                     this.closeModal();
@@ -3501,6 +3866,48 @@
                      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(e.code)) {
                     e.preventDefault();
                 }
+            }
+            
+            honk() {
+                // Visual honk feedback (since we don't have audio)
+                this.showToast('📢', 'HONK!', 'Beep beep!');
+                
+                // Create a visual honk wave
+                if (this.car) {
+                    const honkGeom = new THREE.RingGeometry(1, 1.5, 32);
+                    const honkMat = new THREE.MeshBasicMaterial({
+                        color: 0xFDCB6E,
+                        transparent: true,
+                        opacity: 0.8,
+                        side: THREE.DoubleSide
+                    });
+                    const honkRing = new THREE.Mesh(honkGeom, honkMat);
+                    honkRing.position.copy(this.car.position);
+                    honkRing.position.y += 1;
+                    honkRing.rotation.x = -Math.PI / 2;
+                    this.scene.add(honkRing);
+                    
+                    // Animate the honk wave
+                    const startTime = performance.now();
+                    const animateHonk = () => {
+                        const elapsed = (performance.now() - startTime) / 1000;
+                        if (elapsed < 0.5) {
+                            honkRing.scale.setScalar(1 + elapsed * 8);
+                            honkMat.opacity = 0.8 * (1 - elapsed * 2);
+                            requestAnimationFrame(animateHonk);
+                        } else {
+                            this.scene.remove(honkRing);
+                            honkGeom.dispose();
+                            honkMat.dispose();
+                        }
+                    };
+                    animateHonk();
+                }
+            }
+            
+            toggleMinimap() {
+                const minimap = document.getElementById('miniMap');
+                minimap.classList.toggle('hidden');
             }
             
             onKeyUp(e) {
@@ -3658,6 +4065,20 @@
                 this.checkSectionProximity();
                 this.updateAnimations();
                 
+                // Update dust particles
+                this.updateDustParticles(delta);
+                
+                // Update interactive objects (cones, barrels)
+                if (this.car && this.interactiveObjects) {
+                    this.updateInteractiveObjects(
+                        delta,
+                        this.car.position.x,
+                        this.car.position.z,
+                        this.state.carSpeed,
+                        this.car.rotation.y
+                    );
+                }
+                
                 // Game Feel: Check achievements every 10 frames
                 if (this.frameCount % 10 === 0) {
                     this.checkAchievements();
@@ -3726,6 +4147,7 @@
                 const speedKmh = Math.round(physicsState.speedKmh);
                 document.getElementById('speedValue').textContent = speedKmh;
                 document.getElementById('speedBoost').style.display = this.state.isBoosting ? 'inline-flex' : 'none';
+                document.getElementById('speedAirborne').style.display = physicsState.isAirborne ? 'inline-flex' : 'none';
                 
                 // Visual feedback
                 this.setBoostLines(this.state.isBoosting && physicsState.speedKmh > 60);
@@ -3733,13 +4155,28 @@
                 // Collision feedback
                 if (physicsState.isColliding) {
                     this.triggerScreenShake(0.4);
+                    this.spawnDustBurst(this.car.position.x, 0.2, this.car.position.z, 0.5);
                 }
                 
-                // Landing impact
+                // Landing impact with dust burst
                 if (this.state.wasAirborne && physicsState.isGrounded) {
-                    this.triggerScreenShake(0.5);
+                    const intensity = Math.min(physicsState.landingImpact / 5, 2);
+                    this.triggerScreenShake(0.3 + intensity * 0.3);
+                    this.spawnDustBurst(this.car.position.x, 0.1, this.car.position.z, intensity);
                 }
                 this.state.wasAirborne = physicsState.isAirborne;
+                
+                // Spawn dust when drifting/skidding on grass
+                if (physicsState.isGrounded && !physicsState.isOnRoad && Math.abs(physicsState.speed) > 5) {
+                    if (Math.random() < 0.3) {
+                        this.spawnDustBurst(
+                            this.car.position.x - Math.sin(this.car.rotation.y) * 2,
+                            0.1,
+                            this.car.position.z - Math.cos(this.car.rotation.y) * 2,
+                            0.3
+                        );
+                    }
+                }
             }
             
             updateWheels() {
@@ -3943,7 +4380,7 @@
             }
             
             updateMinimap() {
-                const canvas = document.getElementById('minimap');
+                const canvas = document.getElementById('miniMapCanvas');
                 const ctx = canvas.getContext('2d');
                 
                 // Clear with semi-transparent background

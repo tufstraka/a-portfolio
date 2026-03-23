@@ -1941,10 +1941,12 @@
                 }
                 
                 // --- TURNING ---
-                if (Math.abs(this.speed) > 0.5) {
+                if (Math.abs(this.speed) > 0.5 && Math.abs(effectiveSteer) > 0.001) {
                     // Ackermann-ish steering: turn rate depends on speed and steer angle
                     const wheelBase = CONFIG.CAR_LENGTH * 0.6;
-                    const turnRadius = wheelBase / Math.tan(Math.abs(effectiveSteer) + 0.001);
+                    const tanSteer = Math.tan(Math.abs(effectiveSteer));
+                    // Prevent division by zero or very small numbers
+                    const turnRadius = tanSteer > 0.001 ? wheelBase / tanSteer : 1000;
                     const angularVel = this.speed / turnRadius * Math.sign(effectiveSteer);
                     
                     // Reduced turning in air
@@ -1956,6 +1958,8 @@
                 if (!this.isGrounded) {
                     // Apply gravity
                     this.velocityY -= CONFIG.GRAVITY * delta;
+                    // Terminal velocity cap
+                    this.velocityY = Math.max(this.velocityY, -50);
                 }
                 
                 // Update vertical position
@@ -1969,9 +1973,9 @@
                     this.y = terrainHeight;
                     if (this.velocityY < -2) {
                         // Hard landing - bounce slightly and lose some speed
+                        this.landingImpact = Math.abs(this.velocityY);
                         this.velocityY = Math.abs(this.velocityY) * 0.15;
                         this.speed *= 0.9;
-                        this.landingImpact = Math.abs(this.velocityY);
                     } else {
                         this.velocityY = 0;
                         this.landingImpact = 0;
@@ -1982,8 +1986,8 @@
                     this.landingImpact = 0;
                 }
                 
-                // SAFETY: Absolutely never go below 0
-                if (this.y < 0) this.y = 0;
+                // SAFETY: Absolutely never go below terrain or 0
+                this.y = Math.max(this.y, Math.max(0, terrainHeight));
                 
                 // --- UPDATE HORIZONTAL POSITION ---
                 const prevX = this.x;
@@ -4127,6 +4131,9 @@
                 if (keys['KeyD'] || keys['ArrowRight']) steer = -1;
                 this.state.input.steer = steer;
                 
+                // Check for ramp collision (before physics update)
+                this.checkRampCollision();
+                
                 // Update physics
                 const physicsState = this.vehiclePhysics.update(delta, this.state.input, this.collisionSystem);
                 
@@ -4145,9 +4152,13 @@
                 
                 // Update UI
                 const speedKmh = Math.round(physicsState.speedKmh);
-                document.getElementById('speedValue').textContent = speedKmh;
-                document.getElementById('speedBoost').style.display = this.state.isBoosting ? 'inline-flex' : 'none';
-                document.getElementById('speedAirborne').style.display = physicsState.isAirborne ? 'inline-flex' : 'none';
+                const speedEl = document.getElementById('speedValue');
+                const boostEl = document.getElementById('speedBoost');
+                const airborneEl = document.getElementById('speedAirborne');
+                
+                if (speedEl) speedEl.textContent = speedKmh;
+                if (boostEl) boostEl.style.display = this.state.isBoosting ? 'inline-flex' : 'none';
+                if (airborneEl) airborneEl.style.display = physicsState.isAirborne ? 'inline-flex' : 'none';
                 
                 // Visual feedback
                 this.setBoostLines(this.state.isBoosting && physicsState.speedKmh > 60);
@@ -4175,6 +4186,40 @@
                             this.car.position.z - Math.cos(this.car.rotation.y) * 2,
                             0.3
                         );
+                    }
+                }
+            }
+            
+            checkRampCollision() {
+                if (!this.ramps || !this.vehiclePhysics.isGrounded) return;
+                
+                const carX = this.vehiclePhysics.x;
+                const carZ = this.vehiclePhysics.z;
+                const speed = Math.abs(this.vehiclePhysics.speed);
+                
+                for (const ramp of this.ramps) {
+                    // Simple distance check
+                    const dx = carX - ramp.x;
+                    const dz = carZ - ramp.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    
+                    // If on ramp and moving fast enough
+                    if (dist < 8 && speed > 8) {
+                        // Check if approaching from the correct angle (front of ramp)
+                        const approachAngle = Math.atan2(dx, dz);
+                        const angleDiff = Math.abs(approachAngle - ramp.rotation);
+                        
+                        if (angleDiff < Math.PI / 3 || angleDiff > Math.PI * 5/3) {
+                            // Launch!
+                            const launchPower = Math.min(speed / 15, 1.5);
+                            this.vehiclePhysics.velocityY = 8 * launchPower;
+                            this.vehiclePhysics.isGrounded = false;
+                            this.vehiclePhysics.y = 0.5; // Lift slightly
+                            
+                            this.triggerScreenShake(0.4);
+                            this.showToast('🚀', 'RAMP!', '');
+                            break;
+                        }
                     }
                 }
             }
@@ -4221,7 +4266,8 @@
                     this.character.position.y = Math.sin(this.state.time * 10) * 0.05;
                 }
                 
-                document.getElementById('speedValue').textContent = '0';
+                const speedEl = document.getElementById('speedValue');
+                if (speedEl) speedEl.textContent = '0';
             }
             
             updateCamera() {
@@ -4381,7 +4427,10 @@
             
             updateMinimap() {
                 const canvas = document.getElementById('miniMapCanvas');
+                if (!canvas) return;
+                
                 const ctx = canvas.getContext('2d');
+                if (!ctx) return;
                 
                 // Clear with semi-transparent background
                 ctx.fillStyle = 'rgba(248, 250, 252, 0.95)';

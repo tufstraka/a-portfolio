@@ -1388,18 +1388,337 @@
         // ============================================
         
         const CONFIG = {
-            MAX_SPEED: 2.8,
-            ACCELERATION: 0.14,
-            FRICTION: 0.06,
-            TURN_SPEED: 0.035,
-            BOOST_MULTIPLIER: 2.2,
+            // Physics - Earth-like (scaled for game units where 1 unit ≈ 1 meter)
+            GRAVITY: 9.81,
+            CAR_MASS: 1500,              // kg (typical sedan)
+            
+            // Movement
+            MAX_SPEED: 35,               // ~126 km/h top speed
+            ACCELERATION: 12,            // m/s² (sporty car ~0-100 in 8s)
+            BRAKE_FORCE: 20,             // m/s² (strong braking)
+            REVERSE_MAX_SPEED: 8,        // ~29 km/h reverse
+            
+            // Friction & Grip
+            ROAD_FRICTION: 0.85,         // Asphalt grip
+            GRASS_FRICTION: 0.4,         // Much less grip on grass
+            ROLLING_RESISTANCE: 0.015,   // Constant drag
+            AIR_RESISTANCE: 0.4,         // Drag coefficient
+            
+            // Steering
+            MAX_STEER_ANGLE: 0.6,        // radians (~35 degrees)
+            STEER_SPEED: 3.5,            // How fast steering responds
+            STEER_RETURN_SPEED: 5,       // How fast wheel centers
+            
+            // Suspension feel
+            BODY_ROLL_FACTOR: 0.08,      // How much car leans in turns
+            PITCH_FACTOR: 0.04,          // How much car pitches on accel/brake
+            SUSPENSION_STIFFNESS: 15,    // Spring rate
+            SUSPENSION_DAMPING: 4,       // Damping rate
+            
+            // Collision
+            CAR_COLLISION_RADIUS: 2.5,   // Bounding sphere for car
+            CAR_LENGTH: 4.5,
+            CAR_WIDTH: 2.0,
+            BUILDING_COLLISION_PADDING: 2,
+            TREE_COLLISION_RADIUS: 1.5,
+            WORLD_BOUNDARY: 300,         // Invisible wall distance
+            COLLISION_BOUNCE: 0.3,       // How much car bounces back
+            
+            // Camera
             DEFAULT_CAMERA_DISTANCE: 18,
             DEFAULT_CAMERA_HEIGHT: 8,
             CAMERA_LERP_FACTOR: 0.08,
+            
+            // Gameplay
             SECTION_DETECTION_RADIUS: 25,
+            BOOST_MULTIPLIER: 1.8,
+            
+            // Performance
             TARGET_FPS: 60,
             AUTO_QUALITY_THRESHOLD: 30
         };
+        
+        // ============================================
+        // COLLISION SYSTEM
+        // ============================================
+        
+        class CollisionSystem {
+            constructor() {
+                this.buildings = [];
+                this.trees = [];
+                this.worldBoundary = CONFIG.WORLD_BOUNDARY;
+            }
+            
+            addBuilding(position, width, depth) {
+                this.buildings.push({
+                    x: position.x,
+                    z: position.z,
+                    halfWidth: (width / 2) + CONFIG.BUILDING_COLLISION_PADDING,
+                    halfDepth: (depth / 2) + CONFIG.BUILDING_COLLISION_PADDING,
+                    type: 'building'
+                });
+            }
+            
+            addTree(position) {
+                this.trees.push({
+                    x: position.x,
+                    z: position.z,
+                    radius: CONFIG.TREE_COLLISION_RADIUS,
+                    type: 'tree'
+                });
+            }
+            
+            // Check if a point is on the road (for friction calculation)
+            isOnRoad(x, z) {
+                // Simplified: check if near the road network
+                // Roads connect buildings, so check distance to road lines
+                const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
+                positions.push({ x: 0, z: 60 }); // Start point
+                
+                for (let i = 0; i < positions.length; i++) {
+                    const p1 = positions[i];
+                    const p2 = positions[(i + 1) % positions.length];
+                    
+                    // Distance from point to line segment
+                    const dist = this.pointToSegmentDistance(x, z, p1.x, p1.z, p2.x, p2.z);
+                    if (dist < 8) return true; // Road width / 2
+                }
+                return false;
+            }
+            
+            pointToSegmentDistance(px, pz, x1, z1, x2, z2) {
+                const dx = x2 - x1;
+                const dz = z2 - z1;
+                const lengthSq = dx * dx + dz * dz;
+                
+                if (lengthSq === 0) return Math.sqrt((px - x1) ** 2 + (pz - z1) ** 2);
+                
+                let t = Math.max(0, Math.min(1, ((px - x1) * dx + (pz - z1) * dz) / lengthSq));
+                const nearestX = x1 + t * dx;
+                const nearestZ = z1 + t * dz;
+                
+                return Math.sqrt((px - nearestX) ** 2 + (pz - nearestZ) ** 2);
+            }
+            
+            // Check collision and return push-back vector
+            checkCollision(x, z, radius) {
+                let pushX = 0;
+                let pushZ = 0;
+                let collided = false;
+                
+                // World boundary
+                if (x < -this.worldBoundary) { pushX = (-this.worldBoundary - x) + 1; collided = true; }
+                if (x > this.worldBoundary) { pushX = (this.worldBoundary - x) - 1; collided = true; }
+                if (z < -this.worldBoundary) { pushZ = (-this.worldBoundary - z) + 1; collided = true; }
+                if (z > this.worldBoundary) { pushZ = (this.worldBoundary - z) - 1; collided = true; }
+                
+                // Building collisions (AABB)
+                for (const building of this.buildings) {
+                    const dx = x - building.x;
+                    const dz = z - building.z;
+                    
+                    const overlapX = building.halfWidth + radius - Math.abs(dx);
+                    const overlapZ = building.halfDepth + radius - Math.abs(dz);
+                    
+                    if (overlapX > 0 && overlapZ > 0) {
+                        collided = true;
+                        // Push out along the axis with least overlap
+                        if (overlapX < overlapZ) {
+                            pushX += (dx > 0 ? overlapX : -overlapX);
+                        } else {
+                            pushZ += (dz > 0 ? overlapZ : -overlapZ);
+                        }
+                    }
+                }
+                
+                // Tree collisions (circle)
+                for (const tree of this.trees) {
+                    const dx = x - tree.x;
+                    const dz = z - tree.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    const minDist = tree.radius + radius;
+                    
+                    if (dist < minDist && dist > 0) {
+                        collided = true;
+                        const overlap = minDist - dist;
+                        pushX += (dx / dist) * overlap;
+                        pushZ += (dz / dist) * overlap;
+                    }
+                }
+                
+                return { collided, pushX, pushZ };
+            }
+        }
+        
+        // ============================================
+        // REALISTIC VEHICLE PHYSICS
+        // ============================================
+        
+        class VehiclePhysics {
+            constructor() {
+                this.reset();
+            }
+            
+            reset() {
+                // Position & rotation
+                this.x = 0;
+                this.z = 60;
+                this.rotation = 0;        // Yaw (heading)
+                this.y = 0;               // Height (for suspension)
+                
+                // Velocity
+                this.velocityX = 0;
+                this.velocityZ = 0;
+                this.speed = 0;           // Signed speed (+ forward, - backward)
+                this.angularVelocity = 0;
+                
+                // Steering
+                this.steerAngle = 0;
+                this.targetSteerAngle = 0;
+                
+                // Suspension state
+                this.bodyRoll = 0;
+                this.bodyPitch = 0;
+                
+                // State
+                this.isOnRoad = true;
+                this.isColliding = false;
+            }
+            
+            update(delta, input, collisionSystem) {
+                // Cap delta to prevent physics explosion
+                delta = Math.min(delta, 0.05);
+                
+                // Get surface friction
+                this.isOnRoad = collisionSystem.isOnRoad(this.x, this.z);
+                const friction = this.isOnRoad ? CONFIG.ROAD_FRICTION : CONFIG.GRASS_FRICTION;
+                
+                // --- STEERING ---
+                this.targetSteerAngle = input.steer * CONFIG.MAX_STEER_ANGLE;
+                
+                // Smooth steering (faster to turn, slower to return)
+                const steerSpeed = Math.abs(this.targetSteerAngle) > Math.abs(this.steerAngle) 
+                    ? CONFIG.STEER_SPEED : CONFIG.STEER_RETURN_SPEED;
+                this.steerAngle = THREE.MathUtils.lerp(
+                    this.steerAngle, 
+                    this.targetSteerAngle, 
+                    steerSpeed * delta
+                );
+                
+                // Reduce steering effectiveness at high speed (understeer)
+                const speedFactor = 1 - (Math.abs(this.speed) / CONFIG.MAX_SPEED) * 0.4;
+                const effectiveSteer = this.steerAngle * speedFactor;
+                
+                // --- ACCELERATION & BRAKING ---
+                let accelerationForce = 0;
+                const isMovingForward = this.speed > 0.1;
+                const isMovingBackward = this.speed < -0.1;
+                
+                if (input.throttle > 0) {
+                    // Accelerating forward
+                    const maxSpeed = input.boost ? CONFIG.MAX_SPEED * CONFIG.BOOST_MULTIPLIER : CONFIG.MAX_SPEED;
+                    if (this.speed < maxSpeed) {
+                        accelerationForce = CONFIG.ACCELERATION * input.throttle * friction;
+                        if (input.boost) accelerationForce *= 1.3;
+                    }
+                } else if (input.brake > 0) {
+                    if (isMovingForward) {
+                        // Braking while moving forward
+                        accelerationForce = -CONFIG.BRAKE_FORCE * input.brake * friction;
+                    } else if (this.speed > -CONFIG.REVERSE_MAX_SPEED) {
+                        // Reversing
+                        accelerationForce = -CONFIG.ACCELERATION * 0.5 * input.brake * friction;
+                    }
+                }
+                
+                // --- RESISTANCE FORCES ---
+                // Rolling resistance
+                const rollingResistance = -Math.sign(this.speed) * CONFIG.ROLLING_RESISTANCE * CONFIG.CAR_MASS * CONFIG.GRAVITY;
+                
+                // Air resistance (quadratic)
+                const airResistance = -CONFIG.AIR_RESISTANCE * this.speed * Math.abs(this.speed);
+                
+                // Total acceleration
+                const totalAcceleration = accelerationForce + (rollingResistance + airResistance) / CONFIG.CAR_MASS;
+                
+                // Update speed
+                this.speed += totalAcceleration * delta;
+                
+                // Natural stop at very low speeds
+                if (Math.abs(this.speed) < 0.1 && input.throttle === 0 && input.brake === 0) {
+                    this.speed *= 0.9;
+                    if (Math.abs(this.speed) < 0.01) this.speed = 0;
+                }
+                
+                // --- TURNING ---
+                if (Math.abs(this.speed) > 0.5) {
+                    // Ackermann-ish steering: turn rate depends on speed and steer angle
+                    const wheelBase = CONFIG.CAR_LENGTH * 0.6;
+                    const turnRadius = wheelBase / Math.tan(Math.abs(effectiveSteer) + 0.001);
+                    const angularVel = this.speed / turnRadius * Math.sign(effectiveSteer);
+                    
+                    this.rotation += angularVel * delta;
+                }
+                
+                // --- UPDATE POSITION ---
+                const prevX = this.x;
+                const prevZ = this.z;
+                
+                this.velocityX = Math.sin(this.rotation) * this.speed;
+                this.velocityZ = Math.cos(this.rotation) * this.speed;
+                
+                this.x += this.velocityX * delta;
+                this.z += this.velocityZ * delta;
+                
+                // --- COLLISION DETECTION ---
+                const collision = collisionSystem.checkCollision(this.x, this.z, CONFIG.CAR_COLLISION_RADIUS);
+                
+                if (collision.collided) {
+                    this.isColliding = true;
+                    
+                    // Push car out of collision
+                    this.x += collision.pushX;
+                    this.z += collision.pushZ;
+                    
+                    // Reduce speed on collision (bounce/impact)
+                    this.speed *= (1 - CONFIG.COLLISION_BOUNCE);
+                    
+                    // Add small random rotation on impact for realism
+                    this.rotation += (Math.random() - 0.5) * 0.1 * Math.abs(this.speed) / CONFIG.MAX_SPEED;
+                } else {
+                    this.isColliding = false;
+                }
+                
+                // Ground collision (never go below 0)
+                this.y = Math.max(0, this.y);
+                
+                // --- SUSPENSION / BODY DYNAMICS ---
+                // Body roll (leaning in turns)
+                const lateralG = this.speed * this.angularVelocity;
+                const targetRoll = -lateralG * CONFIG.BODY_ROLL_FACTOR;
+                this.bodyRoll = THREE.MathUtils.lerp(this.bodyRoll, targetRoll, CONFIG.SUSPENSION_DAMPING * delta);
+                this.bodyRoll = THREE.MathUtils.clamp(this.bodyRoll, -0.15, 0.15);
+                
+                // Body pitch (nose dive on brake, squat on accel)
+                const targetPitch = -accelerationForce * CONFIG.PITCH_FACTOR * 0.01;
+                this.bodyPitch = THREE.MathUtils.lerp(this.bodyPitch, targetPitch, CONFIG.SUSPENSION_DAMPING * delta);
+                this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch, -0.1, 0.1);
+                
+                return {
+                    x: this.x,
+                    z: this.z,
+                    y: this.y + 0.5, // Car height offset
+                    rotation: this.rotation,
+                    steerAngle: this.steerAngle,
+                    bodyRoll: this.bodyRoll,
+                    bodyPitch: this.bodyPitch,
+                    speed: this.speed,
+                    speedKmh: Math.abs(this.speed * 3.6), // Convert m/s to km/h
+                    isOnRoad: this.isOnRoad,
+                    isColliding: this.isColliding
+                };
+            }
+        }
 
         // ============================================
         // PORTFOLIO DATA - Fun & Engaging
@@ -1693,9 +2012,14 @@
                 this.sections = [];
                 this.buildings = [];
                 this.decorations = [];
+                this.treePositions = []; // Store tree positions for collision
                 
                 this.sunLight = null;
                 this.sky = null;
+                
+                // Physics & Collision Systems
+                this.collisionSystem = new CollisionSystem();
+                this.vehiclePhysics = new VehiclePhysics();
                 
                 this.state = {
                     playerMode: 'driving',
@@ -1708,6 +2032,13 @@
                     isMobile: this.detectMobile(),
                     quality: this.detectQuality(),
                     time: 0,
+                    // Input state
+                    input: {
+                        throttle: 0,
+                        brake: 0,
+                        steer: 0,
+                        boost: false
+                    },
                     // Game Feel State
                     isBoosting: false,
                     wasBoostingLastFrame: false,
@@ -1764,7 +2095,12 @@
                     
                     // Position car at start
                     this.car.position.set(0, 0.5, 60);
-                    this.camera.position.set(0, 12, 40);
+                    this.camera.position.set(0, 12, 80);
+                    
+                    // Initialize physics position
+                    this.vehiclePhysics.x = 0;
+                    this.vehiclePhysics.z = 60;
+                    this.vehiclePhysics.rotation = 0;
                     
                     this.updateLoadingProgress(100);
                     
@@ -2566,8 +2902,11 @@
                         content: data.content, 
                         color: data.color, 
                         icon: data.icon,
-                        buildingHeight: buildingHeight  // Store for animation
+                        buildingHeight: buildingHeight
                     };
+                    
+                    // Register building with collision system
+                    this.collisionSystem.addBuilding(data.position, 16, 16);
                     
                     this.sections.push(sectionGroup);
                     this.buildings.push(sectionGroup);
@@ -2646,6 +2985,10 @@
                     
                     treeGroup.position.set(x, 0, z);
                     treeGroup.rotation.y = Math.random() * Math.PI * 2;
+                    
+                    // Register tree with collision system
+                    this.collisionSystem.addTree({ x, z });
+                    this.treePositions.push({ x, z });
                     
                     this.scene.add(treeGroup);
                     this.decorations.push(treeGroup);
@@ -3075,90 +3418,68 @@
             
             updateCar(delta) {
                 const keys = this.state.keys;
-                let moving = false;
                 
-                const boosting = keys['ShiftLeft'] || keys['ShiftRight'];
-                this.state.isBoosting = boosting && (keys['KeyW'] || keys['ArrowUp']);
+                // Build input state
+                this.state.input.throttle = (keys['KeyW'] || keys['ArrowUp']) ? 1 : 0;
+                this.state.input.brake = (keys['KeyS'] || keys['ArrowDown']) ? 1 : 0;
+                this.state.input.boost = keys['ShiftLeft'] || keys['ShiftRight'];
                 
-                const maxSpeed = CONFIG.MAX_SPEED * (boosting ? CONFIG.BOOST_MULTIPLIER : 1);
-                const accel = CONFIG.ACCELERATION * (boosting ? CONFIG.BOOST_MULTIPLIER : 1);
+                // Steering (-1 to 1)
+                let steer = 0;
+                if (keys['KeyA'] || keys['ArrowLeft']) steer = 1;
+                if (keys['KeyD'] || keys['ArrowRight']) steer = -1;
+                this.state.input.steer = steer;
                 
-                if (keys['KeyW'] || keys['ArrowUp']) {
-                    this.state.carSpeed = Math.min(this.state.carSpeed + accel, maxSpeed);
-                    moving = true;
-                } else if (keys['KeyS'] || keys['ArrowDown']) {
-                    this.state.carSpeed = Math.max(this.state.carSpeed - accel, -maxSpeed * 0.5);
-                    moving = true;
-                }
+                // Update physics
+                const physicsState = this.vehiclePhysics.update(delta, this.state.input, this.collisionSystem);
                 
-                if (Math.abs(this.state.carSpeed) > 0.1) {
-                    const turnSpeed = CONFIG.TURN_SPEED * (Math.abs(this.state.carSpeed) / CONFIG.MAX_SPEED);
-                    
-                    if (keys['KeyA'] || keys['ArrowLeft']) {
-                        this.car.rotation.y += turnSpeed;
-                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, 0.1, 0.12);
-                    } else if (keys['KeyD'] || keys['ArrowRight']) {
-                        this.car.rotation.y -= turnSpeed;
-                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, -0.1, 0.12);
-                    } else {
-                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, 0, 0.12);
-                    }
-                }
+                // Apply physics to car mesh
+                this.car.position.x = physicsState.x;
+                this.car.position.z = physicsState.z;
+                this.car.position.y = physicsState.y;
+                this.car.rotation.y = physicsState.rotation;
+                this.car.rotation.z = physicsState.bodyRoll;
+                this.car.rotation.x = physicsState.bodyPitch;
                 
-                // Improved friction curve (game feel: snappier stopping)
-                if (!moving) {
-                    const frictionMultiplier = Math.abs(this.state.carSpeed) > 1 ? 0.04 : 0.08;
-                    this.state.carSpeed *= (1 - frictionMultiplier);
-                    if (Math.abs(this.state.carSpeed) < 0.02) this.state.carSpeed = 0;
-                }
+                // Store for other systems
+                this.state.carSpeed = physicsState.speed;
+                this.state.isBoosting = this.state.input.boost && this.state.input.throttle > 0;
                 
-                this.car.position.x += Math.sin(this.car.rotation.y) * this.state.carSpeed;
-                this.car.position.z += Math.cos(this.car.rotation.y) * this.state.carSpeed;
-                
-                // Pitch based on acceleration/deceleration
-                this.car.rotation.x = THREE.MathUtils.lerp(this.car.rotation.x, this.state.carSpeed * 0.05, 0.12);
-                
-                const speedKmh = Math.round(Math.abs(this.state.carSpeed) * 50);
+                // Update UI
+                const speedKmh = Math.round(physicsState.speedKmh);
                 document.getElementById('speedValue').textContent = speedKmh;
                 document.getElementById('speedBoost').style.display = this.state.isBoosting ? 'inline-flex' : 'none';
                 
-                // Game Feel: Boost visual effects
-                this.setBoostLines(this.state.isBoosting && this.state.carSpeed > 2);
+                // Visual feedback
+                this.setBoostLines(this.state.isBoosting && physicsState.speedKmh > 60);
                 
-                // Screen shake on sudden direction changes at high speed
-                if (this.state.carSpeed > 2 && (keys['KeyA'] || keys['KeyD'] || keys['ArrowLeft'] || keys['ArrowRight'])) {
-                    if (Math.random() < 0.02) { // Occasional micro-shake
-                        this.triggerScreenShake(0.2);
-                    }
+                // Collision feedback
+                if (physicsState.isColliding) {
+                    this.triggerScreenShake(0.4);
                 }
+                
+                // Surface indicator (optional: show when on grass)
+                // Could add visual feedback for different surfaces here
             }
             
             updateWheels() {
                 if (!this.wheels || !this.car) return;
                 
-                // Calculate wheel rotation based on distance traveled
+                // Calculate wheel rotation based on speed (distance traveled per frame)
                 const wheelRadius = 0.4;
-                const rotationAmount = this.state.carSpeed / wheelRadius;
+                const speed = this.vehiclePhysics.speed;
+                const rotationAmount = (speed * 0.016) / wheelRadius; // Assuming ~60fps
                 
-                // Get steering input for front wheel turn
-                const keys = this.state.keys;
-                let steeringAngle = 0;
-                if (keys['KeyA'] || keys['ArrowLeft']) steeringAngle = 0.4;
-                if (keys['KeyD'] || keys['ArrowRight']) steeringAngle = -0.4;
+                // Get steering angle from physics
+                const steeringAngle = this.vehiclePhysics.steerAngle;
                 
                 this.wheels.forEach((wheel, index) => {
                     // Rotate all wheels for rolling motion
-                    // Since cylinder is rotated 90° on Z, we rotate the GROUP on X for forward roll
                     wheel.rotation.x += rotationAmount;
                     
-                    // Apply steering to front wheels only (index 0 and 1)
+                    // Apply steering to front wheels only
                     if (wheel.userData.steering) {
-                        // Smoothly interpolate steering angle
-                        wheel.rotation.y = THREE.MathUtils.lerp(
-                            wheel.rotation.y, 
-                            steeringAngle, 
-                            0.15
-                        );
+                        wheel.rotation.y = steeringAngle;
                     }
                 });
             }

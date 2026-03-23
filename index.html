@@ -889,6 +889,270 @@
             }
         }
         
+        /* Notification Toast - Achievement Style */
+        #notificationToast {
+            position: fixed;
+            top: var(--space-6);
+            left: 50%;
+            transform: translateX(-50%) translateY(-100px);
+            background: var(--color-bg-card);
+            padding: var(--space-4) var(--space-6);
+            border-radius: var(--radius-2xl);
+            box-shadow: var(--shadow-xl), var(--shadow-glow);
+            z-index: 150;
+            display: flex;
+            align-items: center;
+            gap: var(--space-4);
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            opacity: 0;
+            transition: transform 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55), opacity 0.3s ease;
+            pointer-events: none;
+        }
+        
+        #notificationToast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        .toast-icon {
+            font-size: 2rem;
+            animation: popIn 0.3s ease;
+        }
+        
+        .toast-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .toast-title {
+            font-weight: 700;
+            font-size: 1rem;
+            color: var(--color-text);
+        }
+        
+        .toast-subtitle {
+            font-size: 0.8125rem;
+            color: var(--color-text-secondary);
+        }
+        
+        /* Tutorial Overlay */
+        #tutorialOverlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.9);
+            z-index: 250;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        
+        #tutorialOverlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .tutorial-content {
+            text-align: center;
+            color: white;
+            max-width: 500px;
+            padding: var(--space-6);
+        }
+        
+        .tutorial-title {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-bottom: var(--space-4);
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .tutorial-subtitle {
+            font-size: 1.125rem;
+            color: var(--color-text-secondary);
+            margin-bottom: var(--space-8);
+        }
+        
+        .tutorial-keys {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: var(--space-6);
+            margin-bottom: var(--space-8);
+        }
+        
+        .tutorial-key-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--space-2);
+        }
+        
+        .tutorial-key {
+            display: flex;
+            gap: var(--space-1);
+        }
+        
+        .tutorial-key kbd {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 3rem;
+            height: 3rem;
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: var(--radius-lg);
+            font-family: 'Space Mono', monospace;
+            font-size: 1rem;
+            font-weight: 700;
+            color: white;
+            transition: all 0.2s ease;
+        }
+        
+        .tutorial-key kbd:hover {
+            background: var(--gradient-primary);
+            border-color: transparent;
+            transform: translateY(-2px);
+        }
+        
+        .tutorial-key-label {
+            font-size: 0.875rem;
+            color: var(--color-text-secondary);
+        }
+        
+        .tutorial-start-btn {
+            background: var(--gradient-primary);
+            color: white;
+            border: none;
+            padding: var(--space-4) var(--space-8);
+            font-family: inherit;
+            font-size: 1.125rem;
+            font-weight: 700;
+            border-radius: var(--radius-full);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 0 rgba(99, 102, 241, 0.4);
+        }
+        
+        .tutorial-start-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 0 rgba(99, 102, 241, 0.4);
+        }
+        
+        .tutorial-start-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 0 rgba(99, 102, 241, 0.4);
+        }
+        
+        .tutorial-skip {
+            margin-top: var(--space-4);
+            background: none;
+            border: none;
+            color: var(--color-text-secondary);
+            font-family: inherit;
+            font-size: 0.875rem;
+            cursor: pointer;
+            text-decoration: underline;
+            transition: color 0.2s ease;
+        }
+        
+        .tutorial-skip:hover {
+            color: white;
+        }
+        
+        /* Screen Effects */
+        #screenEffects {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 50;
+        }
+        
+        .screen-shake {
+            animation: shake 0.3s ease-out;
+        }
+        
+        @keyframes shake {
+            0%, 100% { transform: translate(0, 0); }
+            10% { transform: translate(-5px, -5px); }
+            20% { transform: translate(5px, 5px); }
+            30% { transform: translate(-5px, 5px); }
+            40% { transform: translate(5px, -5px); }
+            50% { transform: translate(-3px, -3px); }
+            60% { transform: translate(3px, 3px); }
+            70% { transform: translate(-2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            90% { transform: translate(-1px, 1px); }
+        }
+        
+        /* Boost Lines Effect */
+        .boost-lines {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 45;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .boost-lines.active {
+            opacity: 1;
+        }
+        
+        .boost-lines::before,
+        .boost-lines::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: boostLine 0.3s linear infinite;
+        }
+        
+        .boost-lines::before {
+            transform: translateY(-20px);
+            animation-delay: 0.1s;
+        }
+        
+        .boost-lines::after {
+            transform: translateY(20px);
+        }
+        
+        @keyframes boostLine {
+            from { transform: translateX(-100%); }
+            to { transform: translateX(100%); }
+        }
+        
+        /* Progress Bar for Section Entry */
+        #progressBar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: rgba(99, 102, 241, 0.2);
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        #progressBar.active {
+            opacity: 1;
+        }
+        
+        #progressBarFill {
+            height: 100%;
+            width: 0%;
+            background: var(--gradient-primary);
+            transition: width 0.1s linear;
+        }
+        
         /* Accessibility */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
@@ -922,6 +1186,65 @@
     
     <!-- Game Container -->
     <div id="gameContainer"></div>
+    
+    <!-- Screen Effects Layer -->
+    <div id="screenEffects"></div>
+    <div class="boost-lines" id="boostLines"></div>
+    
+    <!-- Tutorial Overlay -->
+    <div id="tutorialOverlay">
+        <div class="tutorial-content">
+            <h1 class="tutorial-title">Welcome to My Portfolio! 🎮</h1>
+            <p class="tutorial-subtitle">Explore my work by driving around this 3D world</p>
+            
+            <div class="tutorial-keys">
+                <div class="tutorial-key-group">
+                    <div class="tutorial-key">
+                        <kbd>W</kbd>
+                    </div>
+                    <div class="tutorial-key">
+                        <kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>
+                    </div>
+                    <span class="tutorial-key-label">Drive Around</span>
+                </div>
+                
+                <div class="tutorial-key-group">
+                    <div class="tutorial-key">
+                        <kbd>SPACE</kbd>
+                    </div>
+                    <span class="tutorial-key-label">Enter Building</span>
+                </div>
+                
+                <div class="tutorial-key-group">
+                    <div class="tutorial-key">
+                        <kbd>SHIFT</kbd>
+                    </div>
+                    <span class="tutorial-key-label">Turbo Boost</span>
+                </div>
+            </div>
+            
+            <button class="tutorial-start-btn" id="tutorialStartBtn">
+                Let's Go! 🚗
+            </button>
+            <button class="tutorial-skip" id="tutorialSkipBtn">
+                I've been here before, skip tutorial
+            </button>
+        </div>
+    </div>
+    
+    <!-- Notification Toast -->
+    <div id="notificationToast">
+        <span class="toast-icon" id="toastIcon">🎯</span>
+        <div class="toast-content">
+            <span class="toast-title" id="toastTitle">Achievement</span>
+            <span class="toast-subtitle" id="toastSubtitle">You did something cool!</span>
+        </div>
+    </div>
+    
+    <!-- Progress Bar for Section Entry -->
+    <div id="progressBar">
+        <div id="progressBarFill"></div>
+    </div>
     
     <!-- Controls Panel -->
     <div id="controlsPanel">
@@ -1384,7 +1707,16 @@
                     keys: {},
                     isMobile: this.detectMobile(),
                     quality: this.detectQuality(),
-                    time: 0
+                    time: 0,
+                    // Game Feel State
+                    isBoosting: false,
+                    wasBoostingLastFrame: false,
+                    sectionsVisited: new Set(),
+                    totalDistance: 0,
+                    lastPosition: null,
+                    boostStartTime: 0,
+                    holdingSpaceTime: 0,
+                    tutorialComplete: localStorage.getItem('portfolioTutorialComplete') === 'true'
                 };
                 
                 this.frameCount = 0;
@@ -1439,7 +1771,14 @@
                     // Hide loading screen with style
                     setTimeout(() => {
                         document.getElementById('loadingScreen').classList.add('hidden');
-                        this.animate();
+                        
+                        // Show tutorial for first-time visitors
+                        if (!this.state.tutorialComplete) {
+                            this.showTutorial();
+                        } else {
+                            this.animate();
+                            this.showToast('🚗', 'Welcome Back!', 'Drive to any building to explore');
+                        }
                     }, 600);
                     
                     // Load non-critical assets progressively
@@ -1461,6 +1800,139 @@
             
             updateLoadingProgress(percent) {
                 document.getElementById('loadingBar').style.width = `${percent}%`;
+            }
+            
+            // ============================================
+            // GAME FEEL & UX METHODS
+            // ============================================
+            
+            showTutorial() {
+                const overlay = document.getElementById('tutorialOverlay');
+                overlay.classList.add('active');
+                
+                document.getElementById('tutorialStartBtn').addEventListener('click', () => {
+                    this.closeTutorial();
+                });
+                
+                document.getElementById('tutorialSkipBtn').addEventListener('click', () => {
+                    this.closeTutorial();
+                });
+            }
+            
+            closeTutorial() {
+                const overlay = document.getElementById('tutorialOverlay');
+                overlay.classList.remove('active');
+                
+                // Mark tutorial as complete
+                this.state.tutorialComplete = true;
+                localStorage.setItem('portfolioTutorialComplete', 'true');
+                
+                // Start the game
+                this.animate();
+                
+                // Welcome message
+                setTimeout(() => {
+                    this.showToast('🎉', 'Let\'s Go!', 'Drive to the glowing buildings to explore');
+                }, 500);
+            }
+            
+            showToast(icon, title, subtitle, duration = 3500) {
+                const toast = document.getElementById('notificationToast');
+                const toastIcon = document.getElementById('toastIcon');
+                const toastTitle = document.getElementById('toastTitle');
+                const toastSubtitle = document.getElementById('toastSubtitle');
+                
+                toastIcon.textContent = icon;
+                toastTitle.textContent = title;
+                toastSubtitle.textContent = subtitle;
+                
+                toast.classList.add('show');
+                
+                setTimeout(() => {
+                    toast.classList.remove('show');
+                }, duration);
+            }
+            
+            triggerScreenShake(intensity = 1) {
+                if (this.state.quality === 'low') return; // Skip on low quality
+                
+                const container = document.getElementById('gameContainer');
+                container.style.animation = 'none';
+                container.offsetHeight; // Trigger reflow
+                container.style.animation = `shake ${0.2 + intensity * 0.1}s ease-out`;
+                
+                setTimeout(() => {
+                    container.style.animation = 'none';
+                }, 300);
+            }
+            
+            setBoostLines(active) {
+                const lines = document.getElementById('boostLines');
+                if (active) {
+                    lines.classList.add('active');
+                } else {
+                    lines.classList.remove('active');
+                }
+            }
+            
+            updateProgressBar(progress) {
+                const bar = document.getElementById('progressBar');
+                const fill = document.getElementById('progressBarFill');
+                
+                if (progress > 0 && progress < 1) {
+                    bar.classList.add('active');
+                    fill.style.width = `${progress * 100}%`;
+                } else {
+                    bar.classList.remove('active');
+                    fill.style.width = '0%';
+                }
+            }
+            
+            checkAchievements() {
+                // First boost achievement
+                if (this.state.isBoosting && !this.state.wasBoostingLastFrame) {
+                    this.state.boostStartTime = this.state.time;
+                }
+                
+                // Speed demon achievement (boost for 3 seconds)
+                if (this.state.isBoosting && 
+                    this.state.time - this.state.boostStartTime > 3 &&
+                    !localStorage.getItem('achievement_speedDemon')) {
+                    localStorage.setItem('achievement_speedDemon', 'true');
+                    this.showToast('🔥', 'Speed Demon!', 'Boosted for 3 seconds straight');
+                    this.triggerScreenShake(0.5);
+                }
+                
+                // Explorer achievement (visit all sections)
+                if (this.state.sectionsVisited.size === 6 && 
+                    !localStorage.getItem('achievement_explorer')) {
+                    localStorage.setItem('achievement_explorer', 'true');
+                    this.showToast('🏆', 'Explorer!', 'You\'ve visited every section');
+                    this.triggerScreenShake(0.3);
+                }
+                
+                // Track distance for road warrior achievement
+                if (this.state.lastPosition && this.car) {
+                    const dx = this.car.position.x - this.state.lastPosition.x;
+                    const dz = this.car.position.z - this.state.lastPosition.z;
+                    this.state.totalDistance += Math.sqrt(dx * dx + dz * dz);
+                    
+                    // Road warrior achievement (drive 1000 units)
+                    if (this.state.totalDistance > 1000 &&
+                        !localStorage.getItem('achievement_roadWarrior')) {
+                        localStorage.setItem('achievement_roadWarrior', 'true');
+                        this.showToast('🛣️', 'Road Warrior!', 'Drove over 1000 units');
+                    }
+                }
+                
+                if (this.car) {
+                    this.state.lastPosition = { 
+                        x: this.car.position.x, 
+                        z: this.car.position.z 
+                    };
+                }
+                
+                this.state.wasBoostingLastFrame = this.state.isBoosting;
             }
             
             async initRenderer() {
@@ -2378,9 +2850,10 @@
             onKeyDown(e) {
                 this.state.keys[e.code] = true;
                 
-                if (e.code === 'Space' && this.state.currentSection) {
+                // Space is now handled by hold-to-enter in checkSectionProximity
+                // Just prevent default
+                if (e.code === 'Space') {
                     e.preventDefault();
-                    this.openModal(this.state.currentSection.userData);
                 }
                 
                 if (e.code === 'KeyE') this.togglePlayerMode();
@@ -2470,6 +2943,20 @@
             openModal(data) {
                 const { title, content, color, icon } = data;
                 
+                // Track visited section
+                if (!this.state.sectionsVisited.has(title)) {
+                    this.state.sectionsVisited.add(title);
+                    
+                    // Check if this was the first section
+                    if (this.state.sectionsVisited.size === 1 && 
+                        !localStorage.getItem('achievement_firstExplore')) {
+                        localStorage.setItem('achievement_firstExplore', 'true');
+                        setTimeout(() => {
+                            this.showToast('🎯', 'First Discovery!', 'Keep exploring to find more');
+                        }, 500);
+                    }
+                }
+                
                 document.getElementById('modalTitle').textContent = title;
                 document.getElementById('modalIcon').textContent = icon;
                 
@@ -2488,6 +2975,9 @@
                 
                 document.getElementById('modalContent').innerHTML = html;
                 document.getElementById('modalOverlay').classList.add('active');
+                
+                // Screen shake on modal open (satisfying feedback)
+                this.triggerScreenShake(0.3);
             }
             
             closeModal() {
@@ -2535,6 +3025,11 @@
                 this.checkSectionProximity();
                 this.updateAnimations();
                 
+                // Game Feel: Check achievements every 10 frames
+                if (this.frameCount % 10 === 0) {
+                    this.checkAchievements();
+                }
+                
                 if (this.frameCount % 5 === 0) {
                     this.updateMinimap();
                 }
@@ -2560,6 +3055,8 @@
                 let moving = false;
                 
                 const boosting = keys['ShiftLeft'] || keys['ShiftRight'];
+                this.state.isBoosting = boosting && (keys['KeyW'] || keys['ArrowUp']);
+                
                 const maxSpeed = CONFIG.MAX_SPEED * (boosting ? CONFIG.BOOST_MULTIPLIER : 1);
                 const accel = CONFIG.ACCELERATION * (boosting ? CONFIG.BOOST_MULTIPLIER : 1);
                 
@@ -2576,28 +3073,41 @@
                     
                     if (keys['KeyA'] || keys['ArrowLeft']) {
                         this.car.rotation.y += turnSpeed;
-                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, 0.08, 0.1);
+                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, 0.1, 0.12);
                     } else if (keys['KeyD'] || keys['ArrowRight']) {
                         this.car.rotation.y -= turnSpeed;
-                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, -0.08, 0.1);
+                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, -0.1, 0.12);
                     } else {
-                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, 0, 0.1);
+                        this.car.rotation.z = THREE.MathUtils.lerp(this.car.rotation.z, 0, 0.12);
                     }
                 }
                 
+                // Improved friction curve (game feel: snappier stopping)
                 if (!moving) {
-                    this.state.carSpeed *= (1 - CONFIG.FRICTION);
+                    const frictionMultiplier = Math.abs(this.state.carSpeed) > 1 ? 0.04 : 0.08;
+                    this.state.carSpeed *= (1 - frictionMultiplier);
                     if (Math.abs(this.state.carSpeed) < 0.02) this.state.carSpeed = 0;
                 }
                 
                 this.car.position.x += Math.sin(this.car.rotation.y) * this.state.carSpeed;
                 this.car.position.z += Math.cos(this.car.rotation.y) * this.state.carSpeed;
                 
-                this.car.rotation.x = THREE.MathUtils.lerp(this.car.rotation.x, this.state.carSpeed * 0.04, 0.1);
+                // Pitch based on acceleration/deceleration
+                this.car.rotation.x = THREE.MathUtils.lerp(this.car.rotation.x, this.state.carSpeed * 0.05, 0.12);
                 
                 const speedKmh = Math.round(Math.abs(this.state.carSpeed) * 50);
                 document.getElementById('speedValue').textContent = speedKmh;
-                document.getElementById('speedBoost').style.display = boosting ? 'inline-flex' : 'none';
+                document.getElementById('speedBoost').style.display = this.state.isBoosting ? 'inline-flex' : 'none';
+                
+                // Game Feel: Boost visual effects
+                this.setBoostLines(this.state.isBoosting && this.state.carSpeed > 2);
+                
+                // Screen shake on sudden direction changes at high speed
+                if (this.state.carSpeed > 2 && (keys['KeyA'] || keys['KeyD'] || keys['ArrowLeft'] || keys['ArrowRight'])) {
+                    if (Math.random() < 0.02) { // Occasional micro-shake
+                        this.triggerScreenShake(0.2);
+                    }
+                }
             }
             
             updateWheels() {
@@ -2746,6 +3256,7 @@
                 
                 if (closest !== this.state.currentSection) {
                     this.state.currentSection = closest;
+                    this.state.holdingSpaceTime = 0; // Reset hold timer
                     
                     const indicator = document.getElementById('sectionIndicator');
                     const dot = document.getElementById('indicatorDot');
@@ -2757,11 +3268,37 @@
                         dot.style.backgroundColor = color;
                         dot.style.color = color;
                         title.textContent = `${closest.userData.icon} ${closest.userData.title}`;
-                        hint.textContent = 'SPACE to enter';
+                        hint.textContent = 'Hold SPACE to enter';
                         hint.style.display = 'inline';
                         indicator.style.display = 'block';
+                        
+                        // Show toast for first approach to this section
+                        if (!this.state.sectionsVisited.has(closest.userData.title)) {
+                            this.showToast(closest.userData.icon, `Discovered: ${closest.userData.title}`, 'Hold SPACE to explore', 2500);
+                        }
                     } else {
                         indicator.style.display = 'none';
+                        this.updateProgressBar(0);
+                    }
+                }
+                
+                // Handle hold-to-enter mechanic
+                if (this.state.currentSection && this.state.keys['Space']) {
+                    this.state.holdingSpaceTime += 0.016; // Approximate 60fps
+                    const holdRequired = 0.5; // Half second to enter
+                    const progress = Math.min(this.state.holdingSpaceTime / holdRequired, 1);
+                    
+                    this.updateProgressBar(progress);
+                    
+                    if (progress >= 1) {
+                        this.openModal(this.state.currentSection.userData);
+                        this.state.holdingSpaceTime = 0;
+                        this.updateProgressBar(0);
+                    }
+                } else {
+                    if (this.state.holdingSpaceTime > 0) {
+                        this.state.holdingSpaceTime = Math.max(0, this.state.holdingSpaceTime - 0.032);
+                        this.updateProgressBar(this.state.holdingSpaceTime / 0.5);
                     }
                 }
             }

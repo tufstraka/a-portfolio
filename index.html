@@ -35,36 +35,36 @@
     
     <style>
         :root {
-            /* Vibrant Playful Color System */
-            --color-primary: #6366F1;      /* Indigo */
-            --color-primary-light: #818CF8;
-            --color-secondary: #F59E0B;    /* Amber/Gold */
-            --color-accent: #10B981;       /* Emerald */
-            --color-accent-pink: #EC4899;  /* Pink */
-            --color-accent-cyan: #06B6D4;  /* Cyan */
+            /* Modern Earthy Color System - Warm & Unique */
+            --color-primary: #2D3436;      /* Charcoal */
+            --color-primary-light: #636E72;
+            --color-secondary: #E17055;    /* Terracotta/Coral */
+            --color-accent: #00B894;       /* Mint Green */
+            --color-accent-warm: #FDCB6E;  /* Warm Yellow */
+            --color-accent-blue: #0984E3;  /* Ocean Blue */
             
             /* Backgrounds */
-            --color-bg-dark: #0F172A;
-            --color-bg-card: rgba(255, 255, 255, 0.95);
-            --color-bg-glass: rgba(255, 255, 255, 0.85);
+            --color-bg-dark: #1E272E;
+            --color-bg-card: rgba(255, 255, 255, 0.97);
+            --color-bg-glass: rgba(255, 255, 255, 0.92);
             
             /* Text */
-            --color-text: #1E293B;
-            --color-text-secondary: #64748B;
-            --color-text-light: #F8FAFC;
+            --color-text: #2D3436;
+            --color-text-secondary: #636E72;
+            --color-text-light: #F5F6FA;
             
-            /* Gradients */
-            --gradient-primary: linear-gradient(135deg, #6366F1 0%, #8B5CF6 50%, #EC4899 100%);
-            --gradient-warm: linear-gradient(135deg, #F59E0B 0%, #EF4444 100%);
-            --gradient-cool: linear-gradient(135deg, #06B6D4 0%, #10B981 100%);
-            --gradient-sunset: linear-gradient(135deg, #F97316 0%, #EC4899 50%, #8B5CF6 100%);
+            /* Gradients - Warm & Natural */
+            --gradient-primary: linear-gradient(135deg, #2D3436 0%, #636E72 100%);
+            --gradient-warm: linear-gradient(135deg, #E17055 0%, #D63031 100%);
+            --gradient-cool: linear-gradient(135deg, #00B894 0%, #00CEC9 100%);
+            --gradient-sunset: linear-gradient(135deg, #FDCB6E 0%, #E17055 100%);
             
-            /* Shadows - Colorful */
-            --shadow-sm: 0 1px 2px 0 rgb(99 102 241 / 0.05);
-            --shadow-md: 0 4px 6px -1px rgb(99 102 241 / 0.1), 0 2px 4px -2px rgb(99 102 241 / 0.1);
-            --shadow-lg: 0 10px 15px -3px rgb(99 102 241 / 0.15), 0 4px 6px -4px rgb(99 102 241 / 0.1);
-            --shadow-xl: 0 20px 25px -5px rgb(99 102 241 / 0.15), 0 8px 10px -6px rgb(99 102 241 / 0.1);
-            --shadow-glow: 0 0 40px rgb(99 102 241 / 0.3);
+            /* Shadows - Neutral */
+            --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+            --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+            --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.12), 0 8px 10px -6px rgb(0 0 0 / 0.05);
+            --shadow-glow: 0 0 40px rgb(225 112 85 / 0.25);
             
             /* Spacing */
             --space-1: 0.25rem;
@@ -80,7 +80,7 @@
             --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
             --transition-bounce: 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
             
-            /* Border Radius - More rounded for playful feel */
+            /* Border Radius */
             --radius-sm: 0.5rem;
             --radius-md: 0.75rem;
             --radius-lg: 1rem;
@@ -1407,7 +1407,7 @@
         
         const PORTFOLIO_DATA = {
             'About Me': {
-                color: 0x6366F1,
+                color: 0xE17055,  // Terracotta
                 icon: '👋',
                 position: { x: 0, z: 0 },
                 content: {
@@ -1435,7 +1435,7 @@
                 }
             },
             'Education': {
-                color: 0x8B5CF6,
+                color: 0x0984E3,  // Ocean Blue
                 icon: '🎓',
                 position: { x: -70, z: -50 },
                 content: {
@@ -1463,7 +1463,7 @@
                 }
             },
             'Tech Stack': {
-                color: 0xEC4899,
+                color: 0x00B894,  // Mint Green
                 icon: '⚡',
                 position: { x: 70, z: -50 },
                 content: {
@@ -1500,7 +1500,7 @@
                 }
             },
             'Projects': {
-                color: 0xF59E0B,
+                color: 0xFDCB6E,  // Warm Yellow
                 icon: '🚀',
                 position: { x: 0, z: -100 },
                 content: {
@@ -1528,7 +1528,7 @@
                 }
             },
             'Experience': {
-                color: 0x10B981,
+                color: 0x636E72,  // Slate Gray
                 icon: '💼',
                 position: { x: -70, z: 50 },
                 content: {
@@ -1556,7 +1556,7 @@
                 }
             },
             'Contact': {
-                color: 0x06B6D4,
+                color: 0xD63031,  // Deep Red/Coral
                 icon: '💬',
                 position: { x: 70, z: 50 },
                 content: {
@@ -2091,8 +2091,9 @@
                 
                 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
                 ground.rotation.x = -Math.PI / 2;
-                ground.position.y = -0.1; // Slightly lower to prevent z-fighting with roads
+                ground.position.y = 0; // At base level
                 ground.receiveShadow = this.state.quality !== 'low';
+                ground.renderOrder = 0; // Render first
                 this.scene.add(ground);
                 
                 // Road
@@ -2100,16 +2101,19 @@
             }
             
             createRoads() {
-                // Main circular road
+                // Create road material with polygon offset to prevent z-fighting
                 const roadTexture = this.createRoadTexture();
                 const roadMaterial = new THREE.MeshStandardMaterial({
                     map: roadTexture,
-                    roughness: 0.8,
-                    metalness: 0.1
+                    roughness: 0.85,
+                    metalness: 0.05,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -1,
+                    polygonOffsetUnits: -1
                 });
                 
                 // Create road segments connecting buildings
-                const roadWidth = 12;
+                const roadWidth = 14;
                 const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
                 positions.push({ x: 0, z: 60 }); // Starting point
                 
@@ -2121,19 +2125,39 @@
                     const length = Math.sqrt(dx * dx + dz * dz);
                     const angle = Math.atan2(dx, dz);
                     
-                    const roadGeometry = new THREE.PlaneGeometry(roadWidth, length + 20);
-                    const road = new THREE.Mesh(roadGeometry, roadMaterial);
+                    const roadGeometry = new THREE.PlaneGeometry(roadWidth, length + 25);
+                    const road = new THREE.Mesh(roadGeometry, roadMaterial.clone());
                     
                     road.position.set(
                         pos.x + dx / 2,
-                        0.05,
+                        0.08, // Raised slightly higher
                         pos.z + dz / 2
                     );
                     road.rotation.x = -Math.PI / 2;
                     road.rotation.z = -angle;
                     road.receiveShadow = this.state.quality !== 'low';
+                    road.renderOrder = 1; // Render after ground
                     
                     this.scene.add(road);
+                });
+                
+                // Add intersection circles at each building
+                const intersectionGeometry = new THREE.CircleGeometry(10, 32);
+                const intersectionMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x3a3a3a,
+                    roughness: 0.85,
+                    metalness: 0.05,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -2,
+                    polygonOffsetUnits: -2
+                });
+                
+                positions.forEach(pos => {
+                    const intersection = new THREE.Mesh(intersectionGeometry, intersectionMaterial);
+                    intersection.position.set(pos.x, 0.09, pos.z);
+                    intersection.rotation.x = -Math.PI / 2;
+                    intersection.renderOrder = 2;
+                    this.scene.add(intersection);
                 });
             }
             
@@ -2187,7 +2211,7 @@
                 const carGroup = new THREE.Group();
                 
                 // Car body - Sporty design with PBR materials
-                const bodyColor = 0x6366F1; // Match primary color
+                const bodyColor = 0x2D3436; // Charcoal - matches new color scheme
                 const bodyMaterial = new THREE.MeshStandardMaterial({
                     color: bodyColor,
                     metalness: 0.9,
@@ -2248,8 +2272,14 @@
                 rearGlass.rotation.x = -Math.PI / 5;
                 carGroup.add(rearGlass);
                 
-                // Wheels with realistic materials
-                const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 24);
+                // Wheels - Using TorusGeometry for proper tire shape
+                const wheelPositions = [
+                    { x: -1.1, y: 0.4, z: 1.4, steering: true },   // Front left
+                    { x: 1.1, y: 0.4, z: 1.4, steering: true },    // Front right
+                    { x: -1.1, y: 0.4, z: -1.4, steering: false }, // Rear left
+                    { x: 1.1, y: 0.4, z: -1.4, steering: false }   // Rear right
+                ];
+                
                 const tireMaterial = new THREE.MeshStandardMaterial({
                     color: 0x1a1a1a,
                     roughness: 0.9,
@@ -2257,43 +2287,36 @@
                 });
                 
                 const rimMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xCCCCCC,
-                    metalness: 0.9,
-                    roughness: 0.2
+                    color: 0xAAAAAA,
+                    metalness: 0.8,
+                    roughness: 0.25
                 });
                 
-                const wheelPositions = [
-                    { x: -1.1, y: 0.4, z: 1.4 },
-                    { x: 1.1, y: 0.4, z: 1.4 },
-                    { x: -1.1, y: 0.4, z: -1.4 },
-                    { x: 1.1, y: 0.4, z: -1.4 }
-                ];
-                
                 this.wheels = [];
-                wheelPositions.forEach(pos => {
+                wheelPositions.forEach((pos, index) => {
                     const wheelGroup = new THREE.Group();
                     
-                    // Tire
-                    const tire = new THREE.Mesh(wheelGeometry, tireMaterial);
+                    // Tire - cylinder oriented along X axis for proper rolling
+                    const tireGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.25, 24);
+                    const tire = new THREE.Mesh(tireGeometry, tireMaterial);
+                    // Rotate to align with X axis (wheel axle direction)
                     tire.rotation.z = Math.PI / 2;
                     wheelGroup.add(tire);
                     
-                    // Rim
-                    const rimGeom = new THREE.CylinderGeometry(0.25, 0.25, 0.32, 12);
-                    const rim = new THREE.Mesh(rimGeom, rimMaterial);
+                    // Rim - slightly smaller diameter
+                    const rimGeometry = new THREE.CylinderGeometry(0.28, 0.28, 0.26, 16);
+                    const rim = new THREE.Mesh(rimGeometry, rimMaterial);
                     rim.rotation.z = Math.PI / 2;
                     wheelGroup.add(rim);
                     
-                    // Spokes
-                    for (let i = 0; i < 5; i++) {
-                        const spokeGeom = new THREE.BoxGeometry(0.35, 0.02, 0.05);
-                        const spoke = new THREE.Mesh(spokeGeom, rimMaterial);
-                        spoke.rotation.z = (Math.PI * 2 / 5) * i;
-                        spoke.position.x = 0.16;
-                        wheelGroup.add(spoke);
-                    }
+                    // Hub cap
+                    const hubGeometry = new THREE.CylinderGeometry(0.12, 0.12, 0.27, 12);
+                    const hub = new THREE.Mesh(hubGeometry, rimMaterial);
+                    hub.rotation.z = Math.PI / 2;
+                    wheelGroup.add(hub);
                     
                     wheelGroup.position.set(pos.x, pos.y, pos.z);
+                    wheelGroup.userData.steering = pos.steering;
                     wheelGroup.castShadow = this.state.quality !== 'low';
                     
                     this.wheels.push(wheelGroup);
@@ -3111,16 +3134,31 @@
             }
             
             updateWheels() {
-                if (!this.wheels) return;
+                if (!this.wheels || !this.car) return;
                 
-                // Rotate wheels based on speed
-                // Wheels are rotated 90° on Z-axis, so we rotate on local Y (which appears as forward roll)
-                const wheelRotation = this.state.carSpeed * 0.5;
-                this.wheels.forEach(wheel => {
-                    // The tire is children[0], and it's rotated 90° on z-axis
-                    // So we need to rotate around the cylinder's axis (local Y after the z-rotation)
-                    if (wheel.children[0]) {
-                        wheel.children[0].rotation.y += wheelRotation;
+                // Calculate wheel rotation based on distance traveled
+                const wheelRadius = 0.4;
+                const rotationAmount = this.state.carSpeed / wheelRadius;
+                
+                // Get steering input for front wheel turn
+                const keys = this.state.keys;
+                let steeringAngle = 0;
+                if (keys['KeyA'] || keys['ArrowLeft']) steeringAngle = 0.4;
+                if (keys['KeyD'] || keys['ArrowRight']) steeringAngle = -0.4;
+                
+                this.wheels.forEach((wheel, index) => {
+                    // Rotate all wheels for rolling motion
+                    // Since cylinder is rotated 90° on Z, we rotate the GROUP on X for forward roll
+                    wheel.rotation.x += rotationAmount;
+                    
+                    // Apply steering to front wheels only (index 0 and 1)
+                    if (wheel.userData.steering) {
+                        // Smoothly interpolate steering angle
+                        wheel.rotation.y = THREE.MathUtils.lerp(
+                            wheel.rotation.y, 
+                            steeringAngle, 
+                            0.15
+                        );
                     }
                 });
             }

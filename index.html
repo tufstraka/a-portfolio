@@ -1059,7 +1059,6 @@
         import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
         import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
         import { Sky } from 'three/addons/objects/Sky.js';
-        import { Water } from 'three/addons/objects/Water.js';
 
         // ============================================
         // CONFIGURATION
@@ -1410,40 +1409,54 @@
             }
             
             async init() {
-                this.updateLoadingProgress(5);
-                
-                await this.initRenderer();
-                this.updateLoadingProgress(20);
-                
-                await this.createScene();
-                this.updateLoadingProgress(40);
-                
-                await this.createVehicle();
-                this.updateLoadingProgress(55);
-                
-                this.createCharacter();
-                this.updateLoadingProgress(65);
-                
-                this.createPortfolioSections();
-                this.updateLoadingProgress(80);
-                
-                this.setupEventListeners();
-                this.updateLoadingProgress(90);
-                
-                // Position car at start
-                this.car.position.set(0, 0.5, 60);
-                this.camera.position.set(0, 12, 40);
-                
-                this.updateLoadingProgress(100);
-                
-                // Hide loading screen with style
-                setTimeout(() => {
-                    document.getElementById('loadingScreen').classList.add('hidden');
-                    this.animate();
-                }, 600);
-                
-                // Load non-critical assets progressively
-                setTimeout(() => this.loadEnvironmentDetails(), 500);
+                try {
+                    this.updateLoadingProgress(5);
+                    
+                    await this.initRenderer();
+                    this.updateLoadingProgress(20);
+                    
+                    await this.createScene();
+                    this.updateLoadingProgress(40);
+                    
+                    await this.createVehicle();
+                    this.updateLoadingProgress(55);
+                    
+                    this.createCharacter();
+                    this.updateLoadingProgress(65);
+                    
+                    this.createPortfolioSections();
+                    this.updateLoadingProgress(80);
+                    
+                    this.setupEventListeners();
+                    this.updateLoadingProgress(90);
+                    
+                    // Position car at start
+                    this.car.position.set(0, 0.5, 60);
+                    this.camera.position.set(0, 12, 40);
+                    
+                    this.updateLoadingProgress(100);
+                    
+                    // Hide loading screen with style
+                    setTimeout(() => {
+                        document.getElementById('loadingScreen').classList.add('hidden');
+                        this.animate();
+                    }, 600);
+                    
+                    // Load non-critical assets progressively
+                    setTimeout(() => this.loadEnvironmentDetails(), 500);
+                } catch (error) {
+                    console.error('Portfolio initialization failed:', error);
+                    // Show error message to user
+                    const loadingContent = document.querySelector('.loading-content');
+                    if (loadingContent) {
+                        loadingContent.innerHTML = `
+                            <div class="loading-logo">⚠️</div>
+                            <h1 class="loading-title">Oops!</h1>
+                            <p class="loading-subtitle">Something went wrong. Please refresh the page.</p>
+                            <p style="color: #64748B; font-size: 0.75rem; margin-top: 1rem;">${error.message}</p>
+                        `;
+                    }
+                }
             }
             
             updateLoadingProgress(percent) {
@@ -1606,6 +1619,7 @@
                 
                 const ground = new THREE.Mesh(groundGeometry, groundMaterial);
                 ground.rotation.x = -Math.PI / 2;
+                ground.position.y = -0.1; // Slightly lower to prevent z-fighting with roads
                 ground.receiveShadow = this.state.quality !== 'low';
                 this.scene.add(ground);
                 
@@ -2052,7 +2066,13 @@
                     
                     // Position the section
                     sectionGroup.position.set(data.position.x, 0, data.position.z);
-                    sectionGroup.userData = { title, content: data.content, color: data.color, icon: data.icon };
+                    sectionGroup.userData = { 
+                        title, 
+                        content: data.content, 
+                        color: data.color, 
+                        icon: data.icon,
+                        buildingHeight: buildingHeight  // Store for animation
+                    };
                     
                     this.sections.push(sectionGroup);
                     this.buildings.push(sectionGroup);
@@ -2237,7 +2257,7 @@
                 window.addEventListener('wheel', (e) => {
                     this.state.cameraDistance += e.deltaY * 0.02;
                     this.state.cameraDistance = Math.max(8, Math.min(40, this.state.cameraDistance));
-                });
+                }, { passive: true });
                 
                 // UI Controls
                 document.getElementById('controlsToggle').addEventListener('click', () => {
@@ -2265,6 +2285,94 @@
                 });
                 
                 document.getElementById('qualitySelect').value = this.state.quality;
+                
+                // Mobile touch controls
+                if (this.state.isMobile) {
+                    this.setupMobileControls();
+                }
+            }
+            
+            setupMobileControls() {
+                const joystick = document.getElementById('joystick');
+                const joystickInner = document.getElementById('joystickInner');
+                const boostBtn = document.getElementById('mobileBoost');
+                const actionBtn = document.getElementById('mobileAction');
+                
+                if (!joystick) return;
+                
+                let joystickActive = false;
+                let joystickOrigin = { x: 0, y: 0 };
+                
+                const handleJoystickMove = (clientX, clientY) => {
+                    if (!joystickActive) return;
+                    
+                    const rect = joystick.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    
+                    let dx = clientX - centerX;
+                    let dy = clientY - centerY;
+                    
+                    const maxDist = rect.width / 2 - 25;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist > maxDist) {
+                        dx = (dx / dist) * maxDist;
+                        dy = (dy / dist) * maxDist;
+                    }
+                    
+                    joystickInner.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+                    
+                    // Map to controls
+                    const normalizedX = dx / maxDist;
+                    const normalizedY = -dy / maxDist;
+                    
+                    this.state.keys['KeyW'] = normalizedY > 0.3;
+                    this.state.keys['KeyS'] = normalizedY < -0.3;
+                    this.state.keys['KeyA'] = normalizedX < -0.3;
+                    this.state.keys['KeyD'] = normalizedX > 0.3;
+                };
+                
+                joystick.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    joystickActive = true;
+                    handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY);
+                });
+                
+                joystick.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY);
+                });
+                
+                joystick.addEventListener('touchend', () => {
+                    joystickActive = false;
+                    joystickInner.style.transform = 'translate(-50%, -50%)';
+                    this.state.keys['KeyW'] = false;
+                    this.state.keys['KeyS'] = false;
+                    this.state.keys['KeyA'] = false;
+                    this.state.keys['KeyD'] = false;
+                });
+                
+                // Boost button
+                if (boostBtn) {
+                    boostBtn.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        this.state.keys['ShiftLeft'] = true;
+                    });
+                    boostBtn.addEventListener('touchend', () => {
+                        this.state.keys['ShiftLeft'] = false;
+                    });
+                }
+                
+                // Action button (enter building / exit car)
+                if (actionBtn) {
+                    actionBtn.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        if (this.state.currentSection) {
+                            this.openModal(this.state.currentSection.userData);
+                        }
+                    });
+                }
             }
             
             onKeyDown(e) {
@@ -2496,9 +2604,14 @@
                 if (!this.wheels) return;
                 
                 // Rotate wheels based on speed
+                // Wheels are rotated 90° on Z-axis, so we rotate on local Y (which appears as forward roll)
                 const wheelRotation = this.state.carSpeed * 0.5;
                 this.wheels.forEach(wheel => {
-                    wheel.children[0].rotation.x += wheelRotation;
+                    // The tire is children[0], and it's rotated 90° on z-axis
+                    // So we need to rotate around the cylinder's axis (local Y after the z-rotation)
+                    if (wheel.children[0]) {
+                        wheel.children[0].rotation.y += wheelRotation;
+                    }
                 });
             }
             
@@ -2593,19 +2706,23 @@
             updateAnimations() {
                 // Animate building signs (gentle float)
                 this.sections.forEach((section, i) => {
-                    const sign = section.children.find(c => c.children && c.children.length > 1);
+                    // Find the sign group (has children with label mesh)
+                    const sign = section.children.find(c => c.type === 'Group' && c.children && c.children.length > 1);
                     if (sign) {
-                        sign.position.y = 36 + Math.sin(this.state.time * 2 + i) * 0.5;
+                        const buildingHeight = section.userData.buildingHeight || 35;
+                        const baseY = buildingHeight + 6;
+                        sign.position.y = baseY + Math.sin(this.state.time * 2 + i) * 0.5;
                         sign.rotation.y = Math.sin(this.state.time * 0.5 + i) * 0.1;
                     }
                 });
                 
                 // Animate particles
-                if (this.particles) {
+                if (this.particles && this.particles.geometry && this.particles.geometry.attributes.position) {
                     const positions = this.particles.geometry.attributes.position.array;
                     for (let i = 0; i < positions.length; i += 3) {
-                        positions[i + 1] += Math.sin(this.state.time + i) * 0.01;
+                        positions[i + 1] += Math.sin(this.state.time + i * 0.1) * 0.01;
                         if (positions[i + 1] > 35) positions[i + 1] = 2;
+                        if (positions[i + 1] < 2) positions[i + 1] = 2; // Prevent negative
                     }
                     this.particles.geometry.attributes.position.needsUpdate = true;
                 }
@@ -2750,10 +2867,15 @@
             updateFPS() {
                 const now = performance.now();
                 const delta = now - this.lastFpsTime;
-                this.fps = Math.round(30 * 1000 / delta);
+                // Proper FPS calculation: we update every 30 frames, so multiply by 30
+                this.fps = Math.round(30000 / delta);
                 this.lastFpsTime = now;
-                document.getElementById('fpsCounter').textContent = `${this.fps} FPS`;
                 
+                // Clamp FPS display to reasonable range
+                const displayFps = Math.min(Math.max(this.fps, 0), 999);
+                document.getElementById('fpsCounter').textContent = `${displayFps} FPS`;
+                
+                // Auto-quality adjustment
                 if (this.fps < CONFIG.AUTO_QUALITY_THRESHOLD && this.state.quality !== 'low') {
                     if (this.state.quality === 'ultra') {
                         document.getElementById('qualitySelect').value = 'high';
@@ -2775,6 +2897,19 @@
         
         const engine = new PortfolioEngine();
         engine.init();
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (engine.renderer) {
+                engine.renderer.dispose();
+            }
+            if (engine.composer) {
+                engine.composer.dispose();
+            }
+        });
+        
+        // Expose engine for debugging (optional)
+        window.portfolioEngine = engine;
     </script>
 </body>
 </html>

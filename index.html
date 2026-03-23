@@ -1908,37 +1908,51 @@
         // SHADERS - PUBG-Style Realistic
         // ============================================
         
-        // Custom terrain shader for realistic ground
+        // Enhanced terrain shader for realistic ground with proper lighting
         const TerrainShader = {
             uniforms: {
                 time: { value: 0 },
-                grassColor: { value: new THREE.Color(0x4A7C3F) },
-                dirtColor: { value: new THREE.Color(0x8B7355) },
-                noiseScale: { value: 50.0 }
+                grassColor1: { value: new THREE.Color(0x3D6B35) },  // Dark grass
+                grassColor2: { value: new THREE.Color(0x5A8F4D) },  // Light grass
+                dirtColor: { value: new THREE.Color(0x6B5344) },    // Brown dirt
+                sandColor: { value: new THREE.Color(0xC4A76C) },    // Sandy patches
+                noiseScale: { value: 40.0 },
+                sunDirection: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
+                ambientLight: { value: new THREE.Color(0x404050) },
+                sunLight: { value: new THREE.Color(0xFFFAF0) }
             },
             vertexShader: `
                 varying vec2 vUv;
                 varying vec3 vNormal;
                 varying vec3 vPosition;
+                varying vec3 vWorldPosition;
                 
                 void main() {
                     vUv = uv;
                     vNormal = normalize(normalMatrix * normal);
                     vPosition = position;
+                    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+                    vWorldPosition = worldPos.xyz;
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }
             `,
             fragmentShader: `
                 uniform float time;
-                uniform vec3 grassColor;
+                uniform vec3 grassColor1;
+                uniform vec3 grassColor2;
                 uniform vec3 dirtColor;
+                uniform vec3 sandColor;
                 uniform float noiseScale;
+                uniform vec3 sunDirection;
+                uniform vec3 ambientLight;
+                uniform vec3 sunLight;
                 
                 varying vec2 vUv;
                 varying vec3 vNormal;
                 varying vec3 vPosition;
+                varying vec3 vWorldPosition;
                 
-                // Simplex noise function
+                // Improved noise functions
                 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
                 vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
                 vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
@@ -1948,8 +1962,7 @@
                                        -0.577350269189626, 0.024390243902439);
                     vec2 i  = floor(v + dot(v, C.yy));
                     vec2 x0 = v -   i + dot(i, C.xx);
-                    vec2 i1;
-                    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+                    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
                     vec4 x12 = x0.xyxy + C.xxzz;
                     x12.xy -= i1;
                     i = mod289(i);
@@ -1970,29 +1983,67 @@
                     return 130.0 * dot(m, g);
                 }
                 
-                void main() {
-                    // Multi-octave noise for natural terrain variation
-                    float noise1 = snoise(vPosition.xz / noiseScale) * 0.5 + 0.5;
-                    float noise2 = snoise(vPosition.xz / (noiseScale * 0.5)) * 0.5 + 0.5;
-                    float noise3 = snoise(vPosition.xz / (noiseScale * 0.25)) * 0.5 + 0.5;
-                    
-                    float combinedNoise = noise1 * 0.5 + noise2 * 0.3 + noise3 * 0.2;
-                    
-                    // Mix grass and dirt based on noise
-                    vec3 baseColor = mix(dirtColor, grassColor, combinedNoise);
-                    
-                    // Add subtle variation
-                    baseColor *= 0.9 + noise3 * 0.2;
-                    
-                    // Simple lighting
-                    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
-                    float diff = max(dot(vNormal, lightDir), 0.0);
-                    vec3 ambient = baseColor * 0.4;
-                    vec3 diffuse = baseColor * diff * 0.6;
-                    
-                    gl_FragColor = vec4(ambient + diffuse, 1.0);
+                // Fractal Brownian Motion for more natural look
+                float fbm(vec2 p) {
+                    float value = 0.0;
+                    float amplitude = 0.5;
+                    float frequency = 1.0;
+                    for (int i = 0; i < 4; i++) {
+                        value += amplitude * snoise(p * frequency);
+                        amplitude *= 0.5;
+                        frequency *= 2.0;
+                    }
+                    return value;
                 }
-            `
+                
+                void main() {
+                    vec2 pos = vWorldPosition.xz;
+                    
+                    // Multi-scale noise for terrain variation
+                    float largeNoise = fbm(pos / noiseScale) * 0.5 + 0.5;
+                    float mediumNoise = snoise(pos / (noiseScale * 0.3)) * 0.5 + 0.5;
+                    float smallNoise = snoise(pos / (noiseScale * 0.1)) * 0.5 + 0.5;
+                    float tinyNoise = snoise(pos / 5.0) * 0.5 + 0.5;
+                    
+                    // Grass color variation (two-tone grass)
+                    vec3 grassColor = mix(grassColor1, grassColor2, smallNoise);
+                    
+                    // Mix in dirt based on noise
+                    float dirtFactor = smoothstep(0.3, 0.5, largeNoise) * (1.0 - smoothstep(0.6, 0.8, largeNoise));
+                    vec3 baseColor = mix(grassColor, dirtColor, dirtFactor * 0.6);
+                    
+                    // Add sandy patches (rare)
+                    float sandFactor = smoothstep(0.85, 0.95, mediumNoise);
+                    baseColor = mix(baseColor, sandColor, sandFactor * 0.3);
+                    
+                    // Micro-detail for grass blade illusion
+                    float microDetail = tinyNoise * 0.15;
+                    baseColor *= (0.9 + microDetail);
+                    
+                    // Proper lighting
+                    float NdotL = max(dot(vNormal, sunDirection), 0.0);
+                    
+                    // Diffuse lighting
+                    vec3 diffuse = sunLight * NdotL * 0.7;
+                    
+                    // Ambient with slight sky color
+                    vec3 ambient = ambientLight * 0.5;
+                    
+                    // Hemisphere lighting (ground bounce)
+                    float hemiFactor = vNormal.y * 0.5 + 0.5;
+                    vec3 hemiLight = mix(dirtColor * 0.2, vec3(0.5, 0.6, 0.7) * 0.3, hemiFactor);
+                    
+                    // Final color
+                    vec3 finalColor = baseColor * (ambient + diffuse + hemiLight);
+                    
+                    // Distance fog
+                    float dist = length(vWorldPosition.xz);
+                    float fogFactor = smoothstep(200.0, 500.0, dist);
+                    vec3 fogColor = vec3(0.7, 0.8, 0.9);
+                    finalColor = mix(finalColor, fogColor, fogFactor * 0.5);
+                    
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
         };
 
         // ============================================
@@ -2499,46 +2550,99 @@
             
             createRoadTexture() {
                 const canvas = document.createElement('canvas');
-                canvas.width = 512;
-                canvas.height = 512;
+                canvas.width = 1024;
+                canvas.height = 1024;
                 const ctx = canvas.getContext('2d');
                 
-                // Asphalt base
-                ctx.fillStyle = '#3a3a3a';
-                ctx.fillRect(0, 0, 512, 512);
+                // Dark asphalt base with slight blue tint
+                const gradient = ctx.createLinearGradient(0, 0, 1024, 0);
+                gradient.addColorStop(0, '#2a2a2f');
+                gradient.addColorStop(0.5, '#303035');
+                gradient.addColorStop(1, '#2a2a2f');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 1024, 1024);
                 
-                // Add noise for texture
-                for (let i = 0; i < 5000; i++) {
-                    const x = Math.random() * 512;
-                    const y = Math.random() * 512;
-                    const brightness = 50 + Math.random() * 30;
-                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
-                    ctx.fillRect(x, y, 2, 2);
+                // Add realistic asphalt texture (aggregate noise)
+                for (let i = 0; i < 15000; i++) {
+                    const x = Math.random() * 1024;
+                    const y = Math.random() * 1024;
+                    const size = Math.random() * 3 + 1;
+                    const brightness = 35 + Math.random() * 40;
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness + Math.random() * 5})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, Math.PI * 2);
+                    ctx.fill();
                 }
                 
-                // Road markings
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.lineWidth = 8;
-                ctx.setLineDash([40, 30]);
+                // Add occasional lighter patches (repaired sections)
+                for (let i = 0; i < 8; i++) {
+                    const x = Math.random() * 900 + 50;
+                    const y = Math.random() * 900 + 50;
+                    const w = Math.random() * 80 + 40;
+                    const h = Math.random() * 80 + 40;
+                    ctx.fillStyle = `rgba(60, 60, 65, ${Math.random() * 0.3 + 0.2})`;
+                    ctx.fillRect(x, y, w, h);
+                }
+                
+                // Add tire marks (subtle)
+                ctx.strokeStyle = 'rgba(20, 20, 20, 0.15)';
+                ctx.lineWidth = 4;
+                for (let i = 0; i < 5; i++) {
+                    ctx.beginPath();
+                    const startX = 300 + Math.random() * 100;
+                    ctx.moveTo(startX, 0);
+                    ctx.bezierCurveTo(
+                        startX + Math.random() * 50 - 25, 300,
+                        startX + Math.random() * 50 - 25, 700,
+                        startX + Math.random() * 100 - 50, 1024
+                    );
+                    ctx.stroke();
+                }
+                
+                // Center line (dashed yellow/white)
+                ctx.strokeStyle = '#E8E8E0';
+                ctx.lineWidth = 12;
+                ctx.setLineDash([60, 50]);
+                ctx.lineCap = 'round';
                 ctx.beginPath();
-                ctx.moveTo(256, 0);
-                ctx.lineTo(256, 512);
+                ctx.moveTo(512, 0);
+                ctx.lineTo(512, 1024);
                 ctx.stroke();
                 
-                // Edge lines
+                // Edge lines (solid white)
                 ctx.setLineDash([]);
-                ctx.lineWidth = 6;
+                ctx.strokeStyle = '#F0F0E8';
+                ctx.lineWidth = 10;
+                
+                // Left edge
                 ctx.beginPath();
-                ctx.moveTo(40, 0);
-                ctx.lineTo(40, 512);
-                ctx.moveTo(472, 0);
-                ctx.lineTo(472, 512);
+                ctx.moveTo(60, 0);
+                ctx.lineTo(60, 1024);
                 ctx.stroke();
+                
+                // Right edge
+                ctx.beginPath();
+                ctx.moveTo(964, 0);
+                ctx.lineTo(964, 1024);
+                ctx.stroke();
+                
+                // Add subtle wear on lines
+                ctx.strokeStyle = 'rgba(42, 42, 42, 0.3)';
+                ctx.lineWidth = 2;
+                for (let y = 0; y < 1024; y += 20) {
+                    if (Math.random() > 0.7) {
+                        ctx.beginPath();
+                        ctx.moveTo(55 + Math.random() * 10, y);
+                        ctx.lineTo(55 + Math.random() * 10, y + 15);
+                        ctx.stroke();
+                    }
+                }
                 
                 const texture = new THREE.CanvasTexture(canvas);
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
-                texture.repeat.set(1, 8);
+                texture.repeat.set(1, 6);
+                texture.anisotropy = 16;
                 
                 return texture;
             }

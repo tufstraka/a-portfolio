@@ -2745,55 +2745,50 @@
             }
             
             createRoads() {
-                // Professional road system with realistic details
-                const roadWidth = 10; // Two lanes
-                const laneWidth = 5;
-                const roadHeight = 0.12;
+                // Ultra-polished professional road system
+                const roadWidth = 10;
+                const roadHeight = 0.1;
                 
-                // Get all positions including start point
                 const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
                 const startPos = { x: 0, z: 60 };
                 
-                // Load high-quality asphalt texture
                 const textureLoader = new THREE.TextureLoader();
                 
-                // Use a better asphalt URL with normal map potential
+                // Premium asphalt texture with proper settings
                 const asphaltTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/backgrounddetailed6.jpg');
                 asphaltTexture.wrapS = THREE.RepeatWrapping;
                 asphaltTexture.wrapT = THREE.RepeatWrapping;
-                asphaltTexture.repeat.set(2, 8);
                 asphaltTexture.anisotropy = 16;
                 
-                const roadMaterial = new THREE.MeshStandardMaterial({
-                    map: asphaltTexture,
-                    roughness: 0.9,
-                    metalness: 0.05,
-                    color: 0x333333
-                });
-                
-                // Road segments - hub and spoke layout
                 const roadSegments = [
-                    { from: startPos, to: positions[0] }, // Start to center
+                    { from: startPos, to: positions[0] },
                 ];
                 
-                // Connect center to all other sections
                 for (let i = 1; i < positions.length; i++) {
                     roadSegments.push({ from: positions[0], to: positions[i] });
                 }
                 
-                // Create each road segment with lane markings
-                roadSegments.forEach((segment, idx) => {
+                // Create perfectly uniform roads
+                roadSegments.forEach((segment) => {
                     const dx = segment.to.x - segment.from.x;
                     const dz = segment.to.z - segment.from.z;
                     const length = Math.sqrt(dx * dx + dz * dz);
                     const angle = Math.atan2(dx, dz);
+                    const shortenedLength = length - 20;
                     
-                    // Shorten roads to not overlap with intersections
-                    const shortenedLength = length - 16;
+                    // Set texture repeat based on actual length for consistency
+                    const texRepeatZ = Math.floor(shortenedLength / 5);
+                    asphaltTexture.repeat.set(2, texRepeatZ);
                     
-                    // Main road surface
+                    const roadMaterial = new THREE.MeshStandardMaterial({
+                        map: asphaltTexture.clone(),
+                        roughness: 0.95,
+                        metalness: 0.0,
+                        color: 0x2a2a2a
+                    });
+                    
                     const roadGeometry = new THREE.BoxGeometry(roadWidth, roadHeight, shortenedLength);
-                    const road = new THREE.Mesh(roadGeometry, roadMaterial.clone());
+                    const road = new THREE.Mesh(roadGeometry, roadMaterial);
                     
                     road.position.set(
                         segment.from.x + dx / 2,
@@ -2805,40 +2800,38 @@
                     
                     this.scene.add(road);
                     
-                    // Add realistic lane markings
-                    this.addLaneMarkings(segment.from, segment.to, length, angle);
-                    
-                    // Add road edges (white lines)
-                    this.addRoadEdges(segment.from, segment.to, length, angle, roadWidth);
+                    // Perfect lane markings
+                    this.addLaneMarkings(segment.from, segment.to, length, angle, shortenedLength);
+                    this.addRoadEdges(segment.from, segment.to, length, angle, roadWidth, shortenedLength);
                 });
                 
-                // Add realistic intersections
+                // Uniform intersections
                 positions.forEach(pos => {
-                    this.createIntersection(pos.x, pos.z, 12);
+                    this.createIntersection(pos.x, pos.z, 13);
                 });
                 
-                this.createIntersection(startPos.x, startPos.z, 10);
+                this.createIntersection(startPos.x, startPos.z, 11);
             }
             
-            addLaneMarkings(from, to, length, angle) {
+            addLaneMarkings(from, to, length, angle, roadLength) {
                 const dx = to.x - from.x;
                 const dz = to.z - from.z;
                 
-                // Dashed yellow center line
-                const dashLength = 3;
-                const gapLength = 5;
-                const numDashes = Math.floor((length - 16) / (dashLength + gapLength));
+                const dashLength = 2.5;
+                const gapLength = 4;
+                const startOffset = 10;
+                const numDashes = Math.floor((roadLength - 2) / (dashLength + gapLength));
                 
                 const lineMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0xFFDD00,
+                    color: 0xFFE135,
                     transparent: true,
-                    opacity: 0.9
+                    opacity: 0.95
                 });
                 
                 for (let i = 0; i < numDashes; i++) {
-                    const progress = (i * (dashLength + gapLength) + dashLength / 2 + 8) / length;
+                    const progress = (startOffset + i * (dashLength + gapLength) + dashLength / 2) / length;
                     
-                    const dashGeom = new THREE.BoxGeometry(0.2, 0.02, dashLength);
+                    const dashGeom = new THREE.BoxGeometry(0.15, 0.015, dashLength);
                     const dash = new THREE.Mesh(dashGeom, lineMaterial);
                     
                     dash.position.set(
@@ -2848,33 +2841,37 @@
                     );
                     dash.rotation.y = -angle;
                     
+                        from.x + dx * progress,
+                        0.11,
+                        from.z + dz * progress
+                    );
+                    dash.rotation.y = -angle;
+                    
                     this.scene.add(dash);
                 }
             }
             
-            addRoadEdges(from, to, length, angle, roadWidth) {
+            addRoadEdges(from, to, length, angle, roadWidth, roadLength) {
                 const dx = to.x - from.x;
                 const dz = to.z - from.z;
-                const shortenedLength = length - 16;
                 
-                // White edge lines (solid)
                 const edgeMaterial = new THREE.MeshBasicMaterial({ 
                     color: 0xFFFFFF,
                     transparent: true,
-                    opacity: 0.95
+                    opacity: 0.98
                 });
                 
                 [-1, 1].forEach(side => {
-                    const edgeGeom = new THREE.BoxGeometry(0.15, 0.02, shortenedLength);
+                    const edgeGeom = new THREE.BoxGeometry(0.12, 0.015, roadLength);
                     const edge = new THREE.Mesh(edgeGeom, edgeMaterial);
                     
-                    const offset = (roadWidth / 2 - 0.3) * side;
+                    const offset = (roadWidth / 2 - 0.25) * side;
                     const midX = from.x + dx / 2;
                     const midZ = from.z + dz / 2;
                     
                     edge.position.set(
                         midX + Math.cos(angle) * offset,
-                        0.13,
+                        0.11,
                         midZ - Math.sin(angle) * offset
                     );
                     edge.rotation.y = -angle;
@@ -2884,20 +2881,58 @@
             }
             
             createIntersection(x, z, radius) {
-                // Realistic intersection with asphalt texture
-                const geometry = new THREE.CylinderGeometry(radius, radius, 0.12, 64);
+                const geometry = new THREE.CylinderGeometry(radius, radius, 0.1, 64);
                 
-                // Use same asphalt texture as roads
                 const textureLoader = new THREE.TextureLoader();
                 const asphaltTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/backgrounddetailed6.jpg');
                 asphaltTexture.wrapS = THREE.RepeatWrapping;
                 asphaltTexture.wrapT = THREE.RepeatWrapping;
-                asphaltTexture.repeat.set(4, 4);
+                asphaltTexture.repeat.set(5, 5);
+                asphaltTexture.anisotropy = 16;
                 
                 const material = new THREE.MeshStandardMaterial({
                     map: asphaltTexture,
-                    roughness: 0.9,
-                    metalness: 0.05,
+                    roughness: 0.95,
+                    metalness: 0.0,
+                    color: 0x2a2a2a
+                });
+                
+                const intersection = new THREE.Mesh(geometry, material);
+                intersection.position.set(x, 0.05, z);
+                intersection.receiveShadow = true;
+                this.scene.add(intersection);
+                
+                this.addCrosswalk(x, z, radius);
+            }
+            
+            addCrosswalk(x, z, radius) {
+                const stripeMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xFFFFFF,
+                    transparent: true,
+                    opacity: 0.95
+                });
+                
+                for (let direction = 0; direction < 4; direction++) {
+                    const angle = direction * Math.PI / 2;
+                    
+                    for (let i = 0; i < 7; i++) {
+                        const stripeGeom = new THREE.BoxGeometry(0.7, 0.02, 2.5);
+                        const stripe = new THREE.Mesh(stripeGeom, stripeMaterial);
+                        
+                        const offset = (i - 3) * 1;
+                        const distance = radius - 2.5;
+                        
+                        stripe.position.set(
+                            x + Math.sin(angle) * distance + Math.cos(angle) * offset,
+                            0.11,
+                            z + Math.cos(angle) * distance - Math.sin(angle) * offset
+                        );
+                        stripe.rotation.y = angle;
+                        
+                        this.scene.add(stripe);
+                    }
+                }
+            }
                     color: 0x333333
                 });
                 
@@ -3678,21 +3713,30 @@
             }
             
             createTrees(count) {
+                // Load tree bark texture
+                const textureLoader = new THREE.TextureLoader();
+                const barkTexture = textureLoader.load('https://threejs.org/examples/textures/brick_diffuse.jpg');
+                barkTexture.wrapS = THREE.RepeatWrapping;
+                barkTexture.wrapT = THREE.RepeatWrapping;
+                barkTexture.repeat.set(1, 2);
+                
                 const trunkMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x4A3728,
-                    roughness: 0.9
+                    map: barkTexture,
+                    color: 0x3D2817,
+                    roughness: 0.95,
+                    metalness: 0.0
                 });
                 
                 const leafMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x2D5A27,
-                    roughness: 0.8
+                    color: 0x1A4D2E,
+                    roughness: 0.9,
+                    metalness: 0.0
                 });
                 
                 for (let i = 0; i < count; i++) {
                     const angle = Math.random() * Math.PI * 2;
                     const radius = 50 + Math.random() * 200;
                     
-                    // Avoid roads and buildings
                     const x = Math.sin(angle) * radius;
                     const z = Math.cos(angle) * radius;
                     
@@ -3708,35 +3752,59 @@
                     if (tooClose) continue;
                     
                     const treeGroup = new THREE.Group();
-                    const scale = 0.8 + Math.random() * 0.6;
+                    const scale = 0.9 + Math.random() * 0.8;
                     
-                    // Trunk
-                    const trunkGeom = new THREE.CylinderGeometry(0.3 * scale, 0.5 * scale, 4 * scale, 8);
+                    // Realistic trunk with taper
+                    const trunkGeom = new THREE.CylinderGeometry(
+                        0.25 * scale,  // top radius
+                        0.45 * scale,  // bottom radius (tapered)
+                        5 * scale,     // height
+                        12,            // segments
+                        3              // height segments for better shape
+                    );
                     const trunk = new THREE.Mesh(trunkGeom, trunkMaterial);
-                    trunk.position.y = 2 * scale;
-                    trunk.castShadow = this.state.quality !== 'low';
+                    trunk.position.y = 2.5 * scale;
+                    trunk.castShadow = true;
                     treeGroup.add(trunk);
                     
-                    // Foliage (multiple spheres for fuller look)
-                    const foliagePositions = [
-                        { x: 0, y: 5, z: 0, r: 2.5 },
-                        { x: -1, y: 4.5, z: 0.5, r: 1.8 },
-                        { x: 1, y: 4.2, z: -0.5, r: 1.6 },
-                        { x: 0.5, y: 5.5, z: 0.5, r: 1.5 }
+                    // Detailed crown with multiple layers
+                    const crownLayers = [
+                        { y: 5.5, r: 2.8, segments: 12 },
+                        { y: 6.5, r: 2.5, segments: 10 },
+                        { y: 7.3, r: 2.0, segments: 10 },
+                        { y: 8.0, r: 1.5, segments: 8 }
                     ];
                     
-                    foliagePositions.forEach(pos => {
-                        const foliageGeom = new THREE.SphereGeometry(pos.r * scale, 8, 6);
+                    crownLayers.forEach(layer => {
+                        const foliageGeom = new THREE.SphereGeometry(
+                            layer.r * scale,
+                            layer.segments,
+                            layer.segments / 2
+                        );
                         const foliage = new THREE.Mesh(foliageGeom, leafMaterial);
-                        foliage.position.set(pos.x * scale, pos.y * scale, pos.z * scale);
-                        foliage.castShadow = this.state.quality !== 'low';
+                        foliage.position.y = layer.y * scale;
+                        foliage.castShadow = true;
+                        foliage.receiveShadow = true;
                         treeGroup.add(foliage);
                     });
+                    
+                    // Add some random foliage clusters for natural look
+                    for (let j = 0; j < 3; j++) {
+                        const clusterGeom = new THREE.SphereGeometry(1.2 * scale, 8, 6);
+                        const cluster = new THREE.Mesh(clusterGeom, leafMaterial);
+                        const angleOffset = (j / 3) * Math.PI * 2;
+                        cluster.position.set(
+                            Math.cos(angleOffset) * 1.5 * scale,
+                            5.5 * scale,
+                            Math.sin(angleOffset) * 1.5 * scale
+                        );
+                        cluster.castShadow = true;
+                        treeGroup.add(cluster);
+                    }
                     
                     treeGroup.position.set(x, 0, z);
                     treeGroup.rotation.y = Math.random() * Math.PI * 2;
                     
-                    // Register tree with collision system
                     this.collisionSystem.addTree({ x, z });
                     this.treePositions.push({ x, z });
                     
@@ -4270,31 +4338,61 @@
             }
             
             honk() {
-                // Visual honk feedback (since we don't have audio)
+                // Play realistic car horn sound
+                if (this.audioContext) {
+                    if (this.audioContext.state === 'suspended') {
+                        this.audioContext.resume();
+                    }
+                    
+                    // Create two-tone car horn (classic beep-beep)
+                    const now = this.audioContext.currentTime;
+                    
+                    for (let i = 0; i < 2; i++) {
+                        const osc = this.audioContext.createOscillator();
+                        const gain = this.audioContext.createGain();
+                        
+                        // Car horn frequency (around 400-500 Hz)
+                        osc.frequency.value = 420 + i * 80;
+                        osc.type = 'square';
+                        
+                        const startTime = now + i * 0.15;
+                        const duration = 0.1;
+                        
+                        gain.gain.setValueAtTime(0, startTime);
+                        gain.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
+                        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                        
+                        osc.connect(gain);
+                        gain.connect(this.audioContext.destination);
+                        
+                        osc.start(startTime);
+                        osc.stop(startTime + duration);
+                    }
+                }
+                
                 this.showToast('📢', 'HONK!', 'Beep beep!');
                 
-                // Create a visual honk wave
+                // Visual honk wave
                 if (this.car) {
                     const honkGeom = new THREE.RingGeometry(1, 1.5, 32);
                     const honkMat = new THREE.MeshBasicMaterial({
-                        color: 0xFDCB6E,
+                        color: 0xFFDD44,
                         transparent: true,
                         opacity: 0.8,
                         side: THREE.DoubleSide
                     });
                     const honkRing = new THREE.Mesh(honkGeom, honkMat);
                     honkRing.position.copy(this.car.position);
-                    honkRing.position.y += 1;
+                    honkRing.position.y += 1.5;
                     honkRing.rotation.x = -Math.PI / 2;
                     this.scene.add(honkRing);
                     
-                    // Animate the honk wave
                     const startTime = performance.now();
                     const animateHonk = () => {
                         const elapsed = (performance.now() - startTime) / 1000;
-                        if (elapsed < 0.5) {
-                            honkRing.scale.setScalar(1 + elapsed * 8);
-                            honkMat.opacity = 0.8 * (1 - elapsed * 2);
+                        if (elapsed < 0.4) {
+                            honkRing.scale.setScalar(1 + elapsed * 10);
+                            honkMat.opacity = 0.8 * (1 - elapsed * 2.5);
                             requestAnimationFrame(animateHonk);
                         } else {
                             this.scene.remove(honkRing);

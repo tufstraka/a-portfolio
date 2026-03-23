@@ -2754,11 +2754,12 @@
                 
                 const textureLoader = new THREE.TextureLoader();
                 
-                // Premium asphalt texture with proper settings
-                const asphaltTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/backgrounddetailed6.jpg');
-                asphaltTexture.wrapS = THREE.RepeatWrapping;
-                asphaltTexture.wrapT = THREE.RepeatWrapping;
-                asphaltTexture.anisotropy = 16;
+                // Use solid asphalt color (texture URL was broken)
+                const roadMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x2a2a2a,
+                    roughness: 0.95,
+                    metalness: 0.0
+                });
                 
                 const roadSegments = [
                     { from: startPos, to: positions[0] },
@@ -2775,17 +2776,6 @@
                     const length = Math.sqrt(dx * dx + dz * dz);
                     const angle = Math.atan2(dx, dz);
                     const shortenedLength = length - 20;
-                    
-                    // Set texture repeat based on actual length for consistency
-                    const texRepeatZ = Math.floor(shortenedLength / 5);
-                    asphaltTexture.repeat.set(2, texRepeatZ);
-                    
-                    const roadMaterial = new THREE.MeshStandardMaterial({
-                        map: asphaltTexture.clone(),
-                        roughness: 0.95,
-                        metalness: 0.0,
-                        color: 0x2a2a2a
-                    });
                     
                     const roadGeometry = new THREE.BoxGeometry(roadWidth, roadHeight, shortenedLength);
                     const road = new THREE.Mesh(roadGeometry, roadMaterial);
@@ -2877,18 +2867,10 @@
             createIntersection(x, z, radius) {
                 const geometry = new THREE.CylinderGeometry(radius, radius, 0.1, 64);
                 
-                const textureLoader = new THREE.TextureLoader();
-                const asphaltTexture = textureLoader.load('https://threejs.org/examples/textures/terrain/backgrounddetailed6.jpg');
-                asphaltTexture.wrapS = THREE.RepeatWrapping;
-                asphaltTexture.wrapT = THREE.RepeatWrapping;
-                asphaltTexture.repeat.set(5, 5);
-                asphaltTexture.anisotropy = 16;
-                
                 const material = new THREE.MeshStandardMaterial({
-                    map: asphaltTexture,
+                    color: 0x2a2a2a,
                     roughness: 0.95,
-                    metalness: 0.0,
-                    color: 0x2a2a2a
+                    metalness: 0.0
                 });
                 
                 const intersection = new THREE.Mesh(geometry, material);

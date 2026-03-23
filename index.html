@@ -1231,9 +1231,9 @@
                 
                 <div class="tutorial-key-group">
                     <div class="tutorial-key">
-                        <kbd>SPACE</kbd>
+                        <kbd>J</kbd>
                     </div>
-                    <span class="tutorial-key-label">Enter Building</span>
+                    <span class="tutorial-key-label">Jump</span>
                 </div>
                 
                 <div class="tutorial-key-group">
@@ -2296,9 +2296,6 @@
                     await this.createVehicle();
                     this.updateLoadingProgress(55);
                     
-                    this.createCharacter();
-                    this.updateLoadingProgress(65);
-                    
                     this.createPortfolioSections();
                     this.updateLoadingProgress(80);
                     
@@ -3351,132 +3348,147 @@
                 this.engineGain.gain.value = currentVol + (targetVolume - currentVol) * 0.1;
             }
             
-            createCharacter() {
-                const characterGroup = new THREE.Group();
-                
-                // Stylized character (low-poly friendly)
-                const bodyMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x6366F1,
-                    roughness: 0.7,
-                    metalness: 0.2
-                });
-                
-                const skinMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xD4A574,
-                    roughness: 0.8
-                });
-                
-                // Body
-                const bodyGeom = new THREE.CapsuleGeometry(0.35, 0.9, 4, 12);
-                const body = new THREE.Mesh(bodyGeom, bodyMaterial);
-                body.position.y = 1.15;
-                body.castShadow = this.state.quality !== 'low';
-                characterGroup.add(body);
-                
-                // Head
-                const headGeom = new THREE.SphereGeometry(0.28, 16, 12);
-                const head = new THREE.Mesh(headGeom, skinMaterial);
-                head.position.y = 1.9;
-                head.castShadow = this.state.quality !== 'low';
-                characterGroup.add(head);
-                
-                // Hair
-                const hairMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x1a1a1a,
-                    roughness: 0.9
-                });
-                const hairGeom = new THREE.SphereGeometry(0.3, 16, 12, 0, Math.PI * 2, 0, Math.PI / 2);
-                const hair = new THREE.Mesh(hairGeom, hairMaterial);
-                hair.position.y = 2.0;
-                characterGroup.add(hair);
-                
-                this.character = characterGroup;
-                this.character.visible = false;
-                this.scene.add(this.character);
-            }
-            
             createPortfolioSections() {
                 Object.entries(PORTFOLIO_DATA).forEach(([title, data]) => {
                     const sectionGroup = new THREE.Group();
                     
-                    // Modern building design
+                    // Realistic modern building design
                     const buildingHeight = 30 + Math.random() * 10;
                     
-                    // Main building with glass facade
+                    // Main building structure with detailed facade
                     const buildingGeom = new THREE.BoxGeometry(16, buildingHeight, 16);
                     const buildingMaterial = new THREE.MeshStandardMaterial({
                         color: data.color,
-                        metalness: 0.3,
-                        roughness: 0.7
+                        metalness: 0.4,
+                        roughness: 0.6,
+                        envMapIntensity: 1.2
                     });
                     
                     const building = new THREE.Mesh(buildingGeom, buildingMaterial);
                     building.position.y = buildingHeight / 2;
-                    building.castShadow = this.state.quality !== 'low';
-                    building.receiveShadow = this.state.quality !== 'low';
+                    building.castShadow = true;
+                    building.receiveShadow = true;
                     sectionGroup.add(building);
                     
-                    // Glass panels on facade
+                    // Modern glass facade panels
                     const glassMaterial = new THREE.MeshPhysicalMaterial({
-                        color: 0x88AADD,
-                        metalness: 0.1,
-                        roughness: 0.1,
-                        transmission: 0.6,
-                        thickness: 0.5
+                        color: 0x4A90A4,
+                        metalness: 0.0,
+                        roughness: 0.05,
+                        transmission: 0.9,
+                        thickness: 0.5,
+                        transparent: true,
+                        opacity: 0.6
                     });
                     
-                    // Add windows
-                    for (let floor = 0; floor < Math.floor(buildingHeight / 4); floor++) {
+                    // Grid of windows on each side
+                    const windowsPerSide = 3;
+                    const floorsCount = Math.floor(buildingHeight / 4);
+                    
+                    for (let floor = 0; floor < floorsCount; floor++) {
+                        const y = 3 + floor * 4;
+                        
                         for (let side = 0; side < 4; side++) {
-                            const windowGeom = new THREE.PlaneGeometry(3, 2.5);
-                            const windowMesh = new THREE.Mesh(windowGeom, glassMaterial);
-                            
-                            const y = 3 + floor * 4;
-                            const offset = 8.01;
-                            
-                            switch(side) {
-                                case 0: // Front
-                                    windowMesh.position.set(0, y, offset);
-                                    break;
-                                case 1: // Back
-                                    windowMesh.position.set(0, y, -offset);
-                                    windowMesh.rotation.y = Math.PI;
-                                    break;
-                                case 2: // Left
-                                    windowMesh.position.set(-offset, y, 0);
-                                    windowMesh.rotation.y = -Math.PI / 2;
-                                    break;
-                                case 3: // Right
-                                    windowMesh.position.set(offset, y, 0);
-                                    windowMesh.rotation.y = Math.PI / 2;
-                                    break;
+                            for (let i = 0; i < windowsPerSide; i++) {
+                                const windowGeom = new THREE.BoxGeometry(3, 2.8, 0.1);
+                                const windowMesh = new THREE.Mesh(windowGeom, glassMaterial);
+                                
+                                const offset = 8.05;
+                                const xOffset = (i - 1) * 4;
+                                
+                                switch(side) {
+                                    case 0: // Front
+                                        windowMesh.position.set(xOffset, y, offset);
+                                        break;
+                                    case 1: // Back
+                                        windowMesh.position.set(-xOffset, y, -offset);
+                                        break;
+                                    case 2: // Left
+                                        windowMesh.position.set(-offset, y, xOffset);
+                                        windowMesh.rotation.y = Math.PI / 2;
+                                        break;
+                                    case 3: // Right
+                                        windowMesh.position.set(offset, y, -xOffset);
+                                        windowMesh.rotation.y = -Math.PI / 2;
+                                        break;
+                                }
+                                
+                                sectionGroup.add(windowMesh);
                             }
-                            
-                            sectionGroup.add(windowMesh);
                         }
+                        
+                        // Add floor separator (horizontal band)
+                        const separatorGeom = new THREE.BoxGeometry(16.2, 0.3, 16.2);
+                        const separatorMat = new THREE.MeshStandardMaterial({
+                            color: new THREE.Color(data.color).multiplyScalar(0.5),
+                            metalness: 0.8,
+                            roughness: 0.3
+                        });
+                        const separator = new THREE.Mesh(separatorGeom, separatorMat);
+                        separator.position.y = 1 + floor * 4;
+                        sectionGroup.add(separator);
                     }
                     
-                    // Roof details
-                    const roofGeom = new THREE.BoxGeometry(17, 1.5, 17);
+                    // Rooftop with details
+                    const roofGeom = new THREE.BoxGeometry(17, 2, 17);
                     const roofMaterial = new THREE.MeshStandardMaterial({
-                        color: new THREE.Color(data.color).multiplyScalar(0.6),
-                        metalness: 0.5,
-                        roughness: 0.5
+                        color: new THREE.Color(data.color).multiplyScalar(0.4),
+                        metalness: 0.7,
+                        roughness: 0.4
                     });
                     const roof = new THREE.Mesh(roofGeom, roofMaterial);
-                    roof.position.y = buildingHeight + 0.75;
-                    roof.castShadow = this.state.quality !== 'low';
+                    roof.position.y = buildingHeight + 1;
+                    roof.castShadow = true;
                     sectionGroup.add(roof);
+                    
+                    // Rooftop HVAC units
+                    for (let i = 0; i < 3; i++) {
+                        const hvacGeom = new THREE.BoxGeometry(2, 1.5, 1.5);
+                        const hvacMat = new THREE.MeshStandardMaterial({
+                            color: 0x666666,
+                            metalness: 0.6,
+                            roughness: 0.5
+                        });
+                        const hvac = new THREE.Mesh(hvacGeom, hvacMat);
+                        hvac.position.set((i - 1) * 4, buildingHeight + 2.75, -4);
+                        hvac.castShadow = true;
+                        sectionGroup.add(hvac);
+                    }
+                    
+                    // Entrance awning
+                    const awningGeom = new THREE.BoxGeometry(12, 0.3, 4);
+                    const awningMat = new THREE.MeshStandardMaterial({
+                        color: data.color,
+                        metalness: 0.5,
+                        roughness: 0.6
+                    });
+                    const awning = new THREE.Mesh(awningGeom, awningMat);
+                    awning.position.set(0, 4, 10);
+                    awning.castShadow = true;
+                    sectionGroup.add(awning);
+                    
+                    // Entrance door (large glass double door)
+                    const doorGeom = new THREE.BoxGeometry(4, 6, 0.3);
+                    const doorMat = new THREE.MeshPhysicalMaterial({
+                        color: 0x222222,
+                        metalness: 0.8,
+                        roughness: 0.2
+                    });
+                    const door = new THREE.Mesh(doorGeom, doorMat);
+                    door.position.set(0, 3, 8.2);
+                    sectionGroup.add(door);
                     
                     // Floating sign with emoji
                     const signGroup = new THREE.Group();
                     
-                    // Sign background
-                    const signGeom = new THREE.BoxGeometry(10, 3, 0.3);
+                    // Sign background with LED frame
+                    const signGeom = new THREE.BoxGeometry(12, 4, 0.5);
                     const signMaterial = new THREE.MeshStandardMaterial({
                         color: 0xFFFFFF,
-                        metalness: 0.1,
-                        roughness: 0.9
+                        metalness: 0.2,
+                        roughness: 0.8,
+                        emissive: 0xFFFFFF,
+                        emissiveIntensity: 0.2
                     });
                     const sign = new THREE.Mesh(signGeom, signMaterial);
                     signGroup.add(sign);
@@ -3484,7 +3496,7 @@
                     // Text on sign
                     const labelCanvas = document.createElement('canvas');
                     labelCanvas.width = 512;
-                    labelCanvas.height = 160;
+                    labelCanvas.height = 180;
                     const ctx = labelCanvas.getContext('2d');
                     
                     // Gradient background
@@ -3492,14 +3504,14 @@
                     gradient.addColorStop(0, '#' + new THREE.Color(data.color).getHexString());
                     gradient.addColorStop(1, '#' + new THREE.Color(data.color).multiplyScalar(1.3).getHexString());
                     ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, 512, 160);
+                    ctx.fillRect(0, 0, 512, 180);
                     
                     // Text
                     ctx.fillStyle = 'white';
-                    ctx.font = 'bold 56px Nunito, sans-serif';
+                    ctx.font = 'bold 60px Nunito, sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(`${data.icon} ${title}`, 256, 80);
+                    ctx.fillText(`${data.icon} ${title}`, 256, 90);
                     
                     const labelTexture = new THREE.CanvasTexture(labelCanvas);
                     const labelMaterial = new THREE.MeshBasicMaterial({
@@ -4147,7 +4159,6 @@
                     e.preventDefault();
                 }
                 
-                if (e.code === 'KeyE') this.togglePlayerMode();
                 if (e.code === 'KeyC') this.toggleCamera();
                 if (e.code === 'KeyH') this.honk();
                 if (e.code === 'KeyM') this.toggleMinimap();
@@ -4214,31 +4225,6 @@
                 this.camera.updateProjectionMatrix();
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 this.composer.setSize(window.innerWidth, window.innerHeight);
-            }
-            
-            togglePlayerMode() {
-                if (this.state.playerMode === 'driving') {
-                    this.state.playerMode = 'walking';
-                    
-                    this.character.position.set(
-                        this.car.position.x + Math.sin(this.car.rotation.y + Math.PI/2) * 3,
-                        0,
-                        this.car.position.z + Math.cos(this.car.rotation.y + Math.PI/2) * 3
-                    );
-                    this.character.rotation.y = this.car.rotation.y;
-                    this.character.visible = true;
-                    
-                    this.showNotification('On foot! 🚶', 'Press E to get back in');
-                } else {
-                    const dist = this.character.position.distanceTo(this.car.position);
-                    if (dist < 6) {
-                        this.state.playerMode = 'driving';
-                        this.character.visible = false;
-                        this.showNotification('Back in the car! 🏎️');
-                    } else {
-                        this.showNotification("Too far from car! 🚗", null, '#EF4444');
-                    }
-                }
             }
             
             toggleCamera() {
@@ -4392,11 +4378,7 @@
             }
             
             updateMovement(delta) {
-                if (this.state.playerMode === 'driving') {
-                    this.updateCar(delta);
-                } else {
-                    this.updateCharacter(delta);
-                }
+                this.updateCar(delta);
             }
             
             updateCar(delta) {
@@ -4508,32 +4490,8 @@
                 });
             }
             
-            updateCharacter(delta) {
-                const keys = this.state.keys;
-                const walkSpeed = 0.12;
-                
-                let moveX = 0, moveZ = 0;
-                
-                if (keys['KeyW'] || keys['ArrowUp']) moveZ += walkSpeed;
-                if (keys['KeyS'] || keys['ArrowDown']) moveZ -= walkSpeed;
-                if (keys['KeyA'] || keys['ArrowLeft']) moveX += walkSpeed;
-                if (keys['KeyD'] || keys['ArrowRight']) moveX -= walkSpeed;
-                
-                if (moveX !== 0 || moveZ !== 0) {
-                    this.character.rotation.y = Math.atan2(moveX, moveZ);
-                    this.character.position.x += Math.sin(this.character.rotation.y) * walkSpeed;
-                    this.character.position.z += Math.cos(this.character.rotation.y) * walkSpeed;
-                    
-                    // Walking animation (bob)
-                    this.character.position.y = Math.sin(this.state.time * 10) * 0.05;
-                }
-                
-                const speedEl = document.getElementById('speedValue');
-                if (speedEl) speedEl.textContent = '0';
-            }
-            
             updateCamera() {
-                const target = this.state.playerMode === 'driving' ? this.car : this.character;
+                const target = this.car;
                 if (!target) return;
                 
                 let targetPos = new THREE.Vector3();

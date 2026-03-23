@@ -4557,11 +4557,11 @@
                         wheel.rotation.y = steeringAngle;
                     }
                     
-                    // Rolling rotation: rotate all child meshes (tire, rim, etc.) around their local Z axis
-                    // This is because the wheel meshes are cylinders rotated 90° to be horizontal
+                    // Rolling rotation: cylinders are rotated 90° on Z to point along X axis
+                    // So they roll around the X axis as the car moves forward/backward
                     wheel.children.forEach(mesh => {
                         if (mesh.geometry) {
-                            mesh.rotation.z += rotationAmount;
+                            mesh.rotation.x += rotationAmount;
                         }
                     });
                 });

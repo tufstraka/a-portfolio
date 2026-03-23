@@ -1179,7 +1179,7 @@
                 <div class="loading-bar" id="loadingBar"></div>
             </div>
             <p class="loading-tip">
-                <kbd>WASD</kbd> to drive • <kbd>SPACE</kbd> to explore
+                <kbd>WASD</kbd> to drive • <kbd>J</kbd> to jump • <kbd>SPACE</kbd> to explore
             </p>
         </div>
     </div>
@@ -1260,6 +1260,10 @@
             <div class="control-item">
                 <span class="control-key">WASD</span>
                 <span>Drive around</span>
+            </div>
+            <div class="control-item">
+                <span class="control-key">J</span>
+                <span>Jump! 🦘</span>
             </div>
             <div class="control-item">
                 <span class="control-key">SPACE</span>
@@ -1398,6 +1402,11 @@
             BRAKE_FORCE: 20,             // m/s² (strong braking)
             REVERSE_MAX_SPEED: 8,        // ~29 km/h reverse
             
+            // Jump (Bruno Simon style!)
+            JUMP_FORCE: 12,              // Initial upward velocity
+            JUMP_COOLDOWN: 500,          // ms between jumps
+            AIR_CONTROL: 0.3,            // Steering control while airborne
+            
             // Friction & Grip
             ROAD_FRICTION: 0.85,         // Asphalt grip
             GRASS_FRICTION: 0.4,         // Much less grip on grass
@@ -1428,10 +1437,14 @@
             DEFAULT_CAMERA_DISTANCE: 18,
             DEFAULT_CAMERA_HEIGHT: 8,
             CAMERA_LERP_FACTOR: 0.08,
+            CAMERA_SHAKE_DECAY: 0.9,     // How fast shake diminishes
             
             // Gameplay
             SECTION_DETECTION_RADIUS: 25,
             BOOST_MULTIPLIER: 1.8,
+            
+            // Ramps
+            RAMP_BOOST: 1.5,             // Speed multiplier when hitting ramp
             
             // Performance
             TARGET_FPS: 60,
@@ -1748,11 +1761,12 @@
                 this.x = 0;
                 this.z = 60;
                 this.rotation = 0;        // Yaw (heading)
-                this.y = 0;               // Height (for suspension)
+                this.y = 0;               // Height (for suspension/jump)
                 
                 // Velocity
                 this.velocityX = 0;
                 this.velocityZ = 0;
+                this.velocityY = 0;       // Vertical velocity for jump
                 this.speed = 0;           // Signed speed (+ forward, - backward)
                 this.angularVelocity = 0;
                 
@@ -1764,18 +1778,36 @@
                 this.bodyRoll = 0;
                 this.bodyPitch = 0;
                 
+                // Jump state
+                this.isGrounded = true;
+                this.lastJumpTime = 0;
+                this.jumpCount = 0;
+                
                 // State
                 this.isOnRoad = true;
                 this.isColliding = false;
+            }
+            
+            jump() {
+                const now = performance.now();
+                if (this.isGrounded && (now - this.lastJumpTime) > CONFIG.JUMP_COOLDOWN) {
+                    this.velocityY = CONFIG.JUMP_FORCE;
+                    this.isGrounded = false;
+                    this.lastJumpTime = now;
+                    this.jumpCount++;
+                    return true; // Jump successful
+                }
+                return false;
             }
             
             update(delta, input, collisionSystem) {
                 // Cap delta to prevent physics explosion
                 delta = Math.min(delta, 0.05);
                 
-                // Get surface friction
+                // Get surface friction (reduced in air)
                 this.isOnRoad = collisionSystem.isOnRoad(this.x, this.z);
-                const friction = this.isOnRoad ? CONFIG.ROAD_FRICTION : CONFIG.GRASS_FRICTION;
+                const baseFriction = this.isOnRoad ? CONFIG.ROAD_FRICTION : CONFIG.GRASS_FRICTION;
+                const friction = this.isGrounded ? baseFriction : baseFriction * CONFIG.AIR_CONTROL;
                 
                 // --- STEERING ---
                 this.targetSteerAngle = input.steer * CONFIG.MAX_STEER_ANGLE;
@@ -1789,35 +1821,41 @@
                     steerSpeed * delta
                 );
                 
-                // Reduce steering effectiveness at high speed (understeer)
+                // Reduce steering effectiveness at high speed (understeer) and in air
                 const speedFactor = 1 - (Math.abs(this.speed) / CONFIG.MAX_SPEED) * 0.4;
-                const effectiveSteer = this.steerAngle * speedFactor;
+                const airFactor = this.isGrounded ? 1 : CONFIG.AIR_CONTROL;
+                const effectiveSteer = this.steerAngle * speedFactor * airFactor;
                 
                 // --- ACCELERATION & BRAKING ---
                 let accelerationForce = 0;
                 const isMovingForward = this.speed > 0.1;
                 const isMovingBackward = this.speed < -0.1;
                 
+                // Only accelerate when grounded (or reduced in air)
+                const accelMultiplier = this.isGrounded ? 1 : 0.2;
+                
                 if (input.throttle > 0) {
                     // Accelerating forward
                     const maxSpeed = input.boost ? CONFIG.MAX_SPEED * CONFIG.BOOST_MULTIPLIER : CONFIG.MAX_SPEED;
                     if (this.speed < maxSpeed) {
-                        accelerationForce = CONFIG.ACCELERATION * input.throttle * friction;
+                        accelerationForce = CONFIG.ACCELERATION * input.throttle * friction * accelMultiplier;
                         if (input.boost) accelerationForce *= 1.3;
                     }
                 } else if (input.brake > 0) {
                     if (isMovingForward) {
                         // Braking while moving forward
-                        accelerationForce = -CONFIG.BRAKE_FORCE * input.brake * friction;
+                        accelerationForce = -CONFIG.BRAKE_FORCE * input.brake * friction * accelMultiplier;
                     } else if (this.speed > -CONFIG.REVERSE_MAX_SPEED) {
                         // Reversing
-                        accelerationForce = -CONFIG.ACCELERATION * 0.5 * input.brake * friction;
+                        accelerationForce = -CONFIG.ACCELERATION * 0.5 * input.brake * friction * accelMultiplier;
                     }
                 }
                 
                 // --- RESISTANCE FORCES ---
-                // Rolling resistance
-                const rollingResistance = -Math.sign(this.speed) * CONFIG.ROLLING_RESISTANCE * CONFIG.CAR_MASS * CONFIG.GRAVITY;
+                // Rolling resistance (only when grounded)
+                const rollingResistance = this.isGrounded 
+                    ? -Math.sign(this.speed) * CONFIG.ROLLING_RESISTANCE * CONFIG.CAR_MASS * CONFIG.GRAVITY
+                    : 0;
                 
                 // Air resistance (quadratic)
                 const airResistance = -CONFIG.AIR_RESISTANCE * this.speed * Math.abs(this.speed);
@@ -1829,7 +1867,7 @@
                 this.speed += totalAcceleration * delta;
                 
                 // Natural stop at very low speeds
-                if (Math.abs(this.speed) < 0.1 && input.throttle === 0 && input.brake === 0) {
+                if (Math.abs(this.speed) < 0.1 && input.throttle === 0 && input.brake === 0 && this.isGrounded) {
                     this.speed *= 0.9;
                     if (Math.abs(this.speed) < 0.01) this.speed = 0;
                 }
@@ -1841,10 +1879,36 @@
                     const turnRadius = wheelBase / Math.tan(Math.abs(effectiveSteer) + 0.001);
                     const angularVel = this.speed / turnRadius * Math.sign(effectiveSteer);
                     
-                    this.rotation += angularVel * delta;
+                    // Reduced turning in air
+                    const turnMultiplier = this.isGrounded ? 1 : CONFIG.AIR_CONTROL;
+                    this.rotation += angularVel * delta * turnMultiplier;
                 }
                 
-                // --- UPDATE POSITION ---
+                // --- GRAVITY & VERTICAL PHYSICS ---
+                if (!this.isGrounded) {
+                    // Apply gravity
+                    this.velocityY -= CONFIG.GRAVITY * delta;
+                }
+                
+                // Update vertical position
+                this.y += this.velocityY * delta;
+                
+                // Ground collision
+                if (this.y <= 0) {
+                    this.y = 0;
+                    if (this.velocityY < -2) {
+                        // Hard landing - bounce slightly and lose some speed
+                        this.velocityY = -this.velocityY * 0.2;
+                        this.speed *= 0.95;
+                    } else {
+                        this.velocityY = 0;
+                    }
+                    this.isGrounded = true;
+                } else if (this.y > 0.1) {
+                    this.isGrounded = false;
+                }
+                
+                // --- UPDATE HORIZONTAL POSITION ---
                 const prevX = this.x;
                 const prevZ = this.z;
                 
@@ -1873,20 +1937,22 @@
                     this.isColliding = false;
                 }
                 
-                // Ground collision (never go below 0)
-                this.y = Math.max(0, this.y);
-                
                 // --- SUSPENSION / BODY DYNAMICS ---
+                // Extra pitch when airborne (nose up slightly)
+                const airPitch = this.isGrounded ? 0 : -0.1;
+                
                 // Body roll (leaning in turns)
                 const lateralG = this.speed * this.angularVelocity;
                 const targetRoll = -lateralG * CONFIG.BODY_ROLL_FACTOR;
                 this.bodyRoll = THREE.MathUtils.lerp(this.bodyRoll, targetRoll, CONFIG.SUSPENSION_DAMPING * delta);
                 this.bodyRoll = THREE.MathUtils.clamp(this.bodyRoll, -0.15, 0.15);
                 
-                // Body pitch (nose dive on brake, squat on accel)
-                const targetPitch = -accelerationForce * CONFIG.PITCH_FACTOR * 0.01;
+                // Body pitch (nose dive on brake, squat on accel, up when airborne)
+                const targetPitch = this.isGrounded 
+                    ? -accelerationForce * CONFIG.PITCH_FACTOR * 0.01
+                    : airPitch;
                 this.bodyPitch = THREE.MathUtils.lerp(this.bodyPitch, targetPitch, CONFIG.SUSPENSION_DAMPING * delta);
-                this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch, -0.1, 0.1);
+                this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch, -0.15, 0.15);
                 
                 return {
                     x: this.x,
@@ -1899,7 +1965,9 @@
                     speed: this.speed,
                     speedKmh: Math.abs(this.speed * 3.6), // Convert m/s to km/h
                     isOnRoad: this.isOnRoad,
-                    isColliding: this.isColliding
+                    isColliding: this.isColliding,
+                    isGrounded: this.isGrounded,
+                    isAirborne: !this.isGrounded
                 };
             }
         }
@@ -3026,10 +3094,104 @@
                 // Decorative elements
                 this.createDecorations();
                 
+                // Ramps for jumping! (Bruno Simon inspired)
+                this.createRamps();
+                
                 // Particles (only on high/ultra)
                 if (this.state.quality === 'ultra' || this.state.quality === 'high') {
                     this.createParticles();
                 }
+            }
+            
+            createRamps() {
+                const rampMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xE17055,
+                    roughness: 0.6,
+                    metalness: 0.2
+                });
+                
+                const stripeMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xFDCB6E,
+                    roughness: 0.5
+                });
+                
+                // Ramp positions - place them along roads for fun jumps
+                const rampPositions = [
+                    { x: 0, z: 30, rotation: 0 },           // Near start
+                    { x: 35, z: -25, rotation: Math.PI / 4 },   // Between sections
+                    { x: -35, z: -25, rotation: -Math.PI / 4 },
+                    { x: 0, z: -50, rotation: 0 },          // Halfway to Projects
+                    { x: 35, z: 25, rotation: Math.PI / 4 },
+                    { x: -35, z: 25, rotation: -Math.PI / 4 }
+                ];
+                
+                rampPositions.forEach(pos => {
+                    const rampGroup = new THREE.Group();
+                    
+                    // Main ramp surface
+                    const rampGeom = new THREE.BoxGeometry(8, 0.5, 12);
+                    const ramp = new THREE.Mesh(rampGeom, rampMaterial);
+                    ramp.rotation.x = -Math.PI / 12; // 15 degree incline
+                    ramp.position.y = 1.5;
+                    ramp.position.z = -2;
+                    ramp.castShadow = true;
+                    ramp.receiveShadow = true;
+                    rampGroup.add(ramp);
+                    
+                    // Support structure
+                    const supportGeom = new THREE.BoxGeometry(7.5, 3, 0.5);
+                    const support = new THREE.Mesh(supportGeom, rampMaterial);
+                    support.position.y = 1.5;
+                    support.position.z = -7.5;
+                    support.castShadow = true;
+                    rampGroup.add(support);
+                    
+                    // Warning stripes on front
+                    for (let i = 0; i < 4; i++) {
+                        const stripeGeom = new THREE.BoxGeometry(1.5, 0.6, 0.1);
+                        const stripe = new THREE.Mesh(stripeGeom, stripeMaterial);
+                        stripe.position.set(-3 + i * 2, 0.3, -7.7);
+                        rampGroup.add(stripe);
+                    }
+                    
+                    // Arrow indicator on ramp surface
+                    const arrowGroup = new THREE.Group();
+                    const arrowShaft = new THREE.Mesh(
+                        new THREE.BoxGeometry(1, 0.1, 4),
+                        stripeMaterial
+                    );
+                    arrowShaft.position.z = -1;
+                    arrowGroup.add(arrowShaft);
+                    
+                    const arrowHead = new THREE.Mesh(
+                        new THREE.ConeGeometry(1.2, 2, 3),
+                        stripeMaterial
+                    );
+                    arrowHead.rotation.x = -Math.PI / 2;
+                    arrowHead.position.z = -4;
+                    arrowGroup.add(arrowHead);
+                    
+                    arrowGroup.rotation.x = -Math.PI / 12;
+                    arrowGroup.position.y = 1.8;
+                    arrowGroup.position.z = -2;
+                    rampGroup.add(arrowGroup);
+                    
+                    // Position the ramp
+                    rampGroup.position.set(pos.x, 0, pos.z);
+                    rampGroup.rotation.y = pos.rotation;
+                    
+                    this.scene.add(rampGroup);
+                    
+                    // Store ramp info for collision detection
+                    if (!this.ramps) this.ramps = [];
+                    this.ramps.push({
+                        x: pos.x,
+                        z: pos.z,
+                        rotation: pos.rotation,
+                        width: 8,
+                        length: 12
+                    });
+                });
             }
             
             createTrees(count) {
@@ -3529,6 +3691,15 @@
                 this.state.input.brake = (keys['KeyS'] || keys['ArrowDown']) ? 1 : 0;
                 this.state.input.boost = keys['ShiftLeft'] || keys['ShiftRight'];
                 
+                // Jump! (Space key - but not when entering buildings)
+                if (keys['KeyJ'] && this.state.playerMode === 'driving') {
+                    const jumped = this.vehiclePhysics.jump();
+                    if (jumped) {
+                        this.triggerScreenShake(0.3);
+                        this.showToast('🦘', 'Jump!', '');
+                    }
+                }
+                
                 // Steering (-1 to 1)
                 let steer = 0;
                 if (keys['KeyA'] || keys['ArrowLeft']) steer = 1;
@@ -3549,6 +3720,7 @@
                 // Store for other systems
                 this.state.carSpeed = physicsState.speed;
                 this.state.isBoosting = this.state.input.boost && this.state.input.throttle > 0;
+                this.state.isAirborne = physicsState.isAirborne;
                 
                 // Update UI
                 const speedKmh = Math.round(physicsState.speedKmh);
@@ -3563,8 +3735,11 @@
                     this.triggerScreenShake(0.4);
                 }
                 
-                // Surface indicator (optional: show when on grass)
-                // Could add visual feedback for different surfaces here
+                // Landing impact
+                if (this.state.wasAirborne && physicsState.isGrounded) {
+                    this.triggerScreenShake(0.5);
+                }
+                this.state.wasAirborne = physicsState.isAirborne;
             }
             
             updateWheels() {

@@ -2548,10 +2548,6 @@
             }
             
             async createScene() {
-                // Day/night cycle time (0-1, where 0=midnight, 0.5=noon)
-                this.timeOfDay = 0.5; // Start at noon
-                this.dayNightSpeed = 0.01; // Cycle speed (full cycle ~100 seconds)
-                
                 // Simple gradient sky background
                 this.scene.background = new THREE.Color(0x87CEEB); // Sky blue
                 
@@ -2627,92 +2623,6 @@
                 
                 // Ground with custom shader
                 await this.createTerrain();
-            }
-            
-            updateDayNightCycle(delta) {
-                // Update time of day
-                this.timeOfDay += this.dayNightSpeed * delta;
-                if (this.timeOfDay > 1) this.timeOfDay -= 1;
-                
-                // Calculate sun angle (0 = midnight, 0.5 = noon)
-                const sunAngle = this.timeOfDay * Math.PI * 2;
-                const sunHeight = Math.sin(sunAngle);
-                
-                // Day/night transition
-                const dayness = Math.max(0, sunHeight); // 0 at night, 1 at noon
-                
-                // Sky colors
-                const dayTopColor = new THREE.Color(0x0077ff);      // Deep blue
-                const dayBottomColor = new THREE.Color(0x89CFF0);   // Light blue
-                const nightTopColor = new THREE.Color(0x000814);    // Dark blue-black
-                const nightBottomColor = new THREE.Color(0x1a1a2e); // Dark navy
-                const sunsetColor = new THREE.Color(0xFF6B35);       // Orange
-                
-                // Blend colors based on time
-                let topColor, bottomColor;
-                
-                if (dayness > 0.8) {
-                    // Full day
-                    topColor = dayTopColor;
-                    bottomColor = dayBottomColor;
-                } else if (dayness > 0.2) {
-                    // Sunrise/sunset transition
-                    const sunsetFactor = (dayness - 0.2) / 0.6;
-                    topColor = new THREE.Color().lerpColors(sunsetColor, dayTopColor, sunsetFactor);
-                    bottomColor = new THREE.Color().lerpColors(sunsetColor, dayBottomColor, sunsetFactor);
-                } else if (dayness > 0) {
-                    // Twilight
-                    const twilightFactor = dayness / 0.2;
-                    topColor = new THREE.Color().lerpColors(nightTopColor, sunsetColor, twilightFactor);
-                    bottomColor = new THREE.Color().lerpColors(nightBottomColor, sunsetColor, twilightFactor);
-                } else {
-                    // Night
-                    topColor = nightTopColor;
-                    bottomColor = nightBottomColor;
-                }
-                
-                // Update sky material
-                this.skyMaterial.uniforms.topColor.value.copy(topColor);
-                this.skyMaterial.uniforms.bottomColor.value.copy(bottomColor);
-                this.scene.background.copy(bottomColor);
-                
-                // Update sun position
-                const sunRadius = 500;
-                this.sunLight.position.set(
-                    Math.cos(sunAngle) * sunRadius,
-                    sunHeight * 300 + 50,
-                    Math.sin(sunAngle) * sunRadius
-                );
-                
-                // Update sun intensity
-                this.sunLight.intensity = Math.max(0.2, dayness * 2.0);
-                
-                // Update sun color (warm at sunset, white at noon, cool at night)
-                if (dayness > 0.8) {
-                    this.sunLight.color.setHex(0xFFFFF0); // White-yellow
-                } else if (dayness > 0.2) {
-                    this.sunLight.color.setHex(0xFFAA66); // Orange
-                } else {
-                    this.sunLight.color.setHex(0x6688CC); // Cool blue (moonlight)
-                }
-                
-                // Update ambient and hemisphere lights
-                this.ambientLight.intensity = Math.max(0.1, dayness * 0.4);
-                this.ambientLight.color.copy(topColor);
-                
-                this.hemiLight.intensity = Math.max(0.2, dayness * 0.6);
-                this.hemiLight.color.copy(topColor);
-                
-                // Update visible sun mesh if it exists
-                if (this.sunMesh) {
-                    this.sunMesh.position.copy(this.sunLight.position);
-                    this.sunMesh.visible = dayness > 0.1; // Hide at night
-                    
-                    if (this.sunGlow) {
-                        this.sunGlow.position.copy(this.sunLight.position);
-                        this.sunGlow.visible = dayness > 0.1;
-                    }
-                }
             }
             
             createClouds() {
@@ -4443,9 +4353,6 @@
                 
                 const delta = this.clock.getDelta();
                 this.state.time += delta;
-                
-                // Update day/night cycle
-                this.updateDayNightCycle(delta);
                 
                 this.updateMovement(delta);
                 this.updateCamera();

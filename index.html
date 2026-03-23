@@ -4485,13 +4485,18 @@
                 const steeringAngle = this.vehiclePhysics.steerAngle;
                 
                 this.wheels.forEach((wheel, index) => {
-                    // Rotate all wheels for rolling motion
-                    wheel.rotation.x += rotationAmount;
-                    
-                    // Apply steering to front wheels only
+                    // Apply steering to front wheels (rotate the entire group around Y)
                     if (wheel.userData.steering) {
                         wheel.rotation.y = steeringAngle;
                     }
+                    
+                    // Rolling rotation: rotate all child meshes (tire, rim, etc.) around their local Z axis
+                    // This is because the wheel meshes are cylinders rotated 90° to be horizontal
+                    wheel.children.forEach(mesh => {
+                        if (mesh.geometry) {
+                            mesh.rotation.z += rotationAmount;
+                        }
+                    });
                 });
             }
             

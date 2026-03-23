@@ -1726,19 +1726,29 @@
             
             // Check if a point is on the road (for friction calculation)
             isOnRoad(x, z) {
-                // Simplified: check if near the road network
-                // Roads connect buildings, so check distance to road lines
+                // Hub and spoke road layout - center is About Me at (0,0)
+                const center = { x: 0, z: 0 };
+                const startPos = { x: 0, z: 60 };
                 const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
-                positions.push({ x: 0, z: 60 }); // Start point
+                const roadWidth = 7; // Half width for distance check
                 
-                for (let i = 0; i < positions.length; i++) {
-                    const p1 = positions[i];
-                    const p2 = positions[(i + 1) % positions.length];
-                    
-                    // Distance from point to line segment
-                    const dist = this.pointToSegmentDistance(x, z, p1.x, p1.z, p2.x, p2.z);
-                    if (dist < 8) return true; // Road width / 2
+                // Check if on start road (start to center)
+                const distToStartRoad = this.pointToSegmentDistance(x, z, startPos.x, startPos.z, center.x, center.z);
+                if (distToStartRoad < roadWidth) return true;
+                
+                // Check if on any spoke road (center to each section)
+                for (let i = 1; i < positions.length; i++) {
+                    const dist = this.pointToSegmentDistance(x, z, center.x, center.z, positions[i].x, positions[i].z);
+                    if (dist < roadWidth) return true;
                 }
+                
+                // Check if at any intersection
+                const allPoints = [startPos, ...positions];
+                for (const pos of allPoints) {
+                    const distToPoint = Math.sqrt((x - pos.x) ** 2 + (z - pos.z) ** 2);
+                    if (distToPoint < 10) return true; // Intersection radius
+                }
+                
                 return false;
             }
             
@@ -2057,31 +2067,33 @@
         // SHADERS - PUBG-Style Realistic
         // ============================================
         
-        // Enhanced terrain shader for realistic ground with proper lighting
+        // High-quality terrain shader with realistic grass and lighting
         const TerrainShader = {
             uniforms: {
                 time: { value: 0 },
-                grassColor1: { value: new THREE.Color(0x3D6B35) },  // Dark grass
-                grassColor2: { value: new THREE.Color(0x5A8F4D) },  // Light grass
-                dirtColor: { value: new THREE.Color(0x6B5344) },    // Brown dirt
-                sandColor: { value: new THREE.Color(0xC4A76C) },    // Sandy patches
-                noiseScale: { value: 40.0 },
-                sunDirection: { value: new THREE.Vector3(0.5, 0.8, 0.3).normalize() },
-                ambientLight: { value: new THREE.Color(0x404050) },
-                sunLight: { value: new THREE.Color(0xFFFAF0) }
+                grassColor1: { value: new THREE.Color(0x2E5A1C) },  // Dark rich grass
+                grassColor2: { value: new THREE.Color(0x4A8F3C) },  // Bright grass
+                grassColor3: { value: new THREE.Color(0x6BAF5B) },  // Highlight grass
+                dirtColor: { value: new THREE.Color(0x5D4E37) },    // Rich brown dirt
+                pathColor: { value: new THREE.Color(0x7A6B5A) },    // Worn path color
+                noiseScale: { value: 35.0 },
+                sunDirection: { value: new THREE.Vector3(0.4, 0.7, 0.5).normalize() },
+                sunColor: { value: new THREE.Color(0xFFFBE8) },
+                skyColor: { value: new THREE.Color(0x87CEEB) },
+                shadowColor: { value: new THREE.Color(0x2A3A4A) }
             },
             vertexShader: `
                 varying vec2 vUv;
                 varying vec3 vNormal;
-                varying vec3 vPosition;
                 varying vec3 vWorldPosition;
+                varying float vDistanceFromCenter;
                 
                 void main() {
                     vUv = uv;
                     vNormal = normalize(normalMatrix * normal);
-                    vPosition = position;
                     vec4 worldPos = modelMatrix * vec4(position, 1.0);
                     vWorldPosition = worldPos.xyz;
+                    vDistanceFromCenter = length(worldPos.xz);
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
                 }
             `,
@@ -2089,19 +2101,21 @@
                 uniform float time;
                 uniform vec3 grassColor1;
                 uniform vec3 grassColor2;
+                uniform vec3 grassColor3;
                 uniform vec3 dirtColor;
-                uniform vec3 sandColor;
+                uniform vec3 pathColor;
                 uniform float noiseScale;
                 uniform vec3 sunDirection;
-                uniform vec3 ambientLight;
-                uniform vec3 sunLight;
+                uniform vec3 sunColor;
+                uniform vec3 skyColor;
+                uniform vec3 shadowColor;
                 
                 varying vec2 vUv;
                 varying vec3 vNormal;
-                varying vec3 vPosition;
                 varying vec3 vWorldPosition;
+                varying float vDistanceFromCenter;
                 
-                // Improved noise functions
+                // High quality noise
                 vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
                 vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
                 vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
@@ -2109,35 +2123,33 @@
                 float snoise(vec2 v) {
                     const vec4 C = vec4(0.211324865405187, 0.366025403784439,
                                        -0.577350269189626, 0.024390243902439);
-                    vec2 i  = floor(v + dot(v, C.yy));
-                    vec2 x0 = v -   i + dot(i, C.xx);
+                    vec2 i = floor(v + dot(v, C.yy));
+                    vec2 x0 = v - i + dot(i, C.xx);
                     vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
                     vec4 x12 = x0.xyxy + C.xxzz;
                     x12.xy -= i1;
                     i = mod289(i);
-                    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0))
-                                           + i.x + vec3(0.0, i1.x, 1.0));
-                    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy),
-                                           dot(x12.zw,x12.zw)), 0.0);
-                    m = m*m;
-                    m = m*m;
+                    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+                    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+                    m = m*m*m*m;
                     vec3 x = 2.0 * fract(p * C.www) - 1.0;
                     vec3 h = abs(x) - 0.5;
                     vec3 ox = floor(x + 0.5);
                     vec3 a0 = x - ox;
                     m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
                     vec3 g;
-                    g.x  = a0.x  * x0.x  + h.x  * x0.y;
+                    g.x = a0.x * x0.x + h.x * x0.y;
                     g.yz = a0.yz * x12.xz + h.yz * x12.yw;
                     return 130.0 * dot(m, g);
                 }
                 
-                // Fractal Brownian Motion for more natural look
-                float fbm(vec2 p) {
+                // Multi-octave noise
+                float fbm(vec2 p, int octaves) {
                     float value = 0.0;
                     float amplitude = 0.5;
                     float frequency = 1.0;
-                    for (int i = 0; i < 4; i++) {
+                    for (int i = 0; i < 6; i++) {
+                        if (i >= octaves) break;
                         value += amplitude * snoise(p * frequency);
                         amplitude *= 0.5;
                         frequency *= 2.0;
@@ -2145,51 +2157,78 @@
                     return value;
                 }
                 
+                // Voronoi for grass clumps
+                float voronoi(vec2 p) {
+                    vec2 n = floor(p);
+                    vec2 f = fract(p);
+                    float md = 8.0;
+                    for (int j = -1; j <= 1; j++) {
+                        for (int i = -1; i <= 1; i++) {
+                            vec2 g = vec2(float(i), float(j));
+                            vec2 o = vec2(snoise(n + g) * 0.5 + 0.5, snoise((n + g) * 1.3) * 0.5 + 0.5);
+                            vec2 r = g + o - f;
+                            float d = dot(r, r);
+                            md = min(md, d);
+                        }
+                    }
+                    return sqrt(md);
+                }
+                
                 void main() {
                     vec2 pos = vWorldPosition.xz;
                     
-                    // Multi-scale noise for terrain variation
-                    float largeNoise = fbm(pos / noiseScale) * 0.5 + 0.5;
-                    float mediumNoise = snoise(pos / (noiseScale * 0.3)) * 0.5 + 0.5;
-                    float smallNoise = snoise(pos / (noiseScale * 0.1)) * 0.5 + 0.5;
-                    float tinyNoise = snoise(pos / 5.0) * 0.5 + 0.5;
+                    // Multi-scale noise layers
+                    float largeNoise = fbm(pos / noiseScale, 4) * 0.5 + 0.5;
+                    float mediumNoise = fbm(pos / (noiseScale * 0.4), 3) * 0.5 + 0.5;
+                    float smallNoise = snoise(pos / 8.0) * 0.5 + 0.5;
+                    float microNoise = snoise(pos / 2.0) * 0.5 + 0.5;
                     
-                    // Grass color variation (two-tone grass)
-                    vec3 grassColor = mix(grassColor1, grassColor2, smallNoise);
+                    // Grass clump pattern using voronoi
+                    float grassClumps = voronoi(pos / 4.0);
                     
-                    // Mix in dirt based on noise
-                    float dirtFactor = smoothstep(0.3, 0.5, largeNoise) * (1.0 - smoothstep(0.6, 0.8, largeNoise));
-                    vec3 baseColor = mix(grassColor, dirtColor, dirtFactor * 0.6);
+                    // Three-tone grass blending
+                    vec3 grass = mix(grassColor1, grassColor2, smallNoise);
+                    grass = mix(grass, grassColor3, smoothstep(0.3, 0.7, grassClumps) * 0.4);
                     
-                    // Add sandy patches (rare)
-                    float sandFactor = smoothstep(0.85, 0.95, mediumNoise);
-                    baseColor = mix(baseColor, sandColor, sandFactor * 0.3);
+                    // Add grass blade micro-detail
+                    float bladeDetail = microNoise * 0.2;
+                    grass *= (0.85 + bladeDetail);
                     
-                    // Micro-detail for grass blade illusion
-                    float microDetail = tinyNoise * 0.15;
-                    baseColor *= (0.9 + microDetail);
+                    // Dirt patches (natural distribution)
+                    float dirtPattern = smoothstep(0.45, 0.55, largeNoise);
+                    dirtPattern *= smoothstep(0.4, 0.6, mediumNoise);
+                    vec3 baseColor = mix(grass, dirtColor, dirtPattern * 0.5);
                     
-                    // Proper lighting
+                    // Worn paths near center (where car drives)
+                    float pathDist = smoothstep(15.0, 8.0, vDistanceFromCenter);
+                    baseColor = mix(baseColor, pathColor, pathDist * 0.3);
+                    
+                    // Lighting
                     float NdotL = max(dot(vNormal, sunDirection), 0.0);
+                    float shadow = smoothstep(0.0, 0.3, NdotL);
                     
-                    // Diffuse lighting
-                    vec3 diffuse = sunLight * NdotL * 0.7;
+                    // Diffuse with soft shadow
+                    vec3 diffuse = sunColor * NdotL * 0.65;
                     
-                    // Ambient with slight sky color
-                    vec3 ambient = ambientLight * 0.5;
+                    // Ambient from sky
+                    vec3 ambient = mix(shadowColor, skyColor, 0.3) * 0.4;
                     
-                    // Hemisphere lighting (ground bounce)
-                    float hemiFactor = vNormal.y * 0.5 + 0.5;
-                    vec3 hemiLight = mix(dirtColor * 0.2, vec3(0.5, 0.6, 0.7) * 0.3, hemiFactor);
+                    // Subsurface scattering approximation for grass
+                    float sss = pow(max(0.0, dot(-sunDirection, vNormal) + 0.5), 2.0) * 0.15;
+                    vec3 subsurface = grassColor2 * sss;
                     
-                    // Final color
-                    vec3 finalColor = baseColor * (ambient + diffuse + hemiLight);
+                    // Final color composition
+                    vec3 finalColor = baseColor * (ambient + diffuse) + subsurface;
                     
-                    // Distance fog
+                    // Distance fade to horizon color
                     float dist = length(vWorldPosition.xz);
-                    float fogFactor = smoothstep(200.0, 500.0, dist);
-                    vec3 fogColor = vec3(0.7, 0.8, 0.9);
-                    finalColor = mix(finalColor, fogColor, fogFactor * 0.5);
+                    float fogFactor = smoothstep(150.0, 400.0, dist);
+                    vec3 horizonColor = mix(skyColor, vec3(0.85, 0.9, 0.95), 0.5);
+                    finalColor = mix(finalColor, horizonColor, fogFactor * 0.6);
+                    
+                    // Slight vignette for depth
+                    float vignette = 1.0 - smoothstep(200.0, 600.0, dist) * 0.2;
+                    finalColor *= vignette;
                     
                     gl_FragColor = vec4(finalColor, 1.0);
                 }
@@ -2634,65 +2673,82 @@
             }
             
             createRoads() {
-                // Create road material with polygon offset to prevent z-fighting
+                // Create a single road mesh using ExtrudeGeometry for clean connections
+                const roadWidth = 12;
+                const roadHeight = 0.05;
+                
+                // Get all positions including start point
+                const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
+                const startPos = { x: 0, z: 60 };
+                
+                // Create road texture
                 const roadTexture = this.createRoadTexture();
+                roadTexture.wrapS = THREE.RepeatWrapping;
+                roadTexture.wrapT = THREE.RepeatWrapping;
+                
                 const roadMaterial = new THREE.MeshStandardMaterial({
                     map: roadTexture,
-                    roughness: 0.85,
-                    metalness: 0.05,
-                    polygonOffset: true,
-                    polygonOffsetFactor: -4,
-                    polygonOffsetUnits: -4,
-                    depthWrite: true
+                    roughness: 0.9,
+                    metalness: 0.0,
+                    side: THREE.DoubleSide
                 });
                 
-                // Create road segments connecting buildings
-                const roadWidth = 14;
-                const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
-                positions.push({ x: 0, z: 60 }); // Starting point
+                // Create individual road segments without overlap
+                // Connect start to each section and sections to each other in a star pattern
+                const roadSegments = [];
                 
-                positions.forEach((pos, i) => {
-                    const nextPos = positions[(i + 1) % positions.length];
-                    
-                    const dx = nextPos.x - pos.x;
-                    const dz = nextPos.z - pos.z;
+                // Connect start point to center (About Me)
+                roadSegments.push({ from: startPos, to: positions[0] });
+                
+                // Connect center to all other sections (hub and spoke)
+                for (let i = 1; i < positions.length; i++) {
+                    roadSegments.push({ from: positions[0], to: positions[i] });
+                }
+                
+                // Create each road segment
+                roadSegments.forEach(segment => {
+                    const dx = segment.to.x - segment.from.x;
+                    const dz = segment.to.z - segment.from.z;
                     const length = Math.sqrt(dx * dx + dz * dz);
                     const angle = Math.atan2(dx, dz);
                     
-                    const roadGeometry = new THREE.PlaneGeometry(roadWidth, length + 25);
-                    const road = new THREE.Mesh(roadGeometry, roadMaterial.clone());
+                    // Create road as a box for better depth
+                    const roadGeometry = new THREE.BoxGeometry(roadWidth, roadHeight, length);
+                    const road = new THREE.Mesh(roadGeometry, roadMaterial);
                     
                     road.position.set(
-                        pos.x + dx / 2,
-                        0.02, // Very slightly above ground
-                        pos.z + dz / 2
+                        segment.from.x + dx / 2,
+                        roadHeight / 2,
+                        segment.from.z + dz / 2
                     );
-                    road.rotation.x = -Math.PI / 2;
-                    road.rotation.z = -angle;
-                    road.receiveShadow = this.state.quality !== 'low';
-                    road.renderOrder = 1; // Render after ground
+                    road.rotation.y = -angle;
+                    road.receiveShadow = true;
+                    road.castShadow = false;
                     
                     this.scene.add(road);
                 });
                 
-                // Add intersection circles at each building
-                const intersectionGeometry = new THREE.CircleGeometry(10, 32);
-                const intersectionMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x3a3a3a,
-                    roughness: 0.85,
-                    metalness: 0.05,
-                    polygonOffset: true,
-                    polygonOffsetFactor: -6,
-                    polygonOffsetUnits: -6
+                // Add circular intersections at each point
+                positions.forEach(pos => {
+                    this.createIntersection(pos.x, pos.z, 8);
                 });
                 
-                positions.forEach(pos => {
-                    const intersection = new THREE.Mesh(intersectionGeometry, intersectionMaterial);
-                    intersection.position.set(pos.x, 0.03, pos.z);
-                    intersection.rotation.x = -Math.PI / 2;
-                    intersection.renderOrder = 2;
-                    this.scene.add(intersection);
+                // Intersection at start
+                this.createIntersection(startPos.x, startPos.z, 6);
+            }
+            
+            createIntersection(x, z, radius) {
+                const geometry = new THREE.CylinderGeometry(radius, radius, 0.06, 32);
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0x2a2a30,
+                    roughness: 0.9,
+                    metalness: 0.0
                 });
+                
+                const intersection = new THREE.Mesh(geometry, material);
+                intersection.position.set(x, 0.03, z);
+                intersection.receiveShadow = true;
+                this.scene.add(intersection);
             }
             
             createRoadTexture() {

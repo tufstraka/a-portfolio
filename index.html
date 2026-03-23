@@ -2548,23 +2548,42 @@
             }
             
             async createScene() {
-                // Beautiful blue sky with sun
-                this.sky = new Sky();
-                this.sky.scale.setScalar(10000);
-                this.scene.add(this.sky);
+                // Simple gradient sky background (Sky addon not rendering properly)
+                this.scene.background = new THREE.Color(0x87CEEB); // Sky blue
                 
-                const skyUniforms = this.sky.material.uniforms;
-                skyUniforms['turbidity'].value = 2;        // Clearer sky
-                skyUniforms['rayleigh'].value = 1;         // Nice blue
-                skyUniforms['mieCoefficient'].value = 0.005;
-                skyUniforms['mieDirectionalG'].value = 0.7;
+                // Create hemisphere sky dome for gradient effect
+                const skyGeo = new THREE.SphereGeometry(1000, 32, 15);
+                const skyMat = new THREE.ShaderMaterial({
+                    uniforms: {
+                        topColor: { value: new THREE.Color(0x0077ff) }, // Deep blue
+                        bottomColor: { value: new THREE.Color(0x89CFF0) }, // Light blue
+                        offset: { value: 33 },
+                        exponent: { value: 0.6 }
+                    },
+                    vertexShader: `
+                        varying vec3 vWorldPosition;
+                        void main() {
+                            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                            vWorldPosition = worldPosition.xyz;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform vec3 topColor;
+                        uniform vec3 bottomColor;
+                        uniform float offset;
+                        uniform float exponent;
+                        varying vec3 vWorldPosition;
+                        void main() {
+                            float h = normalize(vWorldPosition + offset).y;
+                            gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+                        }
+                    `,
+                    side: THREE.BackSide
+                });
                 
-                // Sun position (mid-day for bright scene)
-                const sun = new THREE.Vector3();
-                const phi = THREE.MathUtils.degToRad(60);   // 60 degrees from horizon
-                const theta = THREE.MathUtils.degToRad(180);
-                sun.setFromSphericalCoords(1, phi, theta);
-                skyUniforms['sunPosition'].value.copy(sun);
+                const sky = new THREE.Mesh(skyGeo, skyMat);
+                this.scene.add(sky);
                 
                 // Add clouds
                 this.createClouds();
@@ -2670,6 +2689,28 @@
                 
                 this.clouds = cloudGroup;
                 this.scene.add(cloudGroup);
+                
+                // Add visible sun
+                const sunGeo = new THREE.SphereGeometry(30, 32, 32);
+                const sunMat = new THREE.MeshBasicMaterial({
+                    color: 0xFFFAE3,
+                    fog: false
+                });
+                const sun = new THREE.Mesh(sunGeo, sunMat);
+                sun.position.set(400, 300, -200); // Far away in the sky
+                this.scene.add(sun);
+                
+                // Sun glow (larger, transparent)
+                const glowGeo = new THREE.SphereGeometry(50, 32, 32);
+                const glowMat = new THREE.MeshBasicMaterial({
+                    color: 0xFFFFCC,
+                    transparent: true,
+                    opacity: 0.3,
+                    fog: false
+                });
+                const glow = new THREE.Mesh(glowGeo, glowMat);
+                glow.position.copy(sun.position);
+                this.scene.add(glow);
             }
             
             async createTerrain() {
@@ -2786,26 +2827,38 @@
             }
             
             createIntersection(x, z, radius) {
-                // Create a textured circular intersection
-                const geometry = new THREE.CylinderGeometry(radius, radius, 0.2, 48);
+                // Create smooth circular intersection with edge fade
+                const geometry = new THREE.CylinderGeometry(radius, radius, 0.18, 64); // More segments
                 
-                // Asphalt texture for intersection
+                // Better asphalt texture with edge softening
                 const canvas = document.createElement('canvas');
                 canvas.width = 512;
                 canvas.height = 512;
                 const ctx = canvas.getContext('2d');
                 
-                // Dark asphalt
-                ctx.fillStyle = '#2a2a30';
-                ctx.fillRect(0, 0, 512, 512);
+                const centerX = 256;
+                const centerY = 256;
                 
-                // Add noise texture
-                for (let i = 0; i < 3000; i++) {
+                // Draw from outside in for smooth edge
+                for (let r = 256; r >= 0; r -= 2) {
+                    const alpha = r < 230 ? 1.0 : (256 - r) / 26; // Fade outer edge
+                    const brightness = 40 + Math.random() * 5;
+                    ctx.fillStyle = `rgba(${brightness}, ${brightness}, ${brightness}, ${alpha})`;
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Add fine noise texture
+                for (let i = 0; i < 5000; i++) {
                     const px = Math.random() * 512;
                     const py = Math.random() * 512;
-                    const brightness = 30 + Math.random() * 30;
-                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
-                    ctx.fillRect(px, py, 2, 2);
+                    const distFromCenter = Math.sqrt((px - 256) ** 2 + (py - 256) ** 2);
+                    if (distFromCenter < 240) { // Only in non-fade area
+                        const brightness = 30 + Math.random() * 30;
+                        ctx.fillStyle = `rgba(${brightness}, ${brightness}, ${brightness}, 0.3)`;
+                        ctx.fillRect(px, py, 1, 1);
+                    }
                 }
                 
                 const texture = new THREE.CanvasTexture(canvas);
@@ -2813,13 +2866,16 @@
                 const material = new THREE.MeshStandardMaterial({
                     map: texture,
                     roughness: 0.9,
-                    metalness: 0.0
+                    metalness: 0.0,
+                    transparent: true,
+                    opacity: 1.0,
+                    depthWrite: true
                 });
                 
                 const intersection = new THREE.Mesh(geometry, material);
-                intersection.position.set(x, 0.1, z); // Raised to cover road ends
+                intersection.position.set(x, 0.09, z); // Slightly lower for better blend
                 intersection.receiveShadow = true;
-                intersection.castShadow = true;
+                intersection.castShadow = false; // Don't cast shadow
                 this.scene.add(intersection);
             }
             

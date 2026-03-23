@@ -3415,25 +3415,27 @@
             createPortfolioSections() {
                 const textureLoader = new THREE.TextureLoader();
                 
-                // Load realistic building textures from free CDN sources
-                const concreteTexture = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/brick_diffuse.jpg');
-                concreteTexture.wrapS = THREE.RepeatWrapping;
-                concreteTexture.wrapT = THREE.RepeatWrapping;
-                concreteTexture.repeat.set(2, 4);
+                // Load high-quality building texture
+                const buildingTexture = textureLoader.load('https://threejs.org/examples/textures/brick_diffuse.jpg');
+                buildingTexture.wrapS = THREE.RepeatWrapping;
+                buildingTexture.wrapT = THREE.RepeatWrapping;
                 
                 Object.entries(PORTFOLIO_DATA).forEach(([title, data]) => {
                     const sectionGroup = new THREE.Group();
                     
-                    // Realistic modern building design
-                    const buildingHeight = 30 + Math.random() * 10;
+                    // Realistic modern office building - taller and more imposing
+                    const buildingHeight = 35 + Math.random() * 15;
+                    const buildingWidth = 18;
+                    const buildingDepth = 20;
                     
-                    // Main building structure with realistic texture
-                    const buildingGeom = new THREE.BoxGeometry(16, buildingHeight, 16);
+                    // Main building tower
+                    buildingTexture.repeat.set(3, Math.floor(buildingHeight / 5));
+                    const buildingGeom = new THREE.BoxGeometry(buildingWidth, buildingHeight, buildingDepth);
                     const buildingMaterial = new THREE.MeshStandardMaterial({
-                        map: concreteTexture,
-                        color: data.color,
-                        metalness: 0.2,
-                        roughness: 0.8
+                        map: buildingTexture,
+                        color: new THREE.Color(data.color).multiplyScalar(0.7),
+                        metalness: 0.1,
+                        roughness: 0.9
                     });
                     
                     const building = new THREE.Mesh(buildingGeom, buildingMaterial);
@@ -3442,181 +3444,202 @@
                     building.receiveShadow = true;
                     sectionGroup.add(building);
                     
-                    // Modern glass facade panels
+                    // Glass curtain wall windows
                     const glassMaterial = new THREE.MeshPhysicalMaterial({
-                        color: 0x4A90A4,
-                        metalness: 0.0,
-                        roughness: 0.05,
-                        transmission: 0.9,
-                        thickness: 0.5,
+                        color: 0x88B8D8,
+                        metalness: 0.1,
+                        roughness: 0.02,
+                        transmission: 0.85,
+                        thickness: 0.3,
                         transparent: true,
-                        opacity: 0.6
+                        opacity: 0.7,
+                        reflectivity: 0.9
                     });
                     
-                    // Grid of windows on each side
-                    const windowsPerSide = 3;
-                    const floorsCount = Math.floor(buildingHeight / 4);
+                    // Create realistic window grid
+                    const floorsCount = Math.floor(buildingHeight / 3.5);
+                    const windowsPerFloor = 4;
                     
+                    // Front facade with proper windows
                     for (let floor = 0; floor < floorsCount; floor++) {
-                        const y = 3 + floor * 4;
+                        const y = 2.5 + floor * 3.5;
                         
                         for (let side = 0; side < 4; side++) {
-                            for (let i = 0; i < windowsPerSide; i++) {
-                                const windowGeom = new THREE.BoxGeometry(3, 2.8, 0.1);
-                                const windowMesh = new THREE.Mesh(windowGeom, glassMaterial);
+                            for (let i = 0; i < windowsPerFloor; i++) {
+                                const windowGeom = new THREE.PlaneGeometry(3.5, 3);
+                                const window = new THREE.Mesh(windowGeom, glassMaterial);
                                 
-                                const offset = 8.05;
-                                const xOffset = (i - 1) * 4;
+                                const offset = (side === 0 || side === 1) ? buildingDepth / 2 + 0.05 : buildingWidth / 2 + 0.05;
+                                const xPos = (i - windowsPerFloor / 2 + 0.5) * 4;
                                 
                                 switch(side) {
-                                    case 0: // Front
-                                        windowMesh.position.set(xOffset, y, offset);
+                                    case 0: // Front (facing +Z)
+                                        window.position.set(xPos, y, offset);
                                         break;
-                                    case 1: // Back
-                                        windowMesh.position.set(-xOffset, y, -offset);
+                                    case 1: // Back (facing -Z)
+                                        window.position.set(-xPos, y, -offset);
+                                        window.rotation.y = Math.PI;
                                         break;
-                                    case 2: // Left
-                                        windowMesh.position.set(-offset, y, xOffset);
-                                        windowMesh.rotation.y = Math.PI / 2;
+                                    case 2: // Left (facing -X)
+                                        window.position.set(-offset, y, xPos);
+                                        window.rotation.y = Math.PI / 2;
                                         break;
-                                    case 3: // Right
-                                        windowMesh.position.set(offset, y, -xOffset);
-                                        windowMesh.rotation.y = -Math.PI / 2;
+                                    case 3: // Right (facing +X)
+                                        window.position.set(offset, y, -xPos);
+                                        window.rotation.y = -Math.PI / 2;
                                         break;
                                 }
                                 
-                                sectionGroup.add(windowMesh);
+                                sectionGroup.add(window);
                             }
                         }
-                        
-                        // Add floor separator (horizontal band)
-                        const separatorGeom = new THREE.BoxGeometry(16.2, 0.3, 16.2);
-                        const separatorMat = new THREE.MeshStandardMaterial({
-                            color: new THREE.Color(data.color).multiplyScalar(0.5),
-                            metalness: 0.8,
-                            roughness: 0.3
-                        });
-                        const separator = new THREE.Mesh(separatorGeom, separatorMat);
-                        separator.position.y = 1 + floor * 4;
-                        sectionGroup.add(separator);
                     }
                     
-                    // Rooftop with details
-                    const roofGeom = new THREE.BoxGeometry(17, 2, 17);
-                    const roofMaterial = new THREE.MeshStandardMaterial({
-                        color: new THREE.Color(data.color).multiplyScalar(0.4),
-                        metalness: 0.7,
-                        roughness: 0.4
+                    // Ground floor entrance area - recessed
+                    const entranceWidth = 12;
+                    const entranceHeight = 5;
+                    const entranceDepth = 2;
+                    
+                    // Entrance recess (darker)
+                    const entranceGeom = new THREE.BoxGeometry(entranceWidth, entranceHeight, entranceDepth);
+                    const entranceMat = new THREE.MeshStandardMaterial({
+                        color: new THREE.Color(data.color).multiplyScalar(0.3),
+                        roughness: 0.7,
+                        metalness: 0.2
                     });
-                    const roof = new THREE.Mesh(roofGeom, roofMaterial);
-                    roof.position.y = buildingHeight + 1;
-                    roof.castShadow = true;
-                    sectionGroup.add(roof);
+                    const entrance = new THREE.Mesh(entranceGeom, entranceMat);
+                    entrance.position.set(0, entranceHeight / 2, buildingDepth / 2 - entranceDepth / 2);
+                    sectionGroup.add(entrance);
                     
-                    // Rooftop HVAC units
-                    for (let i = 0; i < 3; i++) {
-                        const hvacGeom = new THREE.BoxGeometry(2, 1.5, 1.5);
-                        const hvacMat = new THREE.MeshStandardMaterial({
-                            color: 0x666666,
-                            metalness: 0.6,
-                            roughness: 0.5
-                        });
-                        const hvac = new THREE.Mesh(hvacGeom, hvacMat);
-                        hvac.position.set((i - 1) * 4, buildingHeight + 2.75, -4);
-                        hvac.castShadow = true;
-                        sectionGroup.add(hvac);
-                    }
+                    // Modern glass entrance doors (double doors)
+                    const doorWidth = 2.5;
+                    const doorHeight = 4;
+                    const doorMaterial = new THREE.MeshPhysicalMaterial({
+                        color: 0x1a1a1a,
+                        metalness: 0.9,
+                        roughness: 0.1,
+                        transmission: 0.7,
+                        thickness: 0.1
+                    });
                     
-                    // Entrance awning
-                    const awningGeom = new THREE.BoxGeometry(12, 0.3, 4);
-                    const awningMat = new THREE.MeshStandardMaterial({
+                    // Left door
+                    const leftDoorGeom = new THREE.BoxGeometry(doorWidth, doorHeight, 0.1);
+                    const leftDoor = new THREE.Mesh(leftDoorGeom, doorMaterial);
+                    leftDoor.position.set(-doorWidth / 2 - 0.1, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.1);
+                    sectionGroup.add(leftDoor);
+                    
+                    // Right door
+                    const rightDoor = new THREE.Mesh(leftDoorGeom, doorMaterial);
+                    rightDoor.position.set(doorWidth / 2 + 0.1, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.1);
+                    sectionGroup.add(rightDoor);
+                    
+                    // Door frames (stainless steel)
+                    const frameMat = new THREE.MeshStandardMaterial({
+                        color: 0xC0C0C0,
+                        metalness: 0.95,
+                        roughness: 0.1
+                    });
+                    
+                    // Vertical frames
+                    [-doorWidth - 0.2, 0, doorWidth + 0.2].forEach(x => {
+                        const frameGeom = new THREE.BoxGeometry(0.15, doorHeight + 0.5, 0.15);
+                        const frame = new THREE.Mesh(frameGeom, frameMat);
+                        frame.position.set(x, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.15);
+                        sectionGroup.add(frame);
+                    });
+                    
+                    // Top frame (horizontal)
+                    const topFrameGeom = new THREE.BoxGeometry(doorWidth * 2 + 0.6, 0.15, 0.15);
+                    const topFrame = new THREE.Mesh(topFrameGeom, frameMat);
+                    topFrame.position.set(0, doorHeight + 0.5, buildingDepth / 2 + 0.15);
+                    sectionGroup.add(topFrame);
+                    
+                    // Entrance canopy (modern overhang)
+                    const canopyGeom = new THREE.BoxGeometry(entranceWidth + 2, 0.3, 5);
+                    const canopyMat = new THREE.MeshStandardMaterial({
                         color: data.color,
-                        metalness: 0.5,
-                        roughness: 0.6
+                        metalness: 0.6,
+                        roughness: 0.3
                     });
-                    const awning = new THREE.Mesh(awningGeom, awningMat);
-                    awning.position.set(0, 4, 10);
-                    awning.castShadow = true;
-                    sectionGroup.add(awning);
+                    const canopy = new THREE.Mesh(canopyGeom, canopyMat);
+                    canopy.position.set(0, entranceHeight + 1, buildingDepth / 2 + 1);
+                    canopy.castShadow = true;
+                    sectionGroup.add(canopy);
                     
-                    // Entrance door (large glass double door)
-                    const doorGeom = new THREE.BoxGeometry(4, 6, 0.3);
-                    const doorMat = new THREE.MeshPhysicalMaterial({
-                        color: 0x222222,
-                        metalness: 0.8,
-                        roughness: 0.2
+                    // Canopy supports (pillars)
+                    [-5, 5].forEach(x => {
+                        const pillarGeom = new THREE.CylinderGeometry(0.2, 0.2, entranceHeight + 1, 16);
+                        const pillar = new THREE.Mesh(pillarGeom, frameMat);
+                        pillar.position.set(x, (entranceHeight + 1) / 2, buildingDepth / 2 + 3);
+                        pillar.castShadow = true;
+                        sectionGroup.add(pillar);
                     });
-                    const door = new THREE.Mesh(doorGeom, doorMat);
-                    door.position.set(0, 3, 8.2);
-                    sectionGroup.add(door);
                     
-                    // Floating sign with emoji
-                    const signGroup = new THREE.Group();
-                    
-                    // Sign background with LED frame
-                    const signGeom = new THREE.BoxGeometry(12, 4, 0.5);
-                    const signMaterial = new THREE.MeshStandardMaterial({
+                    // Building name sign above entrance
+                    const signWidth = 10;
+                    const signHeight = 1.5;
+                    const signGeom = new THREE.BoxGeometry(signWidth, signHeight, 0.3);
+                    const signMat = new THREE.MeshStandardMaterial({
                         color: 0xFFFFFF,
-                        metalness: 0.2,
-                        roughness: 0.8,
                         emissive: 0xFFFFFF,
-                        emissiveIntensity: 0.2
+                        emissiveIntensity: 0.3,
+                        metalness: 0.1,
+                        roughness: 0.8
                     });
-                    const sign = new THREE.Mesh(signGeom, signMaterial);
-                    signGroup.add(sign);
+                    const sign = new THREE.Mesh(signGeom, signMat);
+                    sign.position.set(0, entranceHeight + 2.5, buildingDepth / 2 + 0.2);
+                    sectionGroup.add(sign);
                     
-                    // Text on sign
-                    const labelCanvas = document.createElement('canvas');
-                    labelCanvas.width = 512;
-                    labelCanvas.height = 180;
-                    const ctx = labelCanvas.getContext('2d');
+                    // Sign text
+                    const signCanvas = document.createElement('canvas');
+                    signCanvas.width = 512;
+                    signCanvas.height = 80;
+                    const ctx = signCanvas.getContext('2d');
                     
-                    // Gradient background
-                    const gradient = ctx.createLinearGradient(0, 0, 512, 0);
-                    gradient.addColorStop(0, '#' + new THREE.Color(data.color).getHexString());
-                    gradient.addColorStop(1, '#' + new THREE.Color(data.color).multiplyScalar(1.3).getHexString());
-                    ctx.fillStyle = gradient;
-                    ctx.fillRect(0, 0, 512, 180);
+                    // Background
+                    ctx.fillStyle = '#' + new THREE.Color(data.color).getHexString();
+                    ctx.fillRect(0, 0, 512, 80);
                     
                     // Text
                     ctx.fillStyle = 'white';
-                    ctx.font = 'bold 60px Nunito, sans-serif';
+                    ctx.font = 'bold 48px Arial, sans-serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(`${data.icon} ${title}`, 256, 90);
+                    ctx.fillText(`${data.icon} ${title.toUpperCase()}`, 256, 40);
                     
-                    const labelTexture = new THREE.CanvasTexture(labelCanvas);
-                    const labelMaterial = new THREE.MeshBasicMaterial({
-                        map: labelTexture,
-                        transparent: true
+                    const signTexture = new THREE.CanvasTexture(signCanvas);
+                    const signTextMat = new THREE.MeshBasicMaterial({ map: signTexture });
+                    const signTextGeom = new THREE.PlaneGeometry(signWidth - 0.2, signHeight - 0.2);
+                    const signText = new THREE.Mesh(signTextGeom, signTextMat);
+                    signText.position.set(0, entranceHeight + 2.5, buildingDepth / 2 + 0.36);
+                    sectionGroup.add(signText);
+                    
+                    // Rooftop with mechanical units
+                    const roofWidth = buildingWidth + 2;
+                    const roofDepth = buildingDepth + 2;
+                    const roofGeom = new THREE.BoxGeometry(roofWidth, 1, roofDepth);
+                    const roofMat = new THREE.MeshStandardMaterial({
+                        color: 0x2a2a2a,
+                        metalness: 0.5,
+                        roughness: 0.6
                     });
+                    const roof = new THREE.Mesh(roofGeom, roofMat);
+                    roof.position.y = buildingHeight + 0.5;
+                    roof.castShadow = true;
+                    sectionGroup.add(roof);
                     
-                    const labelGeom = new THREE.PlaneGeometry(9.5, 2.5);
-                    const label = new THREE.Mesh(labelGeom, labelMaterial);
-                    label.position.z = 0.2;
-                    signGroup.add(label);
-                    
-                    signGroup.position.y = buildingHeight + 6;
-                    sectionGroup.add(signGroup);
-                    
-                    // Entrance with glow
-                    const entranceGeom = new THREE.BoxGeometry(5, 7, 0.5);
-                    const entranceMaterial = new THREE.MeshStandardMaterial({
-                        color: data.color,
-                        emissive: data.color,
-                        emissiveIntensity: 0.4,
-                        transparent: true,
-                        opacity: 0.9
-                    });
-                    const entrance = new THREE.Mesh(entranceGeom, entranceMaterial);
-                    entrance.position.set(0, 3.5, 8.25);
-                    sectionGroup.add(entrance);
-                    
-                    // Point light at entrance
-                    if (this.state.quality !== 'low') {
-                        const entranceLight = new THREE.PointLight(data.color, 1, 20);
-                        entranceLight.position.set(0, 4, 10);
-                        sectionGroup.add(entranceLight);
+                    // HVAC units on roof
+                    for (let i = 0; i < 4; i++) {
+                        const hvacGeom = new THREE.BoxGeometry(2.5, 1.8, 2);
+                        const hvacMat = new THREE.MeshStandardMaterial({
+                            color: 0x555555,
+                            metalness: 0.7,
+                            roughness: 0.4
+                        });
+                        const hvac = new THREE.Mesh(hvacGeom, hvacMat);
+                        hvac.position.set((i - 1.5) * 5, buildingHeight + 1.9, -5);
+                        hvac.castShadow = true;
+                        sectionGroup.add(hvac);
                     }
                     
                     // Position the section

@@ -2462,7 +2462,7 @@
                 });
                 
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.state.isMobile ? 1 : 2));
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.state.isMobile ? 1 : 1.5));
                 this.renderer.shadowMap.enabled = this.state.quality !== 'low';
                 this.renderer.shadowMap.type = this.state.quality === 'ultra' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -2490,13 +2490,13 @@
                     this.composer.addPass(fxaaPass);
                 }
                 
-                // Bloom for that cinematic look
+                // Bloom for that cinematic look (half resolution for performance)
                 if (this.state.quality !== 'low') {
                     this.bloomPass = new UnrealBloomPass(
-                        new THREE.Vector2(window.innerWidth, window.innerHeight),
-                        this.state.quality === 'ultra' ? 0.3 : 0.2,
-                        0.4,
-                        0.85
+                        new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2),
+                        this.state.quality === 'ultra' ? 0.25 : 0.15,
+                        0.3,
+                        0.9
                     );
                     this.composer.addPass(this.bloomPass);
                 }
@@ -2553,8 +2553,8 @@
                 
                 if (this.state.quality !== 'low') {
                     this.sunLight.castShadow = true;
-                    this.sunLight.shadow.mapSize.width = this.state.quality === 'ultra' ? 4096 : 2048;
-                    this.sunLight.shadow.mapSize.height = this.state.quality === 'ultra' ? 4096 : 2048;
+                    this.sunLight.shadow.mapSize.width = this.state.quality === 'ultra' ? 2048 : 1024;
+                    this.sunLight.shadow.mapSize.height = this.state.quality === 'ultra' ? 2048 : 1024;
                     this.sunLight.shadow.camera.near = 0.5;
                     this.sunLight.shadow.camera.far = 500;
                     
@@ -3346,15 +3346,19 @@
             spawnLandingParticles(count = 8) {
                 if (!this.car || this.state.quality === 'low') return;
                 
-                // Create particle group if it doesn't exist
+                // Limit active particles for performance
                 if (!this.particlePool) {
                     this.particlePool = [];
                     this.activeParticles = [];
                 }
                 
-                const carPos = this.car.position;
+                // Cap max active particles
+                if (this.activeParticles.length > 30) return;
                 
-                for (let i = 0; i < count; i++) {
+                const carPos = this.car.position;
+                const spawnCount = this.state.quality === 'medium' ? Math.ceil(count / 2) : count;
+                
+                for (let i = 0; i < spawnCount; i++) {
                     let particle;
                     
                     // Object pooling - reuse particles
@@ -3855,7 +3859,7 @@
             
             loadEnvironmentDetails() {
                 // Trees
-                this.createTrees(this.state.quality === 'ultra' ? 80 : this.state.quality === 'high' ? 50 : 25);
+                this.createTrees(this.state.quality === 'ultra' ? 50 : this.state.quality === 'high' ? 30 : 15);
                 
                 // Decorative elements
                 this.createDecorations();

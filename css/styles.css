@@ -735,46 +735,88 @@
         #mobileControls {
             display: none;
             position: fixed;
-            bottom: var(--space-6);
-            left: 50%;
-            transform: translateX(-50%);
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            padding: 0 20px;
             z-index: 100;
-            gap: var(--space-4);
+            pointer-events: none;
+        }
+        
+        #mobileControls > * {
+            pointer-events: auto;
         }
         
         .mobile-joystick {
-            width: 120px;
-            height: 120px;
-            background: var(--color-bg-glass);
-            backdrop-filter: blur(20px);
+            position: fixed;
+            left: 30px;
+            bottom: 30px;
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
             border-radius: 50%;
-            border: 3px solid rgba(99, 102, 241, 0.3);
-            position: relative;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            touch-action: none;
         }
         
         .mobile-joystick-inner {
-            width: 50px;
-            height: 50px;
-            background: var(--gradient-primary);
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.3);
             border-radius: 50%;
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            box-shadow: 0 4px 0 rgba(99, 102, 241, 0.4);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            transition: transform 0.05s ease-out;
+        }
+        
+        .mobile-buttons {
+            position: fixed;
+            right: 20px;
+            bottom: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
         
         .mobile-btn {
-            width: 60px;
-            height: 60px;
-            background: var(--color-bg-glass);
-            backdrop-filter: blur(20px);
-            border: 3px solid rgba(99, 102, 241, 0.3);
-            border-radius: var(--radius-xl);
+            width: 65px;
+            height: 65px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 1.5rem;
+            color: white;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+        
+        .mobile-btn:active {
+            background: rgba(255, 255, 255, 0.25);
+            transform: scale(0.95);
+        }
+        
+        .mobile-boost {
+            background: rgba(225, 112, 85, 0.3);
+            border-color: rgba(225, 112, 85, 0.5);
+        }
+        
+        .mobile-jump {
+            background: rgba(0, 184, 148, 0.3);
+            border-color: rgba(0, 184, 148, 0.5);
+        }
+        
+        .mobile-action {
+            background: rgba(99, 102, 241, 0.3);
+            border-color: rgba(99, 102, 241, 0.5);
         }
         
         /* Responsive */
@@ -784,12 +826,25 @@
             }
             
             #mobileControls {
-                display: flex;
+                display: block;
+            }
+            
+            #speedDisplay {
+                bottom: 180px;
+                left: 50%;
+                transform: translateX(-50%);
+            }
+            
+            #miniMap {
+                top: 10px;
+                right: 10px;
+                width: 100px;
+                height: 100px;
             }
             
             #modal {
                 max-height: 90vh;
-                margin: var(--space-2);
+                margin: 10px;
             }
             
             .modal-body {
@@ -797,7 +852,7 @@
             }
             
             #fpsCounter {
-                left: var(--space-4);
+                left: 10px;
                 bottom: calc(var(--space-4) + 100px);
             }
         }

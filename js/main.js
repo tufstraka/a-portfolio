@@ -3194,18 +3194,23 @@
                 if (this.state.isMobile) {
                     this.setupMobileControls();
                 }
+                
+                // Mouse camera control (desktop)
+                if (!this.state.isMobile) {
+                    this.setupMouseCameraControl();
+                }
             }
             
             setupMobileControls() {
                 const joystick = document.getElementById('joystick');
                 const joystickInner = document.getElementById('joystickInner');
                 const boostBtn = document.getElementById('mobileBoost');
+                const jumpBtn = document.getElementById('mobileJump');
                 const actionBtn = document.getElementById('mobileAction');
                 
                 if (!joystick) return;
                 
                 let joystickActive = false;
-                let joystickOrigin = { x: 0, y: 0 };
                 
                 const handleJoystickMove = (clientX, clientY) => {
                     if (!joystickActive) return;
@@ -3217,7 +3222,7 @@
                     let dx = clientX - centerX;
                     let dy = clientY - centerY;
                     
-                    const maxDist = rect.width / 2 - 25;
+                    const maxDist = rect.width / 2 - 30;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     
                     if (dist > maxDist) {
@@ -3227,30 +3232,41 @@
                     
                     joystickInner.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
                     
-                    // Map to controls
+                    // Map to analog-style controls
                     const normalizedX = dx / maxDist;
                     const normalizedY = -dy / maxDist;
                     
-                    this.state.keys['KeyW'] = normalizedY > 0.3;
-                    this.state.keys['KeyS'] = normalizedY < -0.3;
-                    this.state.keys['KeyA'] = normalizedX < -0.3;
-                    this.state.keys['KeyD'] = normalizedX > 0.3;
+                    // Throttle/brake based on Y axis
+                    this.state.input.throttle = Math.max(0, normalizedY);
+                    this.state.input.brake = Math.max(0, -normalizedY);
+                    
+                    // Steering based on X axis
+                    this.state.input.steer = normalizedX;
+                    
+                    // Also set key states for compatibility
+                    this.state.keys['KeyW'] = normalizedY > 0.2;
+                    this.state.keys['KeyS'] = normalizedY < -0.2;
+                    this.state.keys['KeyA'] = normalizedX < -0.2;
+                    this.state.keys['KeyD'] = normalizedX > 0.2;
                 };
                 
                 joystick.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     joystickActive = true;
                     handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY);
-                });
+                }, { passive: false });
                 
                 joystick.addEventListener('touchmove', (e) => {
                     e.preventDefault();
                     handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY);
-                });
+                }, { passive: false });
                 
                 joystick.addEventListener('touchend', () => {
                     joystickActive = false;
                     joystickInner.style.transform = 'translate(-50%, -50%)';
+                    this.state.input.throttle = 0;
+                    this.state.input.brake = 0;
+                    this.state.input.steer = 0;
                     this.state.keys['KeyW'] = false;
                     this.state.keys['KeyS'] = false;
                     this.state.keys['KeyA'] = false;
@@ -3262,21 +3278,95 @@
                     boostBtn.addEventListener('touchstart', (e) => {
                         e.preventDefault();
                         this.state.keys['ShiftLeft'] = true;
-                    });
+                        this.state.input.boost = true;
+                    }, { passive: false });
                     boostBtn.addEventListener('touchend', () => {
                         this.state.keys['ShiftLeft'] = false;
+                        this.state.input.boost = false;
                     });
                 }
                 
-                // Action button (enter building / exit car)
+                // Jump button
+                if (jumpBtn) {
+                    jumpBtn.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        this.state.keys['KeyJ'] = true;
+                        // Trigger jump
+                        if (this.vehiclePhysics && this.vehiclePhysics.isGrounded) {
+                            this.vehiclePhysics.velocityY = CONFIG.JUMP_FORCE;
+                            this.vehiclePhysics.isGrounded = false;
+                        }
+                    }, { passive: false });
+                    jumpBtn.addEventListener('touchend', () => {
+                        this.state.keys['KeyJ'] = false;
+                    });
+                }
+                
+                // Action button (enter building)
                 if (actionBtn) {
                     actionBtn.addEventListener('touchstart', (e) => {
                         e.preventDefault();
+                        this.state.keys['Space'] = true;
                         if (this.state.currentSection) {
                             this.openModal(this.state.currentSection.userData);
                         }
+                    }, { passive: false });
+                    actionBtn.addEventListener('touchend', () => {
+                        this.state.keys['Space'] = false;
                     });
                 }
+            }
+            
+            // 🖱️ MOUSE CAMERA CONTROL
+            setupMouseCameraControl() {
+                this.mouseCamera = {
+                    enabled: false,
+                    sensitivity: 0.003,
+                    yaw: 0,
+                    pitch: 0,
+                    maxPitch: Math.PI / 3,
+                    minPitch: -Math.PI / 6
+                };
+                
+                const canvas = this.renderer.domElement;
+                
+                // Right-click drag to rotate camera
+                canvas.addEventListener('mousedown', (e) => {
+                    if (e.button === 2 || e.button === 0) { // Right or left click
+                        this.mouseCamera.enabled = true;
+                        canvas.style.cursor = 'grabbing';
+                    }
+                });
+                
+                window.addEventListener('mouseup', () => {
+                    this.mouseCamera.enabled = false;
+                    canvas.style.cursor = 'grab';
+                });
+                
+                window.addEventListener('mousemove', (e) => {
+                    if (!this.mouseCamera.enabled) return;
+                    
+                    this.mouseCamera.yaw -= e.movementX * this.mouseCamera.sensitivity;
+                    this.mouseCamera.pitch -= e.movementY * this.mouseCamera.sensitivity;
+                    
+                    // Clamp pitch
+                    this.mouseCamera.pitch = Math.max(
+                        this.mouseCamera.minPitch,
+                        Math.min(this.mouseCamera.maxPitch, this.mouseCamera.pitch)
+                    );
+                });
+                
+                // Scroll to zoom
+                canvas.addEventListener('wheel', (e) => {
+                    this.state.cameraDistance += e.deltaY * 0.02;
+                    this.state.cameraDistance = Math.max(5, Math.min(50, this.state.cameraDistance));
+                }, { passive: true });
+                
+                // Set initial cursor
+                canvas.style.cursor = 'grab';
+                
+                // Prevent context menu on right-click
+                canvas.addEventListener('contextmenu', (e) => e.preventDefault());
             }
             
             onKeyDown(e) {
@@ -3839,22 +3929,31 @@
                 let targetPos = new THREE.Vector3();
                 let lookPos = new THREE.Vector3();
                 
+                // Get mouse camera offset if enabled
+                const mouseYaw = this.mouseCamera ? this.mouseCamera.yaw : 0;
+                const mousePitch = this.mouseCamera ? this.mouseCamera.pitch : 0;
+                
                 switch (this.state.cameraMode) {
                     case 'follow':
+                        // Base angle from car rotation + mouse yaw offset
+                        const baseAngle = target.rotation.y + mouseYaw;
+                        const heightOffset = this.state.cameraHeight + Math.sin(mousePitch) * this.state.cameraDistance * 0.5;
+                        const distanceOffset = this.state.cameraDistance * Math.cos(mousePitch * 0.5);
+                        
                         targetPos.set(
-                            target.position.x - Math.sin(target.rotation.y) * this.state.cameraDistance,
-                            target.position.y + this.state.cameraHeight,
-                            target.position.z - Math.cos(target.rotation.y) * this.state.cameraDistance
+                            target.position.x - Math.sin(baseAngle) * distanceOffset,
+                            target.position.y + heightOffset,
+                            target.position.z - Math.cos(baseAngle) * distanceOffset
                         );
                         lookPos.copy(target.position).add(new THREE.Vector3(0, 2, 0));
                         break;
                         
                     case 'orbit':
-                        const angle = this.state.time * 0.3;
+                        const orbitAngle = this.state.time * 0.3 + mouseYaw;
                         targetPos.set(
-                            target.position.x + Math.sin(angle) * this.state.cameraDistance,
-                            target.position.y + this.state.cameraHeight,
-                            target.position.z + Math.cos(angle) * this.state.cameraDistance
+                            target.position.x + Math.sin(orbitAngle) * this.state.cameraDistance,
+                            target.position.y + this.state.cameraHeight + mousePitch * 10,
+                            target.position.z + Math.cos(orbitAngle) * this.state.cameraDistance
                         );
                         lookPos.copy(target.position);
                         break;
@@ -3870,18 +3969,18 @@
                             );
                             lookPos.copy(targetPos).add(
                                 new THREE.Vector3(
-                                    Math.sin(this.car.rotation.y) * 10,
-                                    -0.5,
-                                    Math.cos(this.car.rotation.y) * 10
+                                    Math.sin(this.car.rotation.y + mouseYaw) * 10,
+                                    -0.5 + mousePitch * 5,
+                                    Math.cos(this.car.rotation.y + mouseYaw) * 10
                                 )
                             );
                         } else {
                             targetPos.copy(this.character.position).add(new THREE.Vector3(0, 1.8, 0));
                             lookPos.copy(targetPos).add(
                                 new THREE.Vector3(
-                                    Math.sin(this.character.rotation.y) * 10,
-                                    0,
-                                    Math.cos(this.character.rotation.y) * 10
+                                    Math.sin(this.character.rotation.y + mouseYaw) * 10,
+                                    mousePitch * 5,
+                                    Math.cos(this.character.rotation.y + mouseYaw) * 10
                                 )
                             );
                         }

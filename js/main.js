@@ -1345,224 +1345,178 @@
             }
             
             createRoads() {
-                // Realistic road system with proper materials
-                const roadWidth = 12;
-                const roadHeight = 0.08;
+                // Roads only lead to building entrances
+                const roadWidth = 10;
+                const roadHeight = 0.05;
                 
-                // Realistic asphalt material with subtle variation
-                const roadMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x1a1a1a,
-                    roughness: 0.92,
-                    metalness: 0.0,
-                });
-                
-                // Add subtle noise to road for realism
+                // Create realistic asphalt texture
                 const roadCanvas = document.createElement('canvas');
-                roadCanvas.width = 256;
-                roadCanvas.height = 256;
+                roadCanvas.width = 512;
+                roadCanvas.height = 512;
                 const ctx = roadCanvas.getContext('2d');
-                ctx.fillStyle = '#1a1a1a';
-                ctx.fillRect(0, 0, 256, 256);
-                // Add noise
-                for (let i = 0; i < 5000; i++) {
-                    const x = Math.random() * 256;
-                    const y = Math.random() * 256;
-                    const brightness = 20 + Math.random() * 15;
+                
+                // Base asphalt color
+                ctx.fillStyle = '#2a2a2a';
+                ctx.fillRect(0, 0, 512, 512);
+                
+                // Add aggregate/gravel texture
+                for (let i = 0; i < 8000; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const size = Math.random() * 2 + 0.5;
+                    const brightness = 30 + Math.random() * 25;
                     ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
-                    ctx.fillRect(x, y, 1, 1);
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, Math.PI * 2);
+                    ctx.fill();
                 }
+                
+                // Add some darker patches (oil stains, wear)
+                for (let i = 0; i < 20; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const radius = 10 + Math.random() * 30;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+                    gradient.addColorStop(0, 'rgba(20,20,20,0.3)');
+                    gradient.addColorStop(1, 'rgba(20,20,20,0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
                 const roadTexture = new THREE.CanvasTexture(roadCanvas);
                 roadTexture.wrapS = THREE.RepeatWrapping;
                 roadTexture.wrapT = THREE.RepeatWrapping;
-                roadTexture.repeat.set(4, 4);
-                roadMaterial.map = roadTexture;
                 
-                // Explicit building positions for reliable road connections
-                const hub = { x: 0, z: 0 };        // About Me (center)
-                const startPos = { x: 0, z: 60 };  // Player spawn
-                const buildings = {
-                    techStack: { x: 70, z: -50 },
-                    projects: { x: 0, z: -100 },
-                    experience: { x: -70, z: 50 },
-                    contact: { x: 70, z: 50 }
-                };
-                
-                // Create road segments: start -> hub, hub -> each building
-                const roadSegments = [
-                    { from: startPos, to: hub },                    // Start to About Me
-                    { from: hub, to: buildings.techStack },         // About Me to Tech Stack
-                    { from: hub, to: buildings.projects },          // About Me to Projects
-                    { from: hub, to: buildings.experience },        // About Me to Experience
-                    { from: hub, to: buildings.contact }            // About Me to Contact
-                ];
-                
-                // Create each road segment
-                roadSegments.forEach((segment) => {
-                    const dx = segment.to.x - segment.from.x;
-                    const dz = segment.to.z - segment.from.z;
-                    const length = Math.sqrt(dx * dx + dz * dz);
-                    const angle = Math.atan2(dx, dz);
-                    
-                    // Road length - leave small gap at intersections
-                    const shortenedLength = length - 10;
-                    
-                    if (shortenedLength <= 0) return; // Skip if too short
-                    
-                    const roadGeometry = new THREE.BoxGeometry(roadWidth, roadHeight, shortenedLength);
-                    const road = new THREE.Mesh(roadGeometry, roadMaterial);
-                    
-                    road.position.set(
-                        segment.from.x + dx / 2,
-                        roadHeight / 2,
-                        segment.from.z + dz / 2
-                    );
-                    road.rotation.y = -angle;
-                    road.receiveShadow = true;
-                    
-                    this.scene.add(road);
-                    
-                    // Lane markings and edges
-                    this.addLaneMarkings(segment.from, segment.to, length, angle, shortenedLength);
-                    this.addRoadEdges(segment.from, segment.to, length, angle, roadWidth, shortenedLength);
+                const roadMaterial = new THREE.MeshStandardMaterial({
+                    map: roadTexture,
+                    roughness: 0.9,
+                    metalness: 0.0,
                 });
                 
-                // Create intersections at each building and start
-                this.createIntersection(hub.x, hub.z, 14);  // About Me (larger hub)
-                this.createIntersection(startPos.x, startPos.z, 11);
-                Object.values(buildings).forEach(pos => {
-                    this.createIntersection(pos.x, pos.z, 12);
+                // Building positions with entrance directions
+                const hub = { x: 0, z: 0, entrance: 'south' };
+                const startPos = { x: 0, z: 60 };
+                const buildings = [
+                    { x: 70, z: -50, entrance: 'west' },    // Tech Stack
+                    { x: 0, z: -100, entrance: 'north' },   // Projects  
+                    { x: -70, z: 50, entrance: 'east' },    // Experience
+                    { x: 70, z: 50, entrance: 'west' }      // Contact
+                ];
+                
+                // Create road from start to hub
+                this.createRoadSegment(startPos, hub, roadWidth, roadHeight, roadMaterial, roadTexture);
+                
+                // Create roads from hub to each building entrance
+                buildings.forEach(building => {
+                    this.createRoadSegment(hub, building, roadWidth, roadHeight, roadMaterial, roadTexture);
+                });
+                
+                // Create intersections
+                this.createIntersection(hub.x, hub.z, 12, roadMaterial);
+                this.createIntersection(startPos.x, startPos.z, 8, roadMaterial);
+                buildings.forEach(b => {
+                    this.createIntersection(b.x, b.z, 10, roadMaterial);
                 });
             }
             
-            addLaneMarkings(from, to, length, angle, roadLength) {
+            createRoadSegment(from, to, width, height, material, texture) {
+                const dx = to.x - from.x;
+                const dz = to.z - from.z;
+                const length = Math.sqrt(dx * dx + dz * dz);
+                const angle = Math.atan2(dx, dz);
+                
+                // Shorten road to not overlap intersections
+                const shortenedLength = length - 16;
+                if (shortenedLength <= 0) return;
+                
+                // Set texture repeat based on road length
+                const textureCopy = texture.clone();
+                textureCopy.repeat.set(width / 10, shortenedLength / 10);
+                textureCopy.needsUpdate = true;
+                
+                const roadMat = material.clone();
+                roadMat.map = textureCopy;
+                
+                const roadGeom = new THREE.BoxGeometry(width, height, shortenedLength);
+                const road = new THREE.Mesh(roadGeom, roadMat);
+                
+                road.position.set(
+                    from.x + dx / 2,
+                    height / 2,
+                    from.z + dz / 2
+                );
+                road.rotation.y = -angle;
+                road.receiveShadow = true;
+                this.scene.add(road);
+                
+                // Add road markings
+                this.addRoadMarkings(from, to, length, angle, shortenedLength, width);
+            }
+            
+            addRoadMarkings(from, to, length, angle, roadLength, roadWidth) {
                 const dx = to.x - from.x;
                 const dz = to.z - from.z;
                 
-                // White dashed center line (realistic road markings)
-                const dashLength = 3;
-                const gapLength = 6;
-                const startOffset = 8;
-                const numDashes = Math.floor((roadLength - startOffset) / (dashLength + gapLength));
+                // White dashed center line
+                const dashLength = 4;
+                const gapLength = 4;
+                const numDashes = Math.floor((roadLength - 8) / (dashLength + gapLength));
                 
-                // Center line material - white, slightly worn
-                const centerLineMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0xE8E8E8,
+                const lineMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xFFFFFF,
                     transparent: true,
                     opacity: 0.9
                 });
                 
                 for (let i = 0; i < numDashes; i++) {
-                    const progress = (startOffset + i * (dashLength + gapLength) + dashLength / 2) / length;
+                    const progress = (8 + i * (dashLength + gapLength) + dashLength / 2) / length;
                     
-                    const dashGeom = new THREE.BoxGeometry(0.15, 0.012, dashLength);
-                    const dash = new THREE.Mesh(dashGeom, centerLineMaterial);
+                    const dashGeom = new THREE.BoxGeometry(0.2, 0.02, dashLength);
+                    const dash = new THREE.Mesh(dashGeom, lineMaterial);
                     
                     dash.position.set(
                         from.x + dx * progress,
-                        0.09,
+                        0.06,
                         from.z + dz * progress
                     );
                     dash.rotation.y = -angle;
-                    
                     this.scene.add(dash);
                 }
-            }
-            
-            addRoadEdges(from, to, length, angle, roadWidth, roadLength) {
-                const dx = to.x - from.x;
-                const dz = to.z - from.z;
                 
-                // Solid white edge lines (like real roads)
-                const edgeMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0xF0F0F0,
-                    transparent: true,
-                    opacity: 0.95
-                });
-                
-                // Add curb/shoulder for realism
-                const curbMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x4a4a4a,
-                    roughness: 0.8
-                });
-                
+                // Solid white edge lines
                 [-1, 1].forEach(side => {
-                    // White edge line
-                    const edgeGeom = new THREE.BoxGeometry(0.12, 0.012, roadLength);
-                    const edge = new THREE.Mesh(edgeGeom, edgeMaterial);
+                    const edgeGeom = new THREE.BoxGeometry(0.15, 0.02, roadLength);
+                    const edge = new THREE.Mesh(edgeGeom, lineMaterial);
                     
-                    const offset = (roadWidth / 2 - 0.5) * side;
+                    const offset = (roadWidth / 2 - 0.3) * side;
                     const midX = from.x + dx / 2;
                     const midZ = from.z + dz / 2;
                     
                     edge.position.set(
                         midX + Math.cos(angle) * offset,
-                        0.09,
+                        0.06,
                         midZ - Math.sin(angle) * offset
                     );
                     edge.rotation.y = -angle;
                     this.scene.add(edge);
-                    
-                    // Curb/shoulder
-                    const curbGeom = new THREE.BoxGeometry(0.8, 0.15, roadLength);
-                    const curb = new THREE.Mesh(curbGeom, curbMaterial);
-                    
-                    const curbOffset = (roadWidth / 2 + 0.3) * side;
-                    curb.position.set(
-                        midX + Math.cos(angle) * curbOffset,
-                        0.075,
-                        midZ - Math.sin(angle) * curbOffset
-                    );
-                    curb.rotation.y = -angle;
-                    curb.castShadow = true;
-                    curb.receiveShadow = true;
-                    this.scene.add(curb);
                 });
             }
             
-            createIntersection(x, z, radius) {
-                const geometry = new THREE.CylinderGeometry(radius, radius, 0.1, 64);
+            createIntersection(x, z, radius, material) {
+                const geometry = new THREE.CylinderGeometry(radius, radius, 0.05, 48);
                 
-                const material = new THREE.MeshStandardMaterial({
+                const intersectionMat = material ? material.clone() : new THREE.MeshStandardMaterial({
                     color: 0x2a2a2a,
-                    roughness: 0.95,
+                    roughness: 0.9,
                     metalness: 0.0
                 });
                 
-                const intersection = new THREE.Mesh(geometry, material);
-                intersection.position.set(x, 0.05, z);
+                const intersection = new THREE.Mesh(geometry, intersectionMat);
+                intersection.position.set(x, 0.025, z);
                 intersection.receiveShadow = true;
                 this.scene.add(intersection);
-                
-                this.addCrosswalk(x, z, radius);
-            }
-            
-            addCrosswalk(x, z, radius) {
-                const stripeMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0xFFFFFF,
-                    transparent: true,
-                    opacity: 0.95
-                });
-                
-                for (let direction = 0; direction < 4; direction++) {
-                    const angle = direction * Math.PI / 2;
-                    
-                    for (let i = 0; i < 7; i++) {
-                        const stripeGeom = new THREE.BoxGeometry(0.7, 0.02, 2.5);
-                        const stripe = new THREE.Mesh(stripeGeom, stripeMaterial);
-                        
-                        const offset = (i - 3) * 1;
-                        const distance = radius - 2.5;
-                        
-                        stripe.position.set(
-                            x + Math.sin(angle) * distance + Math.cos(angle) * offset,
-                            0.11,
-                            z + Math.cos(angle) * distance - Math.sin(angle) * offset
-                        );
-                        stripe.rotation.y = angle;
-                        
-                        this.scene.add(stripe);
-                    }
-                }
             }
             
             createRoadTexture() {
@@ -2388,17 +2342,19 @@
                                 const hasBlinds = Math.random() > 0.6;
                                 const blindsPartial = hasBlinds && Math.random() > 0.5;
                                 
-                                // Interior backing (warm glow when lights on)
+                                // Interior backing (warm glow when lights on) - pushed back to prevent z-fighting
                                 const interiorColor = hasLightsOn ? 
                                     (Math.random() > 0.5 ? 0xFFF4E0 : 0xFFE4B5) : // warm white or soft yellow
                                     0x1a1a2e; // dark interior
                                 const interiorMat = new THREE.MeshBasicMaterial({
                                     color: interiorColor,
-                                    side: THREE.BackSide
+                                    side: THREE.FrontSide,
+                                    depthWrite: true
                                 });
-                                const interiorGeom = new THREE.PlaneGeometry(windowWidth - 0.2, windowHeight - 0.2);
+                                const interiorGeom = new THREE.PlaneGeometry(windowWidth - 0.3, windowHeight - 0.3);
                                 const interior = new THREE.Mesh(interiorGeom, interiorMat);
-                                interior.position.z = -0.15;
+                                interior.position.z = -0.25; // Push further back
+                                interior.renderOrder = 0;
                                 windowGroup.add(interior);
                                 
                                 // Window frame (dark aluminum)
@@ -2465,18 +2421,20 @@
                                     color: hasLightsOn ? 0x6699aa : 0x88aabb,
                                     metalness: 0.0,
                                     roughness: 0.05,
-                                    transmission: hasLightsOn ? 0.3 : 0.7,
-                                    thickness: 0.1,
+                                    transmission: hasLightsOn ? 0.3 : 0.6,
+                                    thickness: 0.05,
                                     transparent: true,
-                                    opacity: hasLightsOn ? 0.5 : 0.8,
-                                    envMapIntensity: 1.5,
-                                    clearcoat: 1.0,
-                                    clearcoatRoughness: 0.1
+                                    opacity: hasLightsOn ? 0.6 : 0.85,
+                                    envMapIntensity: 1.2,
+                                    clearcoat: 0.8,
+                                    clearcoatRoughness: 0.15,
+                                    depthWrite: false
                                 });
                                 
                                 const glassGeom = new THREE.PlaneGeometry(windowWidth - 0.15, windowHeight - 0.15);
                                 const glass = new THREE.Mesh(glassGeom, glassMat);
-                                glass.position.z = 0.02;
+                                glass.position.z = 0.06; // Further forward to prevent z-fighting
+                                glass.renderOrder = 1;
                                 windowGroup.add(glass);
                                 
                                 // Optional blinds/curtains
@@ -3930,6 +3888,9 @@
                         break;
                 }
                 
+                // 🏢 CAMERA COLLISION - prevent camera from going inside buildings
+                targetPos = this.preventCameraCollision(target.position, targetPos);
+                
                 this.camera.position.lerp(targetPos, CONFIG.CAMERA_LERP_FACTOR);
                 
                 const currentDir = new THREE.Vector3();
@@ -3937,6 +3898,39 @@
                 const targetDir = new THREE.Vector3().subVectors(lookPos, this.camera.position).normalize();
                 currentDir.lerp(targetDir, CONFIG.CAMERA_LERP_FACTOR);
                 this.camera.lookAt(this.camera.position.clone().add(currentDir));
+            }
+            
+            // Prevent camera from clipping through buildings
+            preventCameraCollision(carPos, cameraPos) {
+                const buildingPositions = [
+                    { x: 0, z: 0 },       // About Me
+                    { x: 70, z: -50 },    // Tech Stack
+                    { x: 0, z: -100 },    // Projects
+                    { x: -70, z: 50 },    // Experience
+                    { x: 70, z: 50 }      // Contact
+                ];
+                const buildingRadius = 15; // Approximate building radius
+                const minCameraHeight = 3;
+                
+                for (const building of buildingPositions) {
+                    const dx = cameraPos.x - building.x;
+                    const dz = cameraPos.z - building.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    
+                    if (dist < buildingRadius && cameraPos.y < 40) {
+                        // Push camera outside building
+                        const pushDir = new THREE.Vector2(dx, dz).normalize();
+                        cameraPos.x = building.x + pushDir.x * buildingRadius;
+                        cameraPos.z = building.z + pushDir.y * buildingRadius;
+                        
+                        // Also raise camera if too close
+                        if (dist < buildingRadius * 0.7) {
+                            cameraPos.y = Math.max(cameraPos.y, minCameraHeight + (buildingRadius - dist));
+                        }
+                    }
+                }
+                
+                return cameraPos;
             }
             
             updateAnimations() {

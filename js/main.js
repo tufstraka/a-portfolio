@@ -98,8 +98,7 @@
                             items: [
                                 "♟️ Chess player — always thinking moves ahead",
                                 "🎮 Gamer — understanding systems through play",
-                                "🎨 Creating art, even if it isn't perfect",
-                                "💡 Code is art. This portfolio proves it."
+                                "🎨 Creating art, even if it isn't perfect"
                             ]
                         }
                     ]

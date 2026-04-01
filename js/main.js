@@ -1,7 +1,3 @@
-        // ============================================
-        // KEITH KADIMA - INTERACTIVE 3D PORTFOLIO
-        // PUBG-Style Realistic Graphics + Playful Vibe
-        // ============================================
 
         import * as THREE from 'three';
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';

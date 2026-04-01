@@ -1096,7 +1096,7 @@
                 
                 // Renderer with PBR support
                 this.renderer = new THREE.WebGLRenderer({
-                    antialias: this.state.quality !== 'low',
+                    antialias: true, // Always enable for sharp edges
                     powerPreference: 'high-performance',
                     precision: this.state.isMobile ? 'mediump' : 'highp',
                     stencil: false,
@@ -1104,44 +1104,43 @@
                 });
                 
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
-                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.state.isMobile ? 1 : 1.5));
-                this.renderer.shadowMap.enabled = this.state.quality !== 'low';
-                this.renderer.shadowMap.type = this.state.quality === 'ultra' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+                
+                // Adaptive pixel ratio for sharpness without killing performance
+                // Mobile: 1.5x max, Desktop: 2x max (limited to device pixel ratio)
+                const maxPixelRatio = this.state.isMobile ? 1.5 : 2;
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
+                
+                // Enhanced shadow mapping
+                this.renderer.shadowMap.enabled = true;
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows always
+                this.renderer.shadowMap.autoUpdate = true;
+                
+                // Better color management
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace;
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
                 this.renderer.toneMappingExposure = 1.0;
                 
                 container.appendChild(this.renderer.domElement);
                 
-                // Post-processing
+                // Post-processing for enhanced visuals
                 this.composer = new EffectComposer(this.renderer);
                 this.composer.addPass(new RenderPass(this.scene, this.camera));
                 
-                // SMAA for better anti-aliasing (when available)
-                if (this.state.quality === 'ultra' || this.state.quality === 'high') {
-                    const smaaPass = new SMAAPass(
-                        window.innerWidth * this.renderer.getPixelRatio(),
-                        window.innerHeight * this.renderer.getPixelRatio()
-                    );
-                    this.composer.addPass(smaaPass);
-                } else if (!this.state.isMobile) {
-                    const fxaaPass = new ShaderPass(FXAAShader);
-                    const pixelRatio = this.renderer.getPixelRatio();
-                    fxaaPass.material.uniforms['resolution'].value.x = 1 / (window.innerWidth * pixelRatio);
-                    fxaaPass.material.uniforms['resolution'].value.y = 1 / (window.innerHeight * pixelRatio);
-                    this.composer.addPass(fxaaPass);
-                }
+                // SMAA anti-aliasing (better than FXAA, works on all devices)
+                const smaaPass = new SMAAPass(
+                    window.innerWidth * this.renderer.getPixelRatio(),
+                    window.innerHeight * this.renderer.getPixelRatio()
+                );
+                this.composer.addPass(smaaPass);
                 
-                // Bloom for that cinematic look (half resolution for performance)
-                if (this.state.quality !== 'low') {
-                    this.bloomPass = new UnrealBloomPass(
-                        new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2),
-                        this.state.quality === 'ultra' ? 0.25 : 0.15,
-                        0.3,
-                        0.9
-                    );
-                    this.composer.addPass(this.bloomPass);
-                }
+                // Subtle bloom for realistic glow (optimized settings)
+                this.bloomPass = new UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2),
+                    0.18,  // Strength - subtle
+                    0.4,   // Radius
+                    0.88   // Threshold - only bright spots
+                );
+                this.composer.addPass(this.bloomPass);
             }
             
             async createScene() {
@@ -1195,8 +1194,9 @@
                 
                 if (this.state.quality !== 'low') {
                     this.sunLight.castShadow = true;
-                    this.sunLight.shadow.mapSize.width = this.state.quality === 'ultra' ? 2048 : 1024;
-                    this.sunLight.shadow.mapSize.height = this.state.quality === 'ultra' ? 2048 : 1024;
+                    this.sunLight.shadow.mapSize.width = this.state.isMobile ? 1024 : 2048;
+                    this.sunLight.shadow.mapSize.height = this.state.isMobile ? 1024 : 2048;
+                    this.sunLight.shadow.bias = -0.0001;
                     this.sunLight.shadow.camera.near = 0.5;
                     this.sunLight.shadow.camera.far = 500;
                     
@@ -1521,22 +1521,22 @@
             
             createRoadTexture() {
                 const canvas = document.createElement('canvas');
-                canvas.width = 1024;
-                canvas.height = 1024;
+                canvas.width = 2048;
+                canvas.height = 2048;
                 const ctx = canvas.getContext('2d');
                 
                 // Dark asphalt base with slight blue tint
-                const gradient = ctx.createLinearGradient(0, 0, 1024, 0);
+                const gradient = ctx.createLinearGradient(0, 0, 2048, 0);
                 gradient.addColorStop(0, '#2a2a2f');
                 gradient.addColorStop(0.5, '#303035');
                 gradient.addColorStop(1, '#2a2a2f');
                 ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, 1024, 1024);
+                ctx.fillRect(0, 0, 2048, 2048);
                 
-                // Add realistic asphalt texture (aggregate noise)
-                for (let i = 0; i < 15000; i++) {
-                    const x = Math.random() * 1024;
-                    const y = Math.random() * 1024;
+                // Add realistic asphalt texture (aggregate noise) - more particles for 2048x2048
+                for (let i = 0; i < 60000; i++) {
+                    const x = Math.random() * 2048;
+                    const y = Math.random() * 2048;
                     const size = Math.random() * 3 + 1;
                     const brightness = 35 + Math.random() * 40;
                     ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness + Math.random() * 5})`;
@@ -1546,65 +1546,65 @@
                 }
                 
                 // Add occasional lighter patches (repaired sections)
-                for (let i = 0; i < 8; i++) {
-                    const x = Math.random() * 900 + 50;
-                    const y = Math.random() * 900 + 50;
-                    const w = Math.random() * 80 + 40;
-                    const h = Math.random() * 80 + 40;
+                for (let i = 0; i < 12; i++) {
+                    const x = Math.random() * 1800 + 100;
+                    const y = Math.random() * 1800 + 100;
+                    const w = Math.random() * 120 + 60;
+                    const h = Math.random() * 120 + 60;
                     ctx.fillStyle = `rgba(60, 60, 65, ${Math.random() * 0.3 + 0.2})`;
                     ctx.fillRect(x, y, w, h);
                 }
                 
                 // Add tire marks (subtle)
                 ctx.strokeStyle = 'rgba(20, 20, 20, 0.15)';
-                ctx.lineWidth = 4;
-                for (let i = 0; i < 5; i++) {
+                ctx.lineWidth = 6;
+                for (let i = 0; i < 7; i++) {
                     ctx.beginPath();
-                    const startX = 300 + Math.random() * 100;
+                    const startX = 600 + Math.random() * 200;
                     ctx.moveTo(startX, 0);
                     ctx.bezierCurveTo(
-                        startX + Math.random() * 50 - 25, 300,
-                        startX + Math.random() * 50 - 25, 700,
-                        startX + Math.random() * 100 - 50, 1024
+                        startX + Math.random() * 100 - 50, 600,
+                        startX + Math.random() * 100 - 50, 1400,
+                        startX + Math.random() * 200 - 100, 2048
                     );
                     ctx.stroke();
                 }
                 
                 // Center line (dashed yellow/white)
                 ctx.strokeStyle = '#E8E8E0';
-                ctx.lineWidth = 12;
-                ctx.setLineDash([60, 50]);
+                ctx.lineWidth = 18;
+                ctx.setLineDash([100, 80]);
                 ctx.lineCap = 'round';
                 ctx.beginPath();
-                ctx.moveTo(512, 0);
-                ctx.lineTo(512, 1024);
+                ctx.moveTo(1024, 0);
+                ctx.lineTo(1024, 2048);
                 ctx.stroke();
                 
                 // Edge lines (solid white)
                 ctx.setLineDash([]);
                 ctx.strokeStyle = '#F0F0E8';
-                ctx.lineWidth = 10;
+                ctx.lineWidth = 15;
                 
                 // Left edge
                 ctx.beginPath();
-                ctx.moveTo(60, 0);
-                ctx.lineTo(60, 1024);
+                ctx.moveTo(120, 0);
+                ctx.lineTo(120, 2048);
                 ctx.stroke();
                 
                 // Right edge
                 ctx.beginPath();
-                ctx.moveTo(964, 0);
-                ctx.lineTo(964, 1024);
+                ctx.moveTo(1928, 0);
+                ctx.lineTo(1928, 2048);
                 ctx.stroke();
                 
                 // Add subtle wear on lines
                 ctx.strokeStyle = 'rgba(42, 42, 42, 0.3)';
-                ctx.lineWidth = 2;
-                for (let y = 0; y < 1024; y += 20) {
+                ctx.lineWidth = 3;
+                for (let y = 0; y < 2048; y += 30) {
                     if (Math.random() > 0.7) {
                         ctx.beginPath();
-                        ctx.moveTo(55 + Math.random() * 10, y);
-                        ctx.lineTo(55 + Math.random() * 10, y + 15);
+                        ctx.moveTo(110 + Math.random() * 20, y);
+                        ctx.lineTo(110 + Math.random() * 20, y + 20);
                         ctx.stroke();
                     }
                 }
@@ -1612,6 +1612,10 @@
                 const texture = new THREE.CanvasTexture(canvas);
                 texture.wrapS = THREE.RepeatWrapping;
                 texture.wrapT = THREE.RepeatWrapping;
+                texture.anisotropy = this.renderer.capabilities.getMaxAnisotropy(); // Sharp at angles
+                texture.generateMipmaps = true;
+                texture.minFilter = THREE.LinearMipmapLinearFilter;
+                texture.magFilter = THREE.LinearFilter;
                 
                 return texture;
             }

@@ -122,28 +122,48 @@
         #loadingScreen {
             position: fixed;
             inset: 0;
-            background: var(--color-bg-dark);
+            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 50%, #16213e 100%);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            transition: opacity var(--transition-slow), visibility var(--transition-slow);
+            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
+                        visibility 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            overflow: hidden;
         }
         
         #loadingScreen::before {
             content: '';
             position: absolute;
-            inset: 0;
+            inset: -50%;
             background: 
-                radial-gradient(circle at 20% 80%, rgba(99, 102, 241, 0.3) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(236, 72, 153, 0.3) 0%, transparent 50%),
-                radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.2) 0%, transparent 70%);
-            animation: bgPulse 4s ease-in-out infinite;
+                conic-gradient(from 0deg at 50% 50%, 
+                    transparent 0deg, 
+                    rgba(225, 112, 85, 0.15) 90deg,
+                    transparent 180deg,
+                    rgba(0, 184, 148, 0.15) 270deg,
+                    transparent 360deg);
+            animation: rotate 20s linear infinite;
         }
         
-        @keyframes bgPulse {
-            0%, 100% { opacity: 0.5; }
+        #loadingScreen::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(circle at 30% 70%, rgba(225, 112, 85, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at 70% 30%, rgba(0, 184, 148, 0.08) 0%, transparent 60%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+        
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
             50% { opacity: 1; }
         }
         
@@ -158,51 +178,150 @@
             color: white;
             position: relative;
             z-index: 1;
+            animation: fadeInUp 1s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
         
         .loading-logo {
-            font-size: 4rem;
+            font-size: 5rem;
             margin-bottom: var(--space-6);
-            animation: bounce 1s ease-in-out infinite;
+            animation: float 3s ease-in-out infinite, glow 2s ease-in-out infinite;
+            filter: drop-shadow(0 0 30px rgba(225, 112, 85, 0.5));
+            position: relative;
         }
         
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0) rotate(-5deg); }
-            50% { transform: translateY(-15px) rotate(5deg); }
+        @keyframes float {
+            0%, 100% { 
+                transform: translateY(0px) scale(1); 
+            }
+            50% { 
+                transform: translateY(-20px) scale(1.05); 
+            }
+        }
+        
+        @keyframes glow {
+            0%, 100% { 
+                filter: drop-shadow(0 0 20px rgba(225, 112, 85, 0.4));
+            }
+            50% { 
+                filter: drop-shadow(0 0 40px rgba(225, 112, 85, 0.8));
+            }
         }
         
         .loading-title {
-            font-size: 2rem;
+            font-size: 2.5rem;
             font-weight: 800;
-            margin-bottom: var(--space-2);
-            background: var(--gradient-primary);
+            margin-bottom: var(--space-3);
+            background: linear-gradient(135deg, #E17055 0%, #00B894 50%, #E17055 100%);
+            background-size: 200% 200%;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            animation: gradientShift 3s ease infinite;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            position: relative;
+        }
+        
+        @keyframes gradientShift {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+        
+        .loading-title::after {
+            content: 'KEITH KADIMA';
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            background: linear-gradient(135deg, #E17055 0%, #00B894 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            opacity: 0.3;
+            animation: glitch 5s infinite;
+            letter-spacing: 2px;
+        }
+        
+        @keyframes glitch {
+            0%, 100% { 
+                transform: translate(0); 
+                opacity: 0;
+            }
+            10% { 
+                transform: translate(-2px, 2px); 
+                opacity: 0.3;
+            }
+            20% { 
+                transform: translate(2px, -2px); 
+                opacity: 0;
+            }
         }
         
         .loading-subtitle {
             font-size: 1rem;
-            color: var(--color-text-secondary);
+            color: rgba(255, 255, 255, 0.7);
             margin-bottom: var(--space-8);
+            font-family: 'Space Mono', monospace;
+            animation: fadeIn 1.5s ease;
+            letter-spacing: 1px;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         
         .loading-bar-container {
-            width: 280px;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.1);
+            width: 320px;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.05);
             border-radius: var(--radius-full);
             overflow: hidden;
             position: relative;
+            box-shadow: 
+                inset 0 1px 2px rgba(0, 0, 0, 0.3),
+                0 0 20px rgba(225, 112, 85, 0.1);
         }
         
         .loading-bar {
             height: 100%;
             width: 0%;
-            background: var(--gradient-primary);
+            background: linear-gradient(90deg, 
+                #E17055 0%, 
+                #00B894 50%, 
+                #E17055 100%);
+            background-size: 200% 100%;
             border-radius: var(--radius-full);
-            transition: width var(--transition-normal);
+            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
+            box-shadow: 
+                0 0 20px rgba(225, 112, 85, 0.6),
+                0 0 40px rgba(0, 184, 148, 0.3);
+            animation: barGlow 2s ease-in-out infinite;
+        }
+        
+        @keyframes barGlow {
+            0%, 100% {
+                box-shadow: 
+                    0 0 15px rgba(225, 112, 85, 0.4),
+                    0 0 30px rgba(0, 184, 148, 0.2);
+            }
+            50% {
+                box-shadow: 
+                    0 0 25px rgba(225, 112, 85, 0.8),
+                    0 0 50px rgba(0, 184, 148, 0.5);
+            }
         }
         
         .loading-bar::after {
@@ -212,13 +331,16 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-            animation: shimmer 1.5s infinite;
+            background: linear-gradient(90deg, 
+                transparent, 
+                rgba(255,255,255,0.6), 
+                transparent);
+            animation: shimmer 2s infinite;
         }
         
         @keyframes shimmer {
             0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
+            100% { transform: translateX(200%); }
         }
         
         .loading-tip {
@@ -1515,34 +1637,6 @@
                     ]
                 }
             },
-            'Education': {
-                color: 0x0984E3,  // Ocean Blue
-                icon: '🎓',
-                position: { x: -70, z: -50 },
-                content: {
-                    intro: "My learning journey — from curious student to code craftsman. Education never stops!",
-                    sections: [
-                        {
-                            title: "Academic Path",
-                            items: [
-                                "Bachelor's in Computer Science 🖥️",
-                                "Specialized in Software Engineering",
-                                "Deep dive into algorithms & distributed systems",
-                                "Graduated with distinction"
-                            ]
-                        },
-                        {
-                            title: "Always Learning",
-                            items: [
-                                "AWS Certified Developer ☁️",
-                                "Advanced React & Next.js patterns",
-                                "System Design mastery",
-                                "Currently exploring: Rust 🦀 & AI/ML 🤖"
-                            ]
-                        }
-                    ]
-                }
-            },
             'Tech Stack': {
                 color: 0x00B894,  // Mint Green
                 icon: '⚡',
@@ -2449,7 +2543,7 @@
                 }
                 
                 // Explorer achievement (visit all sections)
-                if (this.state.sectionsVisited.size === 6 && 
+                if (this.state.sectionsVisited.size === 5 && 
                     !localStorage.getItem('achievement_explorer')) {
                     localStorage.setItem('achievement_explorer', 'true');
                     this.showToast('🏆', 'Explorer!', 'You\'ve visited every section');

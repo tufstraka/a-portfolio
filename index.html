@@ -4413,47 +4413,80 @@
             }
             
             honk() {
-                // Play realistic car horn sound
+                // Play realistic car horn sound using dual-tone synthesis
                 if (this.audioContext) {
                     if (this.audioContext.state === 'suspended') {
                         this.audioContext.resume();
                     }
                     
-                    // Create two-tone car horn (classic beep-beep)
                     const now = this.audioContext.currentTime;
+                    const duration = 0.5;
                     
-                    for (let i = 0; i < 2; i++) {
+                    // Real car horns use two simultaneous frequencies
+                    // Common pairs: F# + A# (370Hz + 466Hz) or A + D (440Hz + 587Hz)
+                    const frequencies = [370, 466]; // F# and A# - classic car horn
+                    
+                    frequencies.forEach((freq, i) => {
+                        // Main tone oscillator
                         const osc = this.audioContext.createOscillator();
                         const gain = this.audioContext.createGain();
+                        const filter = this.audioContext.createBiquadFilter();
                         
-                        // Car horn frequency (around 400-500 Hz)
-                        osc.frequency.value = 420 + i * 80;
-                        osc.type = 'square';
+                        // Sawtooth wave gives that brassy horn quality
+                        osc.type = 'sawtooth';
+                        osc.frequency.value = freq;
                         
-                        const startTime = now + i * 0.15;
-                        const duration = 0.1;
+                        // Add slight vibrato for realism
+                        const vibrato = this.audioContext.createOscillator();
+                        const vibratoGain = this.audioContext.createGain();
+                        vibrato.frequency.value = 6; // 6Hz vibrato
+                        vibratoGain.gain.value = 3; // ±3Hz variation
+                        vibrato.connect(vibratoGain);
+                        vibratoGain.connect(osc.frequency);
+                        vibrato.start(now);
+                        vibrato.stop(now + duration);
                         
-                        gain.gain.setValueAtTime(0, startTime);
-                        gain.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
-                        gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                        // Low-pass filter for that muffled car horn sound
+                        filter.type = 'lowpass';
+                        filter.frequency.value = 2000;
+                        filter.Q.value = 1;
                         
-                        osc.connect(gain);
+                        // Envelope: quick attack, sustain, quick release
+                        gain.gain.setValueAtTime(0, now);
+                        gain.gain.linearRampToValueAtTime(0.15, now + 0.02); // Fast attack
+                        gain.gain.setValueAtTime(0.15, now + duration - 0.05); // Sustain
+                        gain.gain.exponentialRampToValueAtTime(0.001, now + duration); // Release
+                        
+                        osc.connect(filter);
+                        filter.connect(gain);
                         gain.connect(this.audioContext.destination);
                         
-                        osc.start(startTime);
-                        osc.stop(startTime + duration);
-                    }
+                        osc.start(now);
+                        osc.stop(now + duration);
+                    });
+                    
+                    // Add a subtle sub-bass for body
+                    const subOsc = this.audioContext.createOscillator();
+                    const subGain = this.audioContext.createGain();
+                    subOsc.type = 'sine';
+                    subOsc.frequency.value = 185; // Sub frequency
+                    subGain.gain.setValueAtTime(0, now);
+                    subGain.gain.linearRampToValueAtTime(0.08, now + 0.02);
+                    subGain.gain.setValueAtTime(0.08, now + duration - 0.05);
+                    subGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+                    subOsc.connect(subGain);
+                    subGain.connect(this.audioContext.destination);
+                    subOsc.start(now);
+                    subOsc.stop(now + duration);
                 }
                 
-                this.showToast('📢', 'HONK!', 'Beep beep!');
-                
-                // Visual honk wave
+                // Visual honk wave - more subtle
                 if (this.car) {
                     const honkGeom = new THREE.RingGeometry(1, 1.5, 32);
                     const honkMat = new THREE.MeshBasicMaterial({
-                        color: 0xFFDD44,
+                        color: 0xFFFFFF,
                         transparent: true,
-                        opacity: 0.8,
+                        opacity: 0.3,
                         side: THREE.DoubleSide
                     });
                     const honkRing = new THREE.Mesh(honkGeom, honkMat);
@@ -4467,7 +4500,7 @@
                         const elapsed = (performance.now() - startTime) / 1000;
                         if (elapsed < 0.4) {
                             honkRing.scale.setScalar(1 + elapsed * 10);
-                            honkMat.opacity = 0.8 * (1 - elapsed * 2.5);
+                            honkMat.opacity = 0.3 * (1 - elapsed * 2.5);
                             requestAnimationFrame(animateHonk);
                         } else {
                             this.scene.remove(honkRing);

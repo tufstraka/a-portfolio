@@ -1593,12 +1593,11 @@
                             ]
                         },
                         {
-                            title: "Certifications",
+                            title: "Location",
                             items: [
-                                "☁️ AWS Cloud Practitioner",
-                                "🔐 Information Security (FreeCodeCamp)",
-                                "🎓 Google IT Support Professional",
-                                "🛠️ ALX Africa Software Engineering"
+                                "📍 Nairobi, Kenya",
+                                "🌍 Open to remote work globally",
+                                "⏰ EAT (UTC+3)"
                             ]
                         }
                     ]
@@ -2733,7 +2732,9 @@
                     const dz = segment.to.z - segment.from.z;
                     const length = Math.sqrt(dx * dx + dz * dz);
                     const angle = Math.atan2(dx, dz);
-                    const shortenedLength = length - 20;
+                    
+                    // Shorten less so roads reach closer to buildings
+                    const shortenedLength = length - 12;
                     
                     const roadGeometry = new THREE.BoxGeometry(roadWidth, roadHeight, shortenedLength);
                     const road = new THREE.Mesh(roadGeometry, roadMaterial);
@@ -5127,7 +5128,9 @@
                 
                 ctx.save();
                 ctx.translate(px, py);
-                ctx.rotate(-playerAngle);
+                // Fix rotation: Three.js Y-rotation is counter-clockwise from +Z, 
+                // Canvas needs clockwise from -Y (up), so we add PI
+                ctx.rotate(playerAngle + Math.PI);
                 
                 // Player indicator with glow
                 ctx.shadowColor = '#6366F1';

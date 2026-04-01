@@ -1637,27 +1637,32 @@
             
             // Check if a point is on the road (for friction calculation)
             isOnRoad(x, z) {
-                // Hub and spoke road layout - center is About Me at (0,0)
-                const center = { x: 0, z: 0 };
-                const startPos = { x: 0, z: 60 };
-                const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
+                // Hub and spoke road layout - explicit positions
+                const hub = { x: 0, z: 0 };        // About Me (center)
+                const startPos = { x: 0, z: 60 };  // Player spawn
+                const buildings = [
+                    { x: 70, z: -50 },   // Tech Stack
+                    { x: 0, z: -100 },   // Projects
+                    { x: -70, z: 50 },   // Experience
+                    { x: 70, z: 50 }     // Contact
+                ];
                 const roadWidth = 7; // Half width for distance check
                 
-                // Check if on start road (start to center)
-                const distToStartRoad = this.pointToSegmentDistance(x, z, startPos.x, startPos.z, center.x, center.z);
+                // Check if on start road (start to hub)
+                const distToStartRoad = this.pointToSegmentDistance(x, z, startPos.x, startPos.z, hub.x, hub.z);
                 if (distToStartRoad < roadWidth) return true;
                 
-                // Check if on any spoke road (center to each section)
-                for (let i = 1; i < positions.length; i++) {
-                    const dist = this.pointToSegmentDistance(x, z, center.x, center.z, positions[i].x, positions[i].z);
+                // Check if on any spoke road (hub to each building)
+                for (const building of buildings) {
+                    const dist = this.pointToSegmentDistance(x, z, hub.x, hub.z, building.x, building.z);
                     if (dist < roadWidth) return true;
                 }
                 
                 // Check if at any intersection
-                const allPoints = [startPos, ...positions];
+                const allPoints = [startPos, hub, ...buildings];
                 for (const pos of allPoints) {
                     const distToPoint = Math.sqrt((x - pos.x) ** 2 + (z - pos.z) ** 2);
-                    if (distToPoint < 10) return true; // Intersection radius
+                    if (distToPoint < 12) return true; // Intersection radius
                 }
                 
                 return false;
@@ -2702,39 +2707,49 @@
             }
             
             createRoads() {
-                // Ultra-polished professional road system
+                // Hub-and-spoke road system from About Me to all buildings
                 const roadWidth = 10;
                 const roadHeight = 0.1;
                 
-                const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
-                const startPos = { x: 0, z: 60 };
-                
                 const textureLoader = new THREE.TextureLoader();
                 
-                // Use solid asphalt color (texture URL was broken)
+                // Use solid asphalt color
                 const roadMaterial = new THREE.MeshStandardMaterial({
                     color: 0x2a2a2a,
                     roughness: 0.95,
                     metalness: 0.0
                 });
                 
+                // Explicit building positions for reliable road connections
+                const hub = { x: 0, z: 0 };        // About Me (center)
+                const startPos = { x: 0, z: 60 };  // Player spawn
+                const buildings = {
+                    techStack: { x: 70, z: -50 },
+                    projects: { x: 0, z: -100 },
+                    experience: { x: -70, z: 50 },
+                    contact: { x: 70, z: 50 }
+                };
+                
+                // Create road segments: start -> hub, hub -> each building
                 const roadSegments = [
-                    { from: startPos, to: positions[0] },
+                    { from: startPos, to: hub },                    // Start to About Me
+                    { from: hub, to: buildings.techStack },         // About Me to Tech Stack
+                    { from: hub, to: buildings.projects },          // About Me to Projects
+                    { from: hub, to: buildings.experience },        // About Me to Experience
+                    { from: hub, to: buildings.contact }            // About Me to Contact
                 ];
                 
-                for (let i = 1; i < positions.length; i++) {
-                    roadSegments.push({ from: positions[0], to: positions[i] });
-                }
-                
-                // Create perfectly uniform roads
+                // Create each road segment
                 roadSegments.forEach((segment) => {
                     const dx = segment.to.x - segment.from.x;
                     const dz = segment.to.z - segment.from.z;
                     const length = Math.sqrt(dx * dx + dz * dz);
                     const angle = Math.atan2(dx, dz);
                     
-                    // Shorten less so roads reach closer to buildings
-                    const shortenedLength = length - 12;
+                    // Road length - leave small gap at intersections
+                    const shortenedLength = length - 10;
+                    
+                    if (shortenedLength <= 0) return; // Skip if too short
                     
                     const roadGeometry = new THREE.BoxGeometry(roadWidth, roadHeight, shortenedLength);
                     const road = new THREE.Mesh(roadGeometry, roadMaterial);
@@ -2749,15 +2764,18 @@
                     
                     this.scene.add(road);
                     
-                    // Perfect lane markings
+                    // Lane markings and edges
                     this.addLaneMarkings(segment.from, segment.to, length, angle, shortenedLength);
                     this.addRoadEdges(segment.from, segment.to, length, angle, roadWidth, shortenedLength);
                 });
                 
-                // Uniform intersections
-                positions.forEach(pos => {
-                    this.createIntersection(pos.x, pos.z, 13);
+                // Create intersections at each building and start
+                this.createIntersection(hub.x, hub.z, 14);  // About Me (larger hub)
+                this.createIntersection(startPos.x, startPos.z, 11);
+                Object.values(buildings).forEach(pos => {
+                    this.createIntersection(pos.x, pos.z, 12);
                 });
+            }
                 
                 this.createIntersection(startPos.x, startPos.z, 11);
             }
@@ -5081,20 +5099,32 @@
                 const cy = canvas.height / 2;
                 const scale = 1.8;
                 
-                // Draw roads (simplified)
+                // Draw roads - hub and spoke from center
                 ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
                 ctx.lineWidth = 4;
-                const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
-                positions.push(positions[0]); // Close the loop
                 
+                const hub = { x: 0, z: 0 };
+                const startPos = { x: 0, z: 60 };
+                const buildings = [
+                    { x: 70, z: -50 },   // Tech Stack
+                    { x: 0, z: -100 },   // Projects
+                    { x: -70, z: 50 },   // Experience
+                    { x: 70, z: 50 }     // Contact
+                ];
+                
+                // Draw start road
                 ctx.beginPath();
-                positions.forEach((pos, i) => {
-                    const x = cx + pos.x / scale;
-                    const y = cy + pos.z / scale;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                });
+                ctx.moveTo(cx + startPos.x / scale, cy + startPos.z / scale);
+                ctx.lineTo(cx + hub.x / scale, cy + hub.z / scale);
                 ctx.stroke();
+                
+                // Draw spoke roads from hub to each building
+                buildings.forEach(building => {
+                    ctx.beginPath();
+                    ctx.moveTo(cx + hub.x / scale, cy + hub.z / scale);
+                    ctx.lineTo(cx + building.x / scale, cy + building.z / scale);
+                    ctx.stroke();
+                });
                 
                 // Draw buildings with colors
                 this.sections.forEach(section => {

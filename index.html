@@ -509,37 +509,68 @@
             letter-spacing: 0.05em;
         }
         
-        /* Speed Display - Racing Style */
+        /* Speed Display - Racing Style ⚡ */
         #speedDisplay {
             position: fixed;
             bottom: var(--space-4);
             left: var(--space-4);
-            background: var(--color-bg-glass);
+            background: linear-gradient(135deg, rgba(15, 15, 30, 0.9), rgba(26, 26, 46, 0.95));
             backdrop-filter: blur(20px);
             padding: var(--space-4) var(--space-6);
             border-radius: var(--radius-2xl);
-            box-shadow: var(--shadow-xl);
+            box-shadow: 
+                var(--shadow-xl),
+                0 0 30px rgba(225, 112, 85, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
             z-index: 100;
-            border: 2px solid rgba(99, 102, 241, 0.2);
+            border: 1px solid rgba(225, 112, 85, 0.3);
             display: flex;
             align-items: baseline;
             gap: var(--space-2);
+            transition: all 0.3s ease;
+        }
+        
+        #speedDisplay:hover {
+            transform: scale(1.02);
+            box-shadow: 
+                var(--shadow-xl),
+                0 0 40px rgba(225, 112, 85, 0.25);
         }
         
         .speed-value {
             font-family: 'Space Mono', monospace;
             font-size: 2.5rem;
             font-weight: 700;
-            background: var(--gradient-primary);
+            background: linear-gradient(135deg, #E17055 0%, #00B894 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
             line-height: 1;
+            text-shadow: 0 0 30px rgba(225, 112, 85, 0.5);
+        }
+        
+        /* Speed color transitions based on velocity */
+        .speed-value.fast {
+            background: linear-gradient(135deg, #FF6B6B 0%, #FFE66D 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+        
+        .speed-value.turbo {
+            background: linear-gradient(135deg, #FF4757 0%, #FF6348 50%, #FFA502 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: turboGlow 0.3s ease-in-out infinite alternate;
+        }
+        
+        @keyframes turboGlow {
+            0% { filter: drop-shadow(0 0 5px rgba(255, 71, 87, 0.5)); }
+            100% { filter: drop-shadow(0 0 15px rgba(255, 165, 2, 0.8)); }
         }
         
         .speed-unit {
             font-size: 0.875rem;
-            color: var(--color-text-secondary);
+            color: rgba(255, 255, 255, 0.6);
             font-weight: 600;
         }
         
@@ -1240,36 +1271,66 @@
             pointer-events: none;
             z-index: 45;
             opacity: 0;
-            transition: opacity 0.2s ease;
+            transition: opacity 0.3s ease;
+            overflow: hidden;
         }
         
         .boost-lines.active {
             opacity: 1;
         }
         
-        .boost-lines::before,
+        /* ⚡ GAME FEEL: Enhanced speed lines with radial blur effect */
+        .boost-lines::before {
+            content: '';
+            position: absolute;
+            inset: -20%;
+            background: 
+                repeating-conic-gradient(
+                    from 0deg at 50% 50%,
+                    transparent 0deg,
+                    rgba(255, 200, 100, 0.03) 1deg,
+                    transparent 2deg,
+                    transparent 10deg
+                );
+            animation: spinLines 2s linear infinite;
+        }
+        
         .boost-lines::after {
             content: '';
             position: absolute;
-            top: 50%;
-            width: 100%;
+            inset: 0;
+            background: radial-gradient(
+                ellipse 80% 50% at 50% 50%,
+                transparent 30%,
+                rgba(255, 150, 50, 0.15) 70%,
+                rgba(255, 100, 0, 0.3) 100%
+            );
+            animation: pulseGlow 0.5s ease-in-out infinite alternate;
+        }
+        
+        @keyframes spinLines {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @keyframes pulseGlow {
+            0% { opacity: 0.6; transform: scale(1); }
+            100% { opacity: 1; transform: scale(1.02); }
+        }
+        
+        /* Speed streaks overlay */
+        .boost-lines .streak {
+            position: absolute;
+            width: 100px;
             height: 2px;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-            animation: boostLine 0.3s linear infinite;
+            background: linear-gradient(90deg, transparent, rgba(255, 200, 100, 0.8), transparent);
+            animation: streakMove 0.4s linear infinite;
         }
         
-        .boost-lines::before {
-            transform: translateY(-20px);
-            animation-delay: 0.1s;
-        }
-        
-        .boost-lines::after {
-            transform: translateY(20px);
-        }
-        
-        @keyframes boostLine {
-            from { transform: translateX(-100%); }
-            to { transform: translateX(100%); }
+        @keyframes streakMove {
+            from { transform: translateX(-100vw); opacity: 0; }
+            50% { opacity: 1; }
+            to { transform: translateX(100vw); opacity: 0; }
         }
         
         /* Progress Bar for Section Entry */
@@ -2051,6 +2112,24 @@
                         this.landingImpact = Math.abs(this.velocityY);
                         this.velocityY = Math.abs(this.velocityY) * 0.15;
                         this.speed *= 0.9;
+                        
+                        // ⚡ GAME FEEL: Three-tier impact system
+                        const impactIntensity = this.landingImpact / 15; // Normalize
+                        if (this.landingImpact > 8) {
+                            // Heavy impact
+                            this.triggerScreenShake(0.8);
+                            this.playCollisionSound(1.0);
+                            this.spawnLandingParticles(15);
+                        } else if (this.landingImpact > 4) {
+                            // Medium impact
+                            this.triggerScreenShake(0.4);
+                            this.playCollisionSound(0.6);
+                            this.spawnLandingParticles(8);
+                        } else {
+                            // Light impact
+                            this.triggerScreenShake(0.15);
+                            this.spawnLandingParticles(4);
+                        }
                     } else {
                         this.velocityY = 0;
                         this.landingImpact = 0;
@@ -3433,6 +3512,86 @@
                 osc.stop(this.audioContext.currentTime + 0.3);
             }
             
+            // ⚡ GAME FEEL: Particle system for landing dust/sparks
+            spawnLandingParticles(count = 8) {
+                if (!this.car || this.state.quality === 'low') return;
+                
+                // Create particle group if it doesn't exist
+                if (!this.particlePool) {
+                    this.particlePool = [];
+                    this.activeParticles = [];
+                }
+                
+                const carPos = this.car.position;
+                
+                for (let i = 0; i < count; i++) {
+                    let particle;
+                    
+                    // Object pooling - reuse particles
+                    if (this.particlePool.length > 0) {
+                        particle = this.particlePool.pop();
+                        particle.visible = true;
+                    } else {
+                        const geometry = new THREE.SphereGeometry(0.15, 6, 6);
+                        const material = new THREE.MeshBasicMaterial({
+                            color: 0xD4A373,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        particle = new THREE.Mesh(geometry, material);
+                        this.scene.add(particle);
+                    }
+                    
+                    // Position around car wheels
+                    const angle = Math.random() * Math.PI * 2;
+                    const radius = 1.5 + Math.random() * 1;
+                    particle.position.set(
+                        carPos.x + Math.cos(angle) * radius,
+                        carPos.y + 0.2,
+                        carPos.z + Math.sin(angle) * radius
+                    );
+                    
+                    // Random velocity
+                    particle.userData.velocity = {
+                        x: (Math.random() - 0.5) * 8,
+                        y: 2 + Math.random() * 4,
+                        z: (Math.random() - 0.5) * 8
+                    };
+                    particle.userData.life = 1.0;
+                    particle.userData.decay = 0.02 + Math.random() * 0.02;
+                    
+                    this.activeParticles.push(particle);
+                }
+            }
+            
+            updateParticles(delta) {
+                if (!this.activeParticles) return;
+                
+                for (let i = this.activeParticles.length - 1; i >= 0; i--) {
+                    const p = this.activeParticles[i];
+                    
+                    // Update position
+                    p.position.x += p.userData.velocity.x * delta;
+                    p.position.y += p.userData.velocity.y * delta;
+                    p.position.z += p.userData.velocity.z * delta;
+                    
+                    // Apply gravity
+                    p.userData.velocity.y -= 15 * delta;
+                    
+                    // Fade out
+                    p.userData.life -= p.userData.decay;
+                    p.material.opacity = p.userData.life * 0.8;
+                    p.scale.setScalar(p.userData.life);
+                    
+                    // Remove dead particles (return to pool)
+                    if (p.userData.life <= 0) {
+                        p.visible = false;
+                        this.particlePool.push(p);
+                        this.activeParticles.splice(i, 1);
+                    }
+                }
+            }
+            
             updateEngineSound() {
                 if (!this.audioContext || !this.vehiclePhysics) return;
                 
@@ -4689,6 +4848,9 @@
                 // Update dust particles
                 this.updateDustParticles(delta);
                 
+                // ⚡ GAME FEEL: Update landing impact particles
+                this.updateParticles(delta);
+                
                 // Update interactive objects (cones, barrels)
                 if (this.car && this.interactiveObjects) {
                     this.updateInteractiveObjects(
@@ -4769,7 +4931,16 @@
                 const boostEl = document.getElementById('speedBoost');
                 const airborneEl = document.getElementById('speedAirborne');
                 
-                if (speedEl) speedEl.textContent = speedKmh;
+                if (speedEl) {
+                    speedEl.textContent = speedKmh;
+                    // ⚡ GAME FEEL: Dynamic speed coloring
+                    speedEl.classList.remove('fast', 'turbo');
+                    if (this.state.isBoosting && speedKmh > 80) {
+                        speedEl.classList.add('turbo');
+                    } else if (speedKmh > 60) {
+                        speedEl.classList.add('fast');
+                    }
+                }
                 if (boostEl) boostEl.style.display = this.state.isBoosting ? 'inline-flex' : 'none';
                 if (airborneEl) airborneEl.style.display = physicsState.isAirborne ? 'inline-flex' : 'none';
                 

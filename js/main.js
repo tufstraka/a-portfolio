@@ -1345,18 +1345,37 @@
             }
             
             createRoads() {
-                // Hub-and-spoke road system from About Me to all buildings
-                const roadWidth = 10;
-                const roadHeight = 0.1;
+                // Realistic road system with proper materials
+                const roadWidth = 12;
+                const roadHeight = 0.08;
                 
-                const textureLoader = new THREE.TextureLoader();
-                
-                // Use solid asphalt color
+                // Realistic asphalt material with subtle variation
                 const roadMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x2a2a2a,
-                    roughness: 0.95,
-                    metalness: 0.0
+                    color: 0x1a1a1a,
+                    roughness: 0.92,
+                    metalness: 0.0,
                 });
+                
+                // Add subtle noise to road for realism
+                const roadCanvas = document.createElement('canvas');
+                roadCanvas.width = 256;
+                roadCanvas.height = 256;
+                const ctx = roadCanvas.getContext('2d');
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(0, 0, 256, 256);
+                // Add noise
+                for (let i = 0; i < 5000; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const brightness = 20 + Math.random() * 15;
+                    ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+                const roadTexture = new THREE.CanvasTexture(roadCanvas);
+                roadTexture.wrapS = THREE.RepeatWrapping;
+                roadTexture.wrapT = THREE.RepeatWrapping;
+                roadTexture.repeat.set(4, 4);
+                roadMaterial.map = roadTexture;
                 
                 // Explicit building positions for reliable road connections
                 const hub = { x: 0, z: 0 };        // About Me (center)
@@ -1419,26 +1438,28 @@
                 const dx = to.x - from.x;
                 const dz = to.z - from.z;
                 
-                const dashLength = 2.5;
-                const gapLength = 4;
-                const startOffset = 10;
-                const numDashes = Math.floor((roadLength - 2) / (dashLength + gapLength));
+                // White dashed center line (realistic road markings)
+                const dashLength = 3;
+                const gapLength = 6;
+                const startOffset = 8;
+                const numDashes = Math.floor((roadLength - startOffset) / (dashLength + gapLength));
                 
-                const lineMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0xFFE135,
+                // Center line material - white, slightly worn
+                const centerLineMaterial = new THREE.MeshBasicMaterial({ 
+                    color: 0xE8E8E8,
                     transparent: true,
-                    opacity: 0.95
+                    opacity: 0.9
                 });
                 
                 for (let i = 0; i < numDashes; i++) {
                     const progress = (startOffset + i * (dashLength + gapLength) + dashLength / 2) / length;
                     
-                    const dashGeom = new THREE.BoxGeometry(0.15, 0.015, dashLength);
-                                        const dash = new THREE.Mesh(dashGeom, lineMaterial);
+                    const dashGeom = new THREE.BoxGeometry(0.15, 0.012, dashLength);
+                    const dash = new THREE.Mesh(dashGeom, centerLineMaterial);
                     
                     dash.position.set(
                         from.x + dx * progress,
-                        0.11,
+                        0.09,
                         from.z + dz * progress
                     );
                     dash.rotation.y = -angle;
@@ -1451,28 +1472,50 @@
                 const dx = to.x - from.x;
                 const dz = to.z - from.z;
                 
+                // Solid white edge lines (like real roads)
                 const edgeMaterial = new THREE.MeshBasicMaterial({ 
-                    color: 0xFFFFFF,
+                    color: 0xF0F0F0,
                     transparent: true,
-                    opacity: 0.98
+                    opacity: 0.95
+                });
+                
+                // Add curb/shoulder for realism
+                const curbMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x4a4a4a,
+                    roughness: 0.8
                 });
                 
                 [-1, 1].forEach(side => {
-                    const edgeGeom = new THREE.BoxGeometry(0.12, 0.015, roadLength);
+                    // White edge line
+                    const edgeGeom = new THREE.BoxGeometry(0.12, 0.012, roadLength);
                     const edge = new THREE.Mesh(edgeGeom, edgeMaterial);
                     
-                    const offset = (roadWidth / 2 - 0.25) * side;
+                    const offset = (roadWidth / 2 - 0.5) * side;
                     const midX = from.x + dx / 2;
                     const midZ = from.z + dz / 2;
                     
                     edge.position.set(
                         midX + Math.cos(angle) * offset,
-                        0.11,
+                        0.09,
                         midZ - Math.sin(angle) * offset
                     );
                     edge.rotation.y = -angle;
-                    
                     this.scene.add(edge);
+                    
+                    // Curb/shoulder
+                    const curbGeom = new THREE.BoxGeometry(0.8, 0.15, roadLength);
+                    const curb = new THREE.Mesh(curbGeom, curbMaterial);
+                    
+                    const curbOffset = (roadWidth / 2 + 0.3) * side;
+                    curb.position.set(
+                        midX + Math.cos(angle) * curbOffset,
+                        0.075,
+                        midZ - Math.sin(angle) * curbOffset
+                    );
+                    curb.rotation.y = -angle;
+                    curb.castShadow = true;
+                    curb.receiveShadow = true;
+                    this.scene.add(curb);
                 });
             }
             
@@ -1622,185 +1665,335 @@
             async createVehicle() {
                 const carGroup = new THREE.Group();
                 
-                // Modern sports car body - sleek and realistic
-                const bodyColor = 0xE63946; // Racing red
+                // Realistic sports car with proper proportions
+                const bodyColor = 0xC41E3A; // Deep racing red
                 const bodyMaterial = new THREE.MeshStandardMaterial({
                     color: bodyColor,
-                    metalness: 0.95,
-                    roughness: 0.2,
-                    envMapIntensity: 2.0
+                    metalness: 0.85,
+                    roughness: 0.15,
+                    envMapIntensity: 1.5
                 });
                 
-                // Lower body (main chassis)
-                const lowerBodyGeom = new THREE.BoxGeometry(2, 0.6, 4.5);
+                // Secondary body material (darker accents)
+                const accentMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x1a1a1a,
+                    metalness: 0.6,
+                    roughness: 0.4
+                });
+                
+                // Main body - lower chassis with realistic shape
+                const lowerBodyGeom = new THREE.BoxGeometry(2.1, 0.5, 4.8);
                 const lowerBody = new THREE.Mesh(lowerBodyGeom, bodyMaterial);
-                lowerBody.position.set(0, 0.5, 0);
+                lowerBody.position.set(0, 0.45, 0);
                 lowerBody.castShadow = true;
                 carGroup.add(lowerBody);
                 
-                // Upper body (cabin)
-                const upperBodyGeom = new THREE.BoxGeometry(1.9, 0.8, 2.5);
-                const upperBody = new THREE.Mesh(upperBodyGeom, bodyMaterial);
-                upperBody.position.set(0, 1.1, -0.2);
-                upperBody.castShadow = true;
-                carGroup.add(upperBody);
+                // Front fenders (wheel arches)
+                [-1, 1].forEach(side => {
+                    const fenderGeom = new THREE.BoxGeometry(0.3, 0.35, 1.2);
+                    const fender = new THREE.Mesh(fenderGeom, bodyMaterial);
+                    fender.position.set(side * 1.05, 0.6, 1.4);
+                    fender.castShadow = true;
+                    carGroup.add(fender);
+                });
                 
-                // Hood
-                const hoodGeom = new THREE.BoxGeometry(1.8, 0.3, 1.5);
+                // Rear fenders (wider for sporty look)
+                [-1, 1].forEach(side => {
+                    const rearFenderGeom = new THREE.BoxGeometry(0.35, 0.4, 1.3);
+                    const rearFender = new THREE.Mesh(rearFenderGeom, bodyMaterial);
+                    rearFender.position.set(side * 1.1, 0.6, -1.5);
+                    rearFender.castShadow = true;
+                    carGroup.add(rearFender);
+                });
+                
+                // Hood with slope
+                const hoodGeom = new THREE.BoxGeometry(1.9, 0.25, 1.8);
                 const hood = new THREE.Mesh(hoodGeom, bodyMaterial);
-                hood.position.set(0, 0.8, 1.5);
-                hood.rotation.x = -0.1;
+                hood.position.set(0, 0.75, 1.8);
+                hood.rotation.x = -0.08;
                 hood.castShadow = true;
                 carGroup.add(hood);
                 
-                // Windshields - realistic glass
-                const glassMaterial = new THREE.MeshPhysicalMaterial({
-                    color: 0x4A90A4,
-                    metalness: 0.0,
-                    roughness: 0.05,
-                    transmission: 0.95,
-                    thickness: 0.3,
-                    transparent: true,
-                    opacity: 0.4
+                // Cabin/roof
+                const cabinGeom = new THREE.BoxGeometry(1.85, 0.7, 2.2);
+                const cabin = new THREE.Mesh(cabinGeom, bodyMaterial);
+                cabin.position.set(0, 1.05, -0.3);
+                cabin.castShadow = true;
+                carGroup.add(cabin);
+                
+                // Trunk/rear
+                const trunkGeom = new THREE.BoxGeometry(1.9, 0.35, 1.0);
+                const trunk = new THREE.Mesh(trunkGeom, bodyMaterial);
+                trunk.position.set(0, 0.7, -1.9);
+                trunk.castShadow = true;
+                carGroup.add(trunk);
+                
+                // Front grille
+                const grilleMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x0a0a0a,
+                    metalness: 0.3,
+                    roughness: 0.8
+                });
+                const grilleGeom = new THREE.BoxGeometry(1.4, 0.25, 0.05);
+                const grille = new THREE.Mesh(grilleGeom, grilleMaterial);
+                grille.position.set(0, 0.45, 2.43);
+                carGroup.add(grille);
+                
+                // Front bumper
+                const bumperGeom = new THREE.BoxGeometry(2.1, 0.3, 0.3);
+                const frontBumper = new THREE.Mesh(bumperGeom, accentMaterial);
+                frontBumper.position.set(0, 0.3, 2.4);
+                frontBumper.castShadow = true;
+                carGroup.add(frontBumper);
+                
+                // Rear bumper
+                const rearBumper = new THREE.Mesh(bumperGeom, accentMaterial);
+                rearBumper.position.set(0, 0.3, -2.4);
+                rearBumper.castShadow = true;
+                carGroup.add(rearBumper);
+                
+                // Side skirts
+                [-1, 1].forEach(side => {
+                    const skirtGeom = new THREE.BoxGeometry(0.15, 0.2, 3.5);
+                    const skirt = new THREE.Mesh(skirtGeom, accentMaterial);
+                    skirt.position.set(side * 1.05, 0.25, 0);
+                    carGroup.add(skirt);
                 });
                 
-                // Front windshield
-                const frontGlassGeom = new THREE.PlaneGeometry(1.8, 0.9);
+                // Windshields - realistic glass with proper tint
+                const glassMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x1a3a4a,
+                    metalness: 0.0,
+                    roughness: 0.05,
+                    transmission: 0.9,
+                    thickness: 0.2,
+                    transparent: true,
+                    opacity: 0.35
+                });
+                
+                // Front windshield (angled)
+                const frontGlassGeom = new THREE.PlaneGeometry(1.75, 1.0);
                 const frontGlass = new THREE.Mesh(frontGlassGeom, glassMaterial);
-                frontGlass.position.set(0, 1.35, 1.1);
-                frontGlass.rotation.x = 0.3;
+                frontGlass.position.set(0, 1.2, 0.95);
+                frontGlass.rotation.x = 0.45;
                 carGroup.add(frontGlass);
                 
                 // Rear windshield
-                const rearGlass = frontGlass.clone();
-                rearGlass.position.set(0, 1.35, -1.4);
-                rearGlass.rotation.x = -0.3;
+                const rearGlassGeom = new THREE.PlaneGeometry(1.6, 0.8);
+                const rearGlass = new THREE.Mesh(rearGlassGeom, glassMaterial);
+                rearGlass.position.set(0, 1.15, -1.45);
+                rearGlass.rotation.x = -0.4;
                 carGroup.add(rearGlass);
                 
                 // Side windows
                 [-1, 1].forEach(side => {
                     const sideGlass = new THREE.Mesh(
-                        new THREE.PlaneGeometry(2.3, 0.7),
+                        new THREE.PlaneGeometry(2.0, 0.6),
                         glassMaterial
                     );
-                    sideGlass.position.set(side * 1.0, 1.2, -0.2);
+                    sideGlass.position.set(side * 0.95, 1.1, -0.3);
                     sideGlass.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
                     carGroup.add(sideGlass);
                 });
                 
-                // Realistic wheels
+                // Door handles
+                const handleMaterial = new THREE.MeshStandardMaterial({
+                    color: 0xC0C0C0,
+                    metalness: 0.9,
+                    roughness: 0.2
+                });
+                [-1, 1].forEach(side => {
+                    const handleGeom = new THREE.BoxGeometry(0.02, 0.05, 0.2);
+                    const handle = new THREE.Mesh(handleGeom, handleMaterial);
+                    handle.position.set(side * 1.08, 0.85, 0.2);
+                    carGroup.add(handle);
+                });
+                
+                // Side mirrors
+                [-1, 1].forEach(side => {
+                    const mirrorGroup = new THREE.Group();
+                    
+                    const mirrorArm = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.25, 0.05, 0.05),
+                        accentMaterial
+                    );
+                    mirrorArm.position.set(side * 0.12, 0, 0);
+                    mirrorGroup.add(mirrorArm);
+                    
+                    const mirrorHead = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.08, 0.12, 0.18),
+                        accentMaterial
+                    );
+                    mirrorHead.position.set(side * 0.28, 0, 0);
+                    mirrorGroup.add(mirrorHead);
+                    
+                    // Mirror glass
+                    const mirrorGlass = new THREE.Mesh(
+                        new THREE.PlaneGeometry(0.06, 0.1),
+                        new THREE.MeshStandardMaterial({
+                            color: 0x6688aa,
+                            metalness: 1.0,
+                            roughness: 0.0
+                        })
+                    );
+                    mirrorGlass.position.set(side * 0.32, 0, 0);
+                    mirrorGlass.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
+                    mirrorGroup.add(mirrorGlass);
+                    
+                    mirrorGroup.position.set(side * 0.85, 1.05, 0.8);
+                    carGroup.add(mirrorGroup);
+                });
+                
+                // Realistic wheels with proper tire sidewalls
                 const wheelPositions = [
-                    { x: -1.0, y: 0.4, z: 1.5 },  // Front left
-                    { x: 1.0, y: 0.4, z: 1.5 },   // Front right
-                    { x: -1.0, y: 0.4, z: -1.5 }, // Rear left
-                    { x: 1.0, y: 0.4, z: -1.5 }   // Rear right
+                    { x: -1.0, y: 0.38, z: 1.5 },  // Front left
+                    { x: 1.0, y: 0.38, z: 1.5 },   // Front right
+                    { x: -1.0, y: 0.38, z: -1.5 }, // Rear left
+                    { x: 1.0, y: 0.38, z: -1.5 }   // Rear right
                 ];
                 
                 const tireMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x0a0a0a,
-                    roughness: 0.95,
+                    color: 0x1a1a1a,
+                    roughness: 0.9,
                     metalness: 0.0
                 });
                 
                 const rimMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xC0C0C0,
-                    metalness: 0.9,
-                    roughness: 0.2
+                    color: 0x888888,
+                    metalness: 0.95,
+                    roughness: 0.15
                 });
                 
                 this.wheels = [];
                 wheelPositions.forEach((pos, index) => {
                     const wheelGroup = new THREE.Group();
                     
-                    // Tire
-                    const tireGeom = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 32);
+                    // Tire (outer rubber)
+                    const tireGeom = new THREE.TorusGeometry(0.35, 0.12, 16, 32);
                     const tire = new THREE.Mesh(tireGeom, tireMaterial);
-                    tire.rotation.z = Math.PI / 2;
+                    tire.rotation.y = Math.PI / 2;
                     wheelGroup.add(tire);
                     
-                    // Rim with spokes
-                    const rimGeom = new THREE.CylinderGeometry(0.32, 0.32, 0.32, 32);
+                    // Rim
+                    const rimGeom = new THREE.CylinderGeometry(0.28, 0.28, 0.22, 24);
                     const rim = new THREE.Mesh(rimGeom, rimMaterial);
                     rim.rotation.z = Math.PI / 2;
                     wheelGroup.add(rim);
                     
-                    // Brake disc (behind rim)
-                    const brakeGeom = new THREE.CylinderGeometry(0.25, 0.25, 0.05, 32);
-                    const brakeMat = new THREE.MeshStandardMaterial({
-                        color: 0x333333,
-                        metalness: 0.8,
-                        roughness: 0.4
-                    });
-                    const brake = new THREE.Mesh(brakeGeom, brakeMat);
-                    brake.rotation.z = Math.PI / 2;
-                    brake.position.x = pos.x > 0 ? 0.15 : -0.15;
-                    wheelGroup.add(brake);
+                    // Rim spokes (5-spoke design)
+                    for (let i = 0; i < 5; i++) {
+                        const spokeAngle = (i / 5) * Math.PI * 2;
+                        const spokeGeom = new THREE.BoxGeometry(0.04, 0.22, 0.15);
+                        const spoke = new THREE.Mesh(spokeGeom, rimMaterial);
+                        spoke.position.set(
+                            Math.cos(spokeAngle) * 0.15,
+                            0,
+                            Math.sin(spokeAngle) * 0.15
+                        );
+                        spoke.rotation.y = spokeAngle;
+                        wheelGroup.add(spoke);
+                    }
                     
-                    // Center cap
-                    const capGeom = new THREE.CylinderGeometry(0.1, 0.1, 0.34, 16);
+                    // Center cap with logo indent
+                    const capGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.24, 16);
                     const cap = new THREE.Mesh(capGeom, rimMaterial);
                     cap.rotation.z = Math.PI / 2;
                     wheelGroup.add(cap);
                     
+                    // Brake caliper (visible through spokes)
+                    const caliperGeom = new THREE.BoxGeometry(0.12, 0.08, 0.15);
+                    const caliperMat = new THREE.MeshStandardMaterial({
+                        color: 0xCC0000,  // Red brake calipers
+                        metalness: 0.7,
+                        roughness: 0.3
+                    });
+                    const caliper = new THREE.Mesh(caliperGeom, caliperMat);
+                    caliper.position.set(pos.x > 0 ? 0.05 : -0.05, -0.12, 0);
+                    wheelGroup.add(caliper);
+                    
                     wheelGroup.position.set(pos.x, pos.y, pos.z);
-                    wheelGroup.userData.steering = index < 2; // Front wheels steer
+                    wheelGroup.userData.steering = index < 2;
                     wheelGroup.castShadow = true;
                     
                     this.wheels.push(wheelGroup);
                     carGroup.add(wheelGroup);
                 });
                 
-                // Headlights - bright LEDs
+                // LED Headlights
                 const headlightMaterial = new THREE.MeshStandardMaterial({
                     color: 0xFFFFFF,
                     emissive: 0xFFFFFF,
-                    emissiveIntensity: 1.5
+                    emissiveIntensity: 2.0
                 });
                 
-                [-0.65, 0.65].forEach(x => {
+                [-0.6, 0.6].forEach(x => {
+                    // Main headlight
                     const headlight = new THREE.Mesh(
-                        new THREE.CircleGeometry(0.18, 24),
+                        new THREE.CircleGeometry(0.15, 24),
                         headlightMaterial
                     );
-                    headlight.position.set(x, 0.7, 2.3);
+                    headlight.position.set(x, 0.55, 2.45);
                     carGroup.add(headlight);
+                    
+                    // DRL strip
+                    const drlGeom = new THREE.BoxGeometry(0.3, 0.03, 0.02);
+                    const drl = new THREE.Mesh(drlGeom, headlightMaterial);
+                    drl.position.set(x, 0.7, 2.45);
+                    carGroup.add(drl);
                 });
                 
-                // Taillights
+                // LED Taillights
                 const taillightMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xFF1744,
-                    emissive: 0xFF1744,
-                    emissiveIntensity: 0.8
+                    color: 0xFF0000,
+                    emissive: 0xFF0000,
+                    emissiveIntensity: 1.0
                 });
                 
-                [-0.7, 0.7].forEach(x => {
+                [-0.6, 0.6].forEach(x => {
+                    // Main taillight
                     const taillight = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.35, 0.15, 0.08),
+                        new THREE.BoxGeometry(0.4, 0.12, 0.05),
                         taillightMaterial
                     );
-                    taillight.position.set(x, 0.7, -2.3);
+                    taillight.position.set(x, 0.6, -2.45);
                     carGroup.add(taillight);
                 });
                 
-                // Spoiler
-                const spoilerMat = new THREE.MeshStandardMaterial({
-                    color: 0x1a1a1a,
-                    metalness: 0.6,
+                // Exhaust tips
+                const exhaustMaterial = new THREE.MeshStandardMaterial({
+                    color: 0x333333,
+                    metalness: 0.9,
                     roughness: 0.3
                 });
+                [-0.4, 0.4].forEach(x => {
+                    const exhaustGeom = new THREE.CylinderGeometry(0.06, 0.07, 0.15, 16);
+                    const exhaust = new THREE.Mesh(exhaustGeom, exhaustMaterial);
+                    exhaust.rotation.x = Math.PI / 2;
+                    exhaust.position.set(x, 0.25, -2.5);
+                    carGroup.add(exhaust);
+                });
                 
-                const spoilerBase = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.15, 0.4, 0.1),
-                    spoilerMat
-                );
-                spoilerBase.position.set(0, 1.0, -2.1);
-                carGroup.add(spoilerBase);
+                // Rear spoiler
+                const spoilerMat = new THREE.MeshStandardMaterial({
+                    color: 0x1a1a1a,
+                    metalness: 0.5,
+                    roughness: 0.4
+                });
                 
+                // Spoiler supports
+                [-0.5, 0.5].forEach(x => {
+                    const supportGeom = new THREE.BoxGeometry(0.08, 0.35, 0.08);
+                    const support = new THREE.Mesh(supportGeom, spoilerMat);
+                    support.position.set(x, 1.0, -2.1);
+                    carGroup.add(support);
+                });
+                
+                // Spoiler wing
                 const spoilerWing = new THREE.Mesh(
-                    new THREE.BoxGeometry(1.8, 0.1, 0.4),
+                    new THREE.BoxGeometry(1.6, 0.08, 0.35),
                     spoilerMat
                 );
-                spoilerWing.position.set(0, 1.3, -2.2);
+                spoilerWing.position.set(0, 1.2, -2.15);
                 spoilerWing.rotation.x = -0.15;
                 carGroup.add(spoilerWing);
                 

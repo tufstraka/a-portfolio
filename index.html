@@ -122,49 +122,20 @@
         #loadingScreen {
             position: fixed;
             inset: 0;
-            background: linear-gradient(135deg, #0f0f1e 0%, #1a1a2e 50%, #16213e 100%);
+            background: #0a0a0a;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 1000;
-            transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), 
-                        visibility 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-            overflow: hidden;
+            transition: opacity 1.2s ease, visibility 1.2s ease;
         }
         
         #loadingScreen::before {
             content: '';
             position: absolute;
-            inset: -50%;
-            background: 
-                conic-gradient(from 0deg at 50% 50%, 
-                    transparent 0deg, 
-                    rgba(225, 112, 85, 0.15) 90deg,
-                    transparent 180deg,
-                    rgba(0, 184, 148, 0.15) 270deg,
-                    transparent 360deg);
-            animation: rotate 20s linear infinite;
-        }
-        
-        #loadingScreen::after {
-            content: '';
-            position: absolute;
             inset: 0;
-            background: 
-                radial-gradient(circle at 30% 70%, rgba(225, 112, 85, 0.08) 0%, transparent 60%),
-                radial-gradient(circle at 70% 30%, rgba(0, 184, 148, 0.08) 0%, transparent 60%);
-            animation: pulse 4s ease-in-out infinite;
-        }
-        
-        @keyframes rotate {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 0.6; }
-            50% { opacity: 1; }
+            background: radial-gradient(ellipse at 50% 50%, rgba(255, 255, 255, 0.02) 0%, transparent 70%);
         }
         
         #loadingScreen.hidden {
@@ -193,19 +164,22 @@
         }
         
         .loading-logo {
-            font-size: 5rem;
-            margin-bottom: var(--space-6);
-            animation: float 3s ease-in-out infinite, glow 2s ease-in-out infinite;
-            filter: drop-shadow(0 0 30px rgba(225, 112, 85, 0.5));
-            position: relative;
+            font-size: 2rem;
+            margin-bottom: var(--space-8);
+            color: rgba(255, 255, 255, 0.9);
+            animation: breathe 4s ease-in-out infinite;
+            letter-spacing: 0.5em;
+            font-weight: 300;
         }
         
-        @keyframes float {
+        @keyframes breathe {
             0%, 100% { 
-                transform: translateY(0px) scale(1); 
+                opacity: 0.4;
+                transform: scale(1);
             }
             50% { 
-                transform: translateY(-20px) scale(1.05); 
+                opacity: 1;
+                transform: scale(1.1);
             }
         }
         
@@ -283,45 +257,19 @@
         }
         
         .loading-bar-container {
-            width: 320px;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: var(--radius-full);
+            width: 120px;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
             overflow: hidden;
             position: relative;
-            box-shadow: 
-                inset 0 1px 2px rgba(0, 0, 0, 0.3),
-                0 0 20px rgba(225, 112, 85, 0.1);
         }
         
         .loading-bar {
             height: 100%;
             width: 0%;
-            background: linear-gradient(90deg, 
-                #E17055 0%, 
-                #00B894 50%, 
-                #E17055 100%);
-            background-size: 200% 100%;
-            border-radius: var(--radius-full);
-            transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: rgba(255, 255, 255, 0.8);
+            transition: width 0.4s ease-out;
             position: relative;
-            box-shadow: 
-                0 0 20px rgba(225, 112, 85, 0.6),
-                0 0 40px rgba(0, 184, 148, 0.3);
-            animation: barGlow 2s ease-in-out infinite;
-        }
-        
-        @keyframes barGlow {
-            0%, 100% {
-                box-shadow: 
-                    0 0 15px rgba(225, 112, 85, 0.4),
-                    0 0 30px rgba(0, 184, 148, 0.2);
-            }
-            50% {
-                box-shadow: 
-                    0 0 25px rgba(225, 112, 85, 0.8),
-                    0 0 50px rgba(0, 184, 148, 0.5);
-            }
         }
         
         .loading-bar::after {
@@ -333,7 +281,7 @@
             bottom: 0;
             background: linear-gradient(90deg, 
                 transparent, 
-                rgba(255,255,255,0.6), 
+                rgba(255,255,255,0.8), 
                 transparent);
             animation: shimmer 2s infinite;
         }
@@ -1376,15 +1324,10 @@
     <!-- Loading Screen -->
     <div id="loadingScreen">
         <div class="loading-content">
-            <div class="loading-logo">🏎️</div>
-            <h1 class="loading-title">Keith Kadima</h1>
-            <p class="loading-subtitle">Preparing your adventure...</p>
+            <div class="loading-logo">✦</div>
             <div class="loading-bar-container">
                 <div class="loading-bar" id="loadingBar"></div>
             </div>
-            <p class="loading-tip">
-                <kbd>WASD</kbd> to drive • <kbd>J</kbd> to jump • <kbd>SPACE</kbd> to explore
-            </p>
         </div>
     </div>
     

@@ -1262,6 +1262,18 @@
                 <span class="control-key">M</span>
                 <span>Toggle map</span>
             </div>
+            <div class="control-item">
+                <span class="control-key">T</span>
+                <span>Time of day 🌅</span>
+            </div>
+            <div class="control-item">
+                <span class="control-key">N</span>
+                <span>Night mode 🌙</span>
+            </div>
+            <div class="control-item" style="opacity: 0.4; font-size: 9px;">
+                <span class="control-key">???</span>
+                <span>Secret code...</span>
+            </div>
         </div>
     </div>
     
@@ -4496,8 +4508,10 @@
             onKeyDown(e) {
                 this.state.keys[e.code] = true;
                 
+                // 🥚 KONAMI CODE EASTER EGG
+                this.checkKonamiCode(e.code);
+                
                 // Space is now handled by hold-to-enter in checkSectionProximity
-                // Just prevent default
                 if (e.code === 'Space') {
                     e.preventDefault();
                 }
@@ -4505,6 +4519,8 @@
                 if (e.code === 'KeyC') this.toggleCamera();
                 if (e.code === 'KeyH') this.honk();
                 if (e.code === 'KeyM') this.toggleMinimap();
+                if (e.code === 'KeyT') this.cycleTimeOfDay(); // 🌅 Time of day
+                if (e.code === 'KeyN') this.toggleNightMode(); // 🌙 Night mode
                 
                 if (e.code === 'Escape') {
                     this.closeModal();
@@ -4515,6 +4531,131 @@
                      'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(e.code)) {
                     e.preventDefault();
                 }
+            }
+            
+            // 🥚 KONAMI CODE: ↑↑↓↓←→←→BA
+            checkKonamiCode(code) {
+                const konamiSequence = [
+                    'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
+                    'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight',
+                    'KeyB', 'KeyA'
+                ];
+                
+                if (!this.konamiIndex) this.konamiIndex = 0;
+                
+                if (code === konamiSequence[this.konamiIndex]) {
+                    this.konamiIndex++;
+                    if (this.konamiIndex === konamiSequence.length) {
+                        this.activateKonamiMode();
+                        this.konamiIndex = 0;
+                    }
+                } else {
+                    this.konamiIndex = 0;
+                }
+            }
+            
+            activateKonamiMode() {
+                // 🎮 SECRET UNLOCKED!
+                this.state.konamiActive = true;
+                
+                // Rainbow car!
+                if (this.car) {
+                    this.car.traverse(child => {
+                        if (child.isMesh && child.material && child.material.color) {
+                            child.userData.originalColor = child.material.color.getHex();
+                        }
+                    });
+                    this.state.rainbowMode = true;
+                }
+                
+                // Boost multiplier
+                CONFIG.BOOST_MULTIPLIER = 3.0;
+                CONFIG.JUMP_FORCE = 20;
+                
+                // Epic notification
+                this.showToast('🎮', 'KONAMI CODE!', 'Rainbow mode + Super boost activated!');
+                
+                // Play victory sound
+                if (this.audioContext) {
+                    const now = this.audioContext.currentTime;
+                    [523, 659, 784, 1047].forEach((freq, i) => {
+                        const osc = this.audioContext.createOscillator();
+                        const gain = this.audioContext.createGain();
+                        osc.frequency.value = freq;
+                        osc.type = 'square';
+                        gain.gain.setValueAtTime(0.1, now + i * 0.1);
+                        gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.15);
+                        osc.connect(gain);
+                        gain.connect(this.audioContext.destination);
+                        osc.start(now + i * 0.1);
+                        osc.stop(now + i * 0.1 + 0.2);
+                    });
+                }
+            }
+            
+            // 🌅 DYNAMIC TIME OF DAY
+            cycleTimeOfDay() {
+                const times = ['dawn', 'day', 'sunset', 'night'];
+                if (!this.currentTimeIndex) this.currentTimeIndex = 1; // Start at day
+                this.currentTimeIndex = (this.currentTimeIndex + 1) % times.length;
+                this.setTimeOfDay(times[this.currentTimeIndex]);
+            }
+            
+            toggleNightMode() {
+                const isNight = this.currentTimeIndex === 3;
+                this.setTimeOfDay(isNight ? 'day' : 'night');
+                this.currentTimeIndex = isNight ? 1 : 3;
+            }
+            
+            setTimeOfDay(time) {
+                const settings = {
+                    dawn: {
+                        skyTop: 0xFF9966, skyBottom: 0x3D5C8A,
+                        sunColor: 0xFFAA77, sunIntensity: 1.5,
+                        ambientIntensity: 0.3, fogColor: 0xFFCCB3
+                    },
+                    day: {
+                        skyTop: 0x87CEEB, skyBottom: 0xE8F4F8,
+                        sunColor: 0xFFFFF0, sunIntensity: 2.0,
+                        ambientIntensity: 0.4, fogColor: 0xC8E0F0
+                    },
+                    sunset: {
+                        skyTop: 0xFF6B35, skyBottom: 0x4A1942,
+                        sunColor: 0xFF8844, sunIntensity: 1.2,
+                        ambientIntensity: 0.25, fogColor: 0xFF9966
+                    },
+                    night: {
+                        skyTop: 0x0A0A20, skyBottom: 0x1A1A3A,
+                        sunColor: 0x8888FF, sunIntensity: 0.3,
+                        ambientIntensity: 0.15, fogColor: 0x151530
+                    }
+                };
+                
+                const s = settings[time];
+                if (!s) return;
+                
+                // Animate sky colors
+                if (this.skyMaterial) {
+                    this.skyMaterial.uniforms.topColor.value.setHex(s.skyTop);
+                    this.skyMaterial.uniforms.bottomColor.value.setHex(s.skyBottom);
+                }
+                
+                // Update lights
+                if (this.sunLight) {
+                    this.sunLight.color.setHex(s.sunColor);
+                    this.sunLight.intensity = s.sunIntensity;
+                }
+                if (this.ambientLight) {
+                    this.ambientLight.intensity = s.ambientIntensity;
+                }
+                
+                // Update fog
+                if (this.scene.fog) {
+                    this.scene.fog.color.setHex(s.fogColor);
+                }
+                
+                const timeNames = { dawn: '🌅 Dawn', day: '☀️ Day', sunset: '🌆 Sunset', night: '🌙 Night' };
+                this.showToast('🕐', timeNames[time], 'Press T to cycle time');
             }
             
             honk() {
@@ -4758,6 +4899,10 @@
                 // ⚡ GAME FEEL: Update landing impact particles
                 this.updateParticles(delta);
                 
+                // 🚗 DRIFT: Check for drifting and update smoke
+                this.checkDrift();
+                this.updateDriftSmoke(delta);
+                
                 // Update interactive objects (cones, barrels)
                 if (this.car && this.interactiveObjects) {
                     this.updateInteractiveObjects(
@@ -4979,9 +5124,18 @@
             }
             
             updateAnimations() {
+                // 🌈 RAINBOW MODE (Konami code activated)
+                if (this.state.rainbowMode && this.car) {
+                    const hue = (this.state.time * 50) % 360;
+                    this.car.traverse(child => {
+                        if (child.isMesh && child.material && child.material.color && child.userData.originalColor !== undefined) {
+                            child.material.color.setHSL(hue / 360, 0.8, 0.5);
+                        }
+                    });
+                }
+                
                 // Animate building signs (gentle float)
                 this.sections.forEach((section, i) => {
-                    // Find the sign group (has children with label mesh)
                     const sign = section.children.find(c => c.type === 'Group' && c.children && c.children.length > 1);
                     if (sign) {
                         const buildingHeight = section.userData.buildingHeight || 35;
@@ -4997,9 +5151,132 @@
                     for (let i = 0; i < positions.length; i += 3) {
                         positions[i + 1] += Math.sin(this.state.time + i * 0.1) * 0.01;
                         if (positions[i + 1] > 35) positions[i + 1] = 2;
-                        if (positions[i + 1] < 2) positions[i + 1] = 2; // Prevent negative
+                        if (positions[i + 1] < 2) positions[i + 1] = 2;
                     }
                     this.particles.geometry.attributes.position.needsUpdate = true;
+                }
+            }
+            
+            // 🚗 DRIFT DETECTION - tire screech and smoke
+            checkDrift() {
+                if (!this.vehiclePhysics || !this.car) return;
+                
+                const speed = Math.abs(this.vehiclePhysics.speed);
+                const steer = Math.abs(this.state.input.steer);
+                const speedKmh = speed * 3.6;
+                
+                // Drift = high speed + hard steering
+                const isDrifting = speedKmh > 40 && steer > 0.7 && this.vehiclePhysics.isGrounded;
+                
+                if (isDrifting && !this.state.wasDrifting) {
+                    // Start drift
+                    this.playTireScreech();
+                    this.state.driftStartTime = this.state.time;
+                }
+                
+                if (isDrifting) {
+                    // Spawn tire smoke
+                    if (this.frameCount % 3 === 0) {
+                        this.spawnDriftSmoke();
+                    }
+                    
+                    // Check for drift achievement
+                    const driftDuration = this.state.time - (this.state.driftStartTime || 0);
+                    if (driftDuration > 2 && !this.state.achievements.driftKing) {
+                        this.state.achievements.driftKing = true;
+                        this.showToast('🏎️', 'Drift King!', '2+ second drift!');
+                    }
+                }
+                
+                this.state.wasDrifting = isDrifting;
+            }
+            
+            playTireScreech() {
+                if (!this.audioContext || this.state.quality === 'low') return;
+                
+                if (this.audioContext.state === 'suspended') {
+                    this.audioContext.resume();
+                }
+                
+                // White noise filtered for tire screech
+                const duration = 0.5;
+                const bufferSize = this.audioContext.sampleRate * duration;
+                const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
+                
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+                }
+                
+                const source = this.audioContext.createBufferSource();
+                source.buffer = buffer;
+                
+                const filter = this.audioContext.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.value = 2000;
+                filter.Q.value = 5;
+                
+                const gain = this.audioContext.createGain();
+                gain.gain.value = 0.08;
+                
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.audioContext.destination);
+                
+                source.start();
+            }
+            
+            spawnDriftSmoke() {
+                if (!this.car || this.state.quality === 'low') return;
+                if (!this.driftSmokePool) {
+                    this.driftSmokePool = [];
+                    this.activeDriftSmoke = [];
+                }
+                
+                if (this.activeDriftSmoke.length > 20) return;
+                
+                // Spawn at rear wheels
+                [-1.1, 1.1].forEach(xOffset => {
+                    let smoke;
+                    if (this.driftSmokePool.length > 0) {
+                        smoke = this.driftSmokePool.pop();
+                        smoke.visible = true;
+                    } else {
+                        const geom = new THREE.SphereGeometry(0.3, 6, 6);
+                        const mat = new THREE.MeshBasicMaterial({
+                            color: 0xCCCCCC,
+                            transparent: true,
+                            opacity: 0.4
+                        });
+                        smoke = new THREE.Mesh(geom, mat);
+                        this.scene.add(smoke);
+                    }
+                    
+                    const worldPos = new THREE.Vector3(xOffset, 0.3, -2);
+                    worldPos.applyMatrix4(this.car.matrixWorld);
+                    smoke.position.copy(worldPos);
+                    smoke.scale.setScalar(1);
+                    smoke.userData.life = 1.0;
+                    
+                    this.activeDriftSmoke.push(smoke);
+                });
+            }
+            
+            updateDriftSmoke(delta) {
+                if (!this.activeDriftSmoke) return;
+                
+                for (let i = this.activeDriftSmoke.length - 1; i >= 0; i--) {
+                    const smoke = this.activeDriftSmoke[i];
+                    smoke.userData.life -= delta * 1.5;
+                    smoke.position.y += delta * 2;
+                    smoke.scale.addScalar(delta * 3);
+                    smoke.material.opacity = smoke.userData.life * 0.4;
+                    
+                    if (smoke.userData.life <= 0) {
+                        smoke.visible = false;
+                        this.driftSmokePool.push(smoke);
+                        this.activeDriftSmoke.splice(i, 1);
+                    }
                 }
             }
             

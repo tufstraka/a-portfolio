@@ -1731,7 +1731,7 @@
                 // Better color management
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace;
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                this.renderer.toneMappingExposure = 1.0;
+                this.renderer.toneMappingExposure = 1.4;  // Brighter exposure
                 
                 container.appendChild(this.renderer.domElement);
                 
@@ -1755,18 +1755,18 @@
                 );
                 this.composer.addPass(this.bloomPass);
                 
-                // 🎨 NEW: Color Grading for cinematic look
+                // 🎨 NEW: Color Grading for vibrant look
                 this.colorGradingPass = new ShaderPass(ColorGradingShader);
-                this.colorGradingPass.uniforms['brightness'].value = 0.02;  // Slight brightness boost
-                this.colorGradingPass.uniforms['contrast'].value = 1.08;    // Subtle contrast
-                this.colorGradingPass.uniforms['saturation'].value = 1.15;  // Vibrant colors
-                this.colorGradingPass.uniforms['gamma'].value = 1.0;
+                this.colorGradingPass.uniforms['brightness'].value = 0.08;  // Brighter
+                this.colorGradingPass.uniforms['contrast'].value = 1.1;     // More contrast
+                this.colorGradingPass.uniforms['saturation'].value = 1.25;  // More vibrant colors
+                this.colorGradingPass.uniforms['gamma'].value = 0.95;       // Slightly brighter mids
                 this.composer.addPass(this.colorGradingPass);
                 
-                // 🎨 NEW: Vignette for cinematic edges
+                // 🎨 NEW: Vignette for cinematic edges - reduced for brighter look
                 this.vignettePass = new ShaderPass(VignetteShader);
-                this.vignettePass.uniforms['offset'].value = 0.95;    // How far from center
-                this.vignettePass.uniforms['darkness'].value = 1.4;   // Subtle darkening
+                this.vignettePass.uniforms['offset'].value = 1.0;     // Further from center
+                this.vignettePass.uniforms['darkness'].value = 1.0;   // Lighter vignette
                 this.composer.addPass(this.vignettePass);
                 
                 // 🎨 NEW: Film Grain for texture (disabled by default, enable on high quality)
@@ -1853,12 +1853,12 @@
                 
                 this.scene.add(this.sunLight);
                 
-                // Ambient light (sky color)
-                this.ambientLight = new THREE.AmbientLight(0x87CEEB, 0.4);
+                // Ambient light (sky color) - increased for vibrancy
+                this.ambientLight = new THREE.AmbientLight(0x87CEEB, 0.6);
                 this.scene.add(this.ambientLight);
                 
-                // Hemisphere light for realistic outdoor lighting
-                this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3D5C3D, 0.6);
+                // Hemisphere light for realistic outdoor lighting - increased
+                this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3D5C3D, 0.8);
                 this.scene.add(this.hemiLight);
                 
                 // Ground with custom shader

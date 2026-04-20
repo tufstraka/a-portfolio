@@ -1939,6 +1939,175 @@
                 this.scene.add(this.sunGlow);
             }
             
+            // Generate realistic procedural grass texture
+            createGrassTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                
+                // Base grass green with variation
+                const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 400);
+                gradient.addColorStop(0, '#4a7c3f');
+                gradient.addColorStop(0.5, '#3d6b34');
+                gradient.addColorStop(1, '#2d5a28');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, 512, 512);
+                
+                // Add grass blade details
+                for (let i = 0; i < 15000; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const length = 3 + Math.random() * 8;
+                    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.6;
+                    
+                    // Vary grass color
+                    const brightness = 0.7 + Math.random() * 0.5;
+                    const hue = 90 + Math.random() * 30; // Green range
+                    ctx.strokeStyle = `hsl(${hue}, 50%, ${30 * brightness}%)`;
+                    ctx.lineWidth = 0.5 + Math.random() * 1;
+                    
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    ctx.lineTo(x + Math.cos(angle) * length, y + Math.sin(angle) * length);
+                    ctx.stroke();
+                }
+                
+                // Add some dirt patches
+                for (let i = 0; i < 30; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const radius = 5 + Math.random() * 20;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+                    gradient.addColorStop(0, 'rgba(101, 78, 50, 0.4)');
+                    gradient.addColorStop(1, 'rgba(101, 78, 50, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Add small flowers/details
+                for (let i = 0; i < 100; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const colors = ['#fff', '#ffeb3b', '#e91e63', '#9c27b0'];
+                    ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1 + Math.random() * 2, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                return canvas;
+            }
+            
+            // Generate realistic asphalt texture
+            createAsphaltTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                
+                // Dark asphalt base
+                ctx.fillStyle = '#1a1a1f';
+                ctx.fillRect(0, 0, 512, 512);
+                
+                // Add aggregate (small stones)
+                for (let i = 0; i < 20000; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const size = 0.5 + Math.random() * 2.5;
+                    const brightness = 20 + Math.random() * 50;
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness + Math.random() * 10})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, size, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Add darker patches (oil stains, wear)
+                for (let i = 0; i < 15; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const radiusX = 20 + Math.random() * 60;
+                    const radiusY = 15 + Math.random() * 40;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, Math.max(radiusX, radiusY));
+                    gradient.addColorStop(0, 'rgba(10, 10, 15, 0.5)');
+                    gradient.addColorStop(1, 'rgba(10, 10, 15, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, radiusX, radiusY, Math.random() * Math.PI, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                // Add subtle cracks
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+                ctx.lineWidth = 0.5;
+                for (let i = 0; i < 8; i++) {
+                    ctx.beginPath();
+                    let x = Math.random() * 512;
+                    let y = Math.random() * 512;
+                    ctx.moveTo(x, y);
+                    for (let j = 0; j < 5 + Math.random() * 10; j++) {
+                        x += (Math.random() - 0.5) * 30;
+                        y += (Math.random() - 0.5) * 30;
+                        ctx.lineTo(x, y);
+                    }
+                    ctx.stroke();
+                }
+                
+                // Add lighter worn areas (tire tracks)
+                for (let i = 0; i < 5; i++) {
+                    const x = Math.random() * 512;
+                    const y = Math.random() * 512;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, 40);
+                    gradient.addColorStop(0, 'rgba(60, 60, 65, 0.3)');
+                    gradient.addColorStop(1, 'rgba(60, 60, 65, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 40, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                return canvas;
+            }
+            
+            // Generate concrete/stone texture for buildings
+            createConcreteTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                
+                // Concrete base color
+                ctx.fillStyle = '#8a8a8a';
+                ctx.fillRect(0, 0, 256, 256);
+                
+                // Add noise/grain
+                for (let i = 0; i < 10000; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const brightness = 100 + Math.random() * 80;
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+                
+                // Add some darker spots
+                for (let i = 0; i < 20; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const radius = 5 + Math.random() * 15;
+                    const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+                    gradient.addColorStop(0, 'rgba(60, 60, 60, 0.3)');
+                    gradient.addColorStop(1, 'rgba(60, 60, 60, 0)');
+                    ctx.fillStyle = gradient;
+                    ctx.beginPath();
+                    ctx.arc(x, y, radius, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                return canvas;
+            }
+            
             async createTerrain() {
                 // Main ground plane with realistic grass texture
                 const groundSize = 2000;
@@ -1946,16 +2115,25 @@
                 
                 groundGeometry.computeVertexNormals();
                 
-                // Load realistic grass texture
-                const textureLoader = new THREE.TextureLoader();
-                const grassTexture = textureLoader.load('https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/textures/terrain/grasslight-big.jpg');
+                // Use procedural grass texture
+                const grassCanvas = this.createGrassTexture();
+                const grassTexture = new THREE.CanvasTexture(grassCanvas);
                 grassTexture.wrapS = THREE.RepeatWrapping;
                 grassTexture.wrapT = THREE.RepeatWrapping;
-                grassTexture.repeat.set(200, 200);
+                grassTexture.repeat.set(150, 150);
+                
+                // Create normal map for grass depth
+                const grassNormalCanvas = this.createGrassNormalMap();
+                const grassNormalMap = new THREE.CanvasTexture(grassNormalCanvas);
+                grassNormalMap.wrapS = THREE.RepeatWrapping;
+                grassNormalMap.wrapT = THREE.RepeatWrapping;
+                grassNormalMap.repeat.set(150, 150);
                 
                 const groundMaterial = new THREE.MeshStandardMaterial({
                     map: grassTexture,
-                    roughness: 0.9,
+                    normalMap: grassNormalMap,
+                    normalScale: new THREE.Vector2(0.5, 0.5),
+                    roughness: 0.95,
                     metalness: 0.0
                 });
                 
@@ -1973,54 +2151,182 @@
                 this.createRoads();
             }
             
-            createRoads() {
-                // Roads only lead to building entrances
-                const roadWidth = 10;
-                const roadHeight = 0.05;
+            // Simple normal map for grass
+            createGrassNormalMap() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
                 
-                // Create realistic asphalt texture
-                const roadCanvas = document.createElement('canvas');
-                roadCanvas.width = 512;
-                roadCanvas.height = 512;
-                const ctx = roadCanvas.getContext('2d');
+                // Base normal (pointing up = rgb(128, 128, 255))
+                ctx.fillStyle = 'rgb(128, 128, 255)';
+                ctx.fillRect(0, 0, 256, 256);
                 
-                // Base asphalt color
-                ctx.fillStyle = '#2a2a2a';
-                ctx.fillRect(0, 0, 512, 512);
+                // Add random normal variations for grass texture
+                for (let i = 0; i < 3000; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const nx = 128 + (Math.random() - 0.5) * 60;
+                    const ny = 128 + (Math.random() - 0.5) * 60;
+                    ctx.fillStyle = `rgb(${nx}, ${ny}, 255)`;
+                    ctx.fillRect(x, y, 2, 2);
+                }
                 
-                // Add aggregate/gravel texture
-                for (let i = 0; i < 8000; i++) {
-                    const x = Math.random() * 512;
-                    const y = Math.random() * 512;
-                    const size = Math.random() * 2 + 0.5;
-                    const brightness = 30 + Math.random() * 25;
-                    ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+                return canvas;
+            }
+            
+            // Normal map for asphalt bumps
+            createAsphaltNormalMap() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                
+                // Base normal (pointing up)
+                ctx.fillStyle = 'rgb(128, 128, 255)';
+                ctx.fillRect(0, 0, 256, 256);
+                
+                // Add aggregate bump variations
+                for (let i = 0; i < 5000; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const size = 1 + Math.random() * 3;
+                    const nx = 128 + (Math.random() - 0.5) * 40;
+                    const ny = 128 + (Math.random() - 0.5) * 40;
+                    ctx.fillStyle = `rgb(${nx}, ${ny}, 255)`;
                     ctx.beginPath();
                     ctx.arc(x, y, size, 0, Math.PI * 2);
                     ctx.fill();
                 }
                 
-                // Add some darker patches (oil stains, wear)
-                for (let i = 0; i < 20; i++) {
-                    const x = Math.random() * 512;
-                    const y = Math.random() * 512;
-                    const radius = 10 + Math.random() * 30;
+                return canvas;
+            }
+            
+            // Modern building facade texture (concrete panels with subtle details)
+            createBuildingTexture() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                
+                // Concrete panel base
+                ctx.fillStyle = '#d4d4d8';
+                ctx.fillRect(0, 0, 256, 256);
+                
+                // Add concrete texture noise
+                for (let i = 0; i < 8000; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const brightness = 180 + Math.random() * 50;
+                    ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness + 5})`;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+                
+                // Panel grid lines (horizontal and vertical)
+                ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)';
+                ctx.lineWidth = 2;
+                
+                // Horizontal panel lines
+                for (let y = 64; y < 256; y += 64) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(256, y);
+                    ctx.stroke();
+                }
+                
+                // Vertical panel lines
+                for (let x = 64; x < 256; x += 64) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, 256);
+                    ctx.stroke();
+                }
+                
+                // Add weathering/stains
+                for (let i = 0; i < 10; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const radius = 10 + Math.random() * 25;
                     const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-                    gradient.addColorStop(0, 'rgba(20,20,20,0.3)');
-                    gradient.addColorStop(1, 'rgba(20,20,20,0)');
+                    gradient.addColorStop(0, 'rgba(120, 120, 120, 0.2)');
+                    gradient.addColorStop(1, 'rgba(120, 120, 120, 0)');
                     ctx.fillStyle = gradient;
                     ctx.beginPath();
                     ctx.arc(x, y, radius, 0, Math.PI * 2);
                     ctx.fill();
                 }
                 
+                return canvas;
+            }
+            
+            // Normal map for building panels depth
+            createBuildingNormalMap() {
+                const canvas = document.createElement('canvas');
+                canvas.width = 256;
+                canvas.height = 256;
+                const ctx = canvas.getContext('2d');
+                
+                // Base normal
+                ctx.fillStyle = 'rgb(128, 128, 255)';
+                ctx.fillRect(0, 0, 256, 256);
+                
+                // Add panel edge normals (creates inset panel look)
+                ctx.fillStyle = 'rgb(100, 128, 255)'; // Left edges
+                for (let x = 0; x < 256; x += 64) {
+                    ctx.fillRect(x, 0, 3, 256);
+                }
+                
+                ctx.fillStyle = 'rgb(156, 128, 255)'; // Right edges
+                for (let x = 61; x < 256; x += 64) {
+                    ctx.fillRect(x, 0, 3, 256);
+                }
+                
+                ctx.fillStyle = 'rgb(128, 100, 255)'; // Top edges
+                for (let y = 0; y < 256; y += 64) {
+                    ctx.fillRect(0, y, 256, 3);
+                }
+                
+                ctx.fillStyle = 'rgb(128, 156, 255)'; // Bottom edges
+                for (let y = 61; y < 256; y += 64) {
+                    ctx.fillRect(0, y, 256, 3);
+                }
+                
+                // Add surface variation
+                for (let i = 0; i < 2000; i++) {
+                    const x = Math.random() * 256;
+                    const y = Math.random() * 256;
+                    const nx = 128 + (Math.random() - 0.5) * 20;
+                    const ny = 128 + (Math.random() - 0.5) * 20;
+                    ctx.fillStyle = `rgb(${nx}, ${ny}, 255)`;
+                    ctx.fillRect(x, y, 2, 2);
+                }
+                
+                return canvas;
+            }
+            
+            createRoads() {
+                // Roads only lead to building entrances
+                const roadWidth = 10;
+                const roadHeight = 0.05;
+                
+                // Use the realistic asphalt texture generator
+                const roadCanvas = this.createAsphaltTexture();
+                
                 const roadTexture = new THREE.CanvasTexture(roadCanvas);
                 roadTexture.wrapS = THREE.RepeatWrapping;
                 roadTexture.wrapT = THREE.RepeatWrapping;
                 
+                // Create normal map for asphalt bumps
+                const asphaltNormalCanvas = this.createAsphaltNormalMap();
+                const asphaltNormalMap = new THREE.CanvasTexture(asphaltNormalCanvas);
+                asphaltNormalMap.wrapS = THREE.RepeatWrapping;
+                asphaltNormalMap.wrapT = THREE.RepeatWrapping;
+                
                 const roadMaterial = new THREE.MeshStandardMaterial({
                     map: roadTexture,
-                    roughness: 0.9,
+                    normalMap: asphaltNormalMap,
+                    normalScale: new THREE.Vector2(0.3, 0.3),
+                    roughness: 0.85,
                     metalness: 0.0,
                     polygonOffset: true,       // Fix z-fighting with ground
                     polygonOffsetFactor: -1,   // Push roads slightly forward
@@ -2953,12 +3259,17 @@
             }
             
             createPortfolioSections() {
-                const textureLoader = new THREE.TextureLoader();
-                
-                // Load high-quality building texture
-                const buildingTexture = textureLoader.load('https://threejs.org/examples/textures/brick_diffuse.jpg');
+                // Create procedural building texture (concrete/panels)
+                const buildingCanvas = this.createBuildingTexture();
+                const buildingTexture = new THREE.CanvasTexture(buildingCanvas);
                 buildingTexture.wrapS = THREE.RepeatWrapping;
                 buildingTexture.wrapT = THREE.RepeatWrapping;
+                
+                // Create normal map for building depth
+                const buildingNormalCanvas = this.createBuildingNormalMap();
+                const buildingNormalMap = new THREE.CanvasTexture(buildingNormalCanvas);
+                buildingNormalMap.wrapS = THREE.RepeatWrapping;
+                buildingNormalMap.wrapT = THREE.RepeatWrapping;
                 
                 Object.entries(PORTFOLIO_DATA).forEach(([title, data]) => {
                     const sectionGroup = new THREE.Group();
@@ -2968,14 +3279,23 @@
                     const buildingWidth = 18;
                     const buildingDepth = 20;
                     
-                    // Main building tower
-                    buildingTexture.repeat.set(3, Math.floor(buildingHeight / 5));
+                    // Main building tower - use cloned texture for individual repeat
+                    const thisBuildingTexture = buildingTexture.clone();
+                    thisBuildingTexture.repeat.set(4, Math.floor(buildingHeight / 4));
+                    thisBuildingTexture.needsUpdate = true;
+                    
+                    const thisBuildingNormal = buildingNormalMap.clone();
+                    thisBuildingNormal.repeat.set(4, Math.floor(buildingHeight / 4));
+                    thisBuildingNormal.needsUpdate = true;
+                    
                     const buildingGeom = new THREE.BoxGeometry(buildingWidth, buildingHeight, buildingDepth);
                     const buildingMaterial = new THREE.MeshStandardMaterial({
-                        map: buildingTexture,
-                        color: new THREE.Color(data.color).multiplyScalar(0.7),
-                        metalness: 0.1,
-                        roughness: 0.9
+                        map: thisBuildingTexture,
+                        normalMap: thisBuildingNormal,
+                        normalScale: new THREE.Vector2(0.3, 0.3),
+                        color: new THREE.Color(data.color).multiplyScalar(0.8),
+                        metalness: 0.15,
+                        roughness: 0.75
                     });
                     
                     const building = new THREE.Mesh(buildingGeom, buildingMaterial);

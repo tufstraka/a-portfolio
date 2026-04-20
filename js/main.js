@@ -124,6 +124,106 @@
                 }
             `
         };
+        
+        // Motion Blur Shader - Adds subtle blur based on movement
+        const MotionBlurShader = {
+            uniforms: {
+                'tDiffuse': { value: null },
+                'velocity': { value: 0.0 },
+                'maxBlur': { value: 0.02 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float velocity;
+                uniform float maxBlur;
+                varying vec2 vUv;
+                
+                void main() {
+                    float blur = velocity * maxBlur;
+                    vec4 color = vec4(0.0);
+                    
+                    // Radial blur from center
+                    vec2 dir = vUv - vec2(0.5);
+                    
+                    for(float i = -4.0; i <= 4.0; i += 1.0) {
+                        vec2 offset = dir * blur * (i / 4.0);
+                        color += texture2D(tDiffuse, vUv + offset);
+                    }
+                    
+                    gl_FragColor = color / 9.0;
+                }
+            `
+        };
+
+        // ============================================
+        // CAMERA SHAKE SYSTEM
+        // ============================================
+        
+        class CameraShake {
+            constructor() {
+                this.trauma = 0;           // Current trauma level (0-1)
+                this.decay = 2.5;          // How fast trauma decays
+                this.maxOffset = 0.3;      // Max position offset
+                this.maxAngle = 0.02;      // Max rotation offset
+                this.frequency = 15;       // Shake frequency
+                
+                this.offsetX = 0;
+                this.offsetY = 0;
+                this.offsetZ = 0;
+                this.rotationX = 0;
+                this.rotationY = 0;
+                this.rotationZ = 0;
+            }
+            
+            // Add trauma (0-1 range, accumulates)
+            addTrauma(amount) {
+                this.trauma = Math.min(1, this.trauma + amount);
+            }
+            
+            // Update shake values
+            update(delta, time) {
+                if (this.trauma <= 0) {
+                    this.offsetX = this.offsetY = this.offsetZ = 0;
+                    this.rotationX = this.rotationY = this.rotationZ = 0;
+                    return;
+                }
+                
+                // Trauma squared for more dramatic falloff
+                const shake = this.trauma * this.trauma;
+                
+                // Perlin-like noise using sin waves at different frequencies
+                const t = time * this.frequency;
+                
+                this.offsetX = this.maxOffset * shake * Math.sin(t * 1.1 + 0.3);
+                this.offsetY = this.maxOffset * shake * Math.sin(t * 1.3 + 1.7);
+                this.offsetZ = this.maxOffset * shake * Math.sin(t * 0.9 + 2.9);
+                
+                this.rotationX = this.maxAngle * shake * Math.sin(t * 1.4 + 0.5);
+                this.rotationY = this.maxAngle * shake * Math.sin(t * 1.2 + 1.2);
+                this.rotationZ = this.maxAngle * shake * Math.sin(t * 1.5 + 2.1);
+                
+                // Decay trauma
+                this.trauma = Math.max(0, this.trauma - this.decay * delta);
+            }
+            
+            // Apply shake to camera
+            apply(camera, basePosition, baseRotation) {
+                camera.position.x = basePosition.x + this.offsetX;
+                camera.position.y = basePosition.y + this.offsetY;
+                camera.position.z = basePosition.z + this.offsetZ;
+                
+                camera.rotation.x = baseRotation.x + this.rotationX;
+                camera.rotation.y = baseRotation.y + this.rotationY;
+                camera.rotation.z = baseRotation.z + this.rotationZ;
+            }
+        }
 
         // ============================================
         // CONFIGURATION
@@ -1326,6 +1426,9 @@
                 this.cullableObjects = []; // Objects that can be culled
                 this.adaptiveQuality = null; // Initialized after engine setup
                 
+                // Camera shake system
+                this.cameraShake = new CameraShake();
+                
                 // Object pools for particles
                 this.dustParticlePool = null;
                 this.smokeParticlePool = null;
@@ -1498,6 +1601,12 @@
             triggerScreenShake(intensity = 1) {
                 if (this.state.quality === 'low') return; // Skip on low quality
                 
+                // 🎥 NEW: Use camera shake system for smoother shake
+                if (this.cameraShake) {
+                    this.cameraShake.addTrauma(intensity * 0.5);
+                }
+                
+                // Also trigger CSS shake for UI elements
                 const container = document.getElementById('gameContainer');
                 container.style.animation = 'none';
                 container.offsetHeight; // Trigger reflow
@@ -1664,6 +1773,13 @@
                 this.filmGrainPass.uniforms['intensity'].value = 0.03; // Very subtle
                 this.filmGrainPass.enabled = this.state.quality === 'ultra'; // Only on ultra
                 this.composer.addPass(this.filmGrainPass);
+                
+                // 🎨 NEW: Motion Blur for speed feel
+                this.motionBlurPass = new ShaderPass(MotionBlurShader);
+                this.motionBlurPass.uniforms['velocity'].value = 0;
+                this.motionBlurPass.uniforms['maxBlur'].value = 0.015;
+                this.motionBlurPass.enabled = this.state.quality !== 'low';
+                this.composer.addPass(this.motionBlurPass);
                 
                 // Output pass for proper color space
                 this.composer.addPass(new OutputPass());
@@ -4296,6 +4412,11 @@
                 if (this.bloomPass) {
                     this.bloomPass.enabled = quality !== 'low';
                 }
+                if (this.motionBlurPass) {
+                    this.motionBlurPass.enabled = quality !== 'low';
+                    // Stronger motion blur on ultra
+                    this.motionBlurPass.uniforms['maxBlur'].value = quality === 'ultra' ? 0.02 : 0.012;
+                }
             }
             
             applyEffects(level) {
@@ -4365,6 +4486,17 @@
                 // 🎨 Update film grain time for animated noise
                 if (this.filmGrainPass && this.filmGrainPass.enabled) {
                     this.filmGrainPass.uniforms['time'].value = this.state.time;
+                }
+                
+                // 🎥 Update camera shake
+                if (this.cameraShake) {
+                    this.cameraShake.update(delta, this.state.time);
+                }
+                
+                // 🎥 Update motion blur based on speed
+                if (this.motionBlurPass && this.motionBlurPass.enabled) {
+                    const normalizedSpeed = Math.abs(this.state.carSpeed) / CONFIG.MAX_SPEED;
+                    this.motionBlurPass.uniforms['velocity'].value = normalizedSpeed * 0.8;
                 }
                 
                 this.frameCount++;

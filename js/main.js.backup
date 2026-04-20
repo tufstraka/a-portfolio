@@ -69,209 +69,8 @@
             
             // Performance
             TARGET_FPS: 60,
-            AUTO_QUALITY_THRESHOLD: 30,
-            
-            // Frustum Culling & LOD
-            CULLING_ENABLED: true,
-            LOD_ENABLED: true,
-            LOD_DISTANCES: [30, 60, 120],  // Near, medium, far thresholds
-            CHUNK_SIZE: 50,                 // World chunk size for spatial partitioning
-            VIEW_DISTANCE: 250,             // Max render distance
-            BEHIND_CAMERA_CULL: true        // Cull objects behind camera
+            AUTO_QUALITY_THRESHOLD: 30
         };
-
-        // ============================================
-        // FRUSTUM CULLING & SPATIAL PARTITIONING
-        // ============================================
-        
-        class SpatialPartition {
-            constructor(chunkSize = CONFIG.CHUNK_SIZE) {
-                this.chunkSize = chunkSize;
-                this.chunks = new Map(); // Map<chunkKey, Set<object>>
-                this.objectChunks = new Map(); // Map<object, chunkKey>
-            }
-            
-            getChunkKey(x, z) {
-                const cx = Math.floor(x / this.chunkSize);
-                const cz = Math.floor(z / this.chunkSize);
-                return `${cx},${cz}`;
-            }
-            
-            add(object, x, z) {
-                const key = this.getChunkKey(x, z);
-                if (!this.chunks.has(key)) {
-                    this.chunks.set(key, new Set());
-                }
-                this.chunks.get(key).add(object);
-                this.objectChunks.set(object, key);
-            }
-            
-            remove(object) {
-                const key = this.objectChunks.get(object);
-                if (key && this.chunks.has(key)) {
-                    this.chunks.get(key).delete(object);
-                }
-                this.objectChunks.delete(object);
-            }
-            
-            update(object, x, z) {
-                const newKey = this.getChunkKey(x, z);
-                const oldKey = this.objectChunks.get(object);
-                if (newKey !== oldKey) {
-                    this.remove(object);
-                    this.add(object, x, z);
-                }
-            }
-            
-            // Get objects in chunks within radius
-            getNearbyChunks(x, z, radius) {
-                const results = [];
-                const chunkRadius = Math.ceil(radius / this.chunkSize);
-                const cx = Math.floor(x / this.chunkSize);
-                const cz = Math.floor(z / this.chunkSize);
-                
-                for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
-                    for (let dz = -chunkRadius; dz <= chunkRadius; dz++) {
-                        const key = `${cx + dx},${cz + dz}`;
-                        if (this.chunks.has(key)) {
-                            results.push(...this.chunks.get(key));
-                        }
-                    }
-                }
-                return results;
-            }
-        }
-        
-        class FrustumCuller {
-            constructor(camera) {
-                this.camera = camera;
-                this.frustum = new THREE.Frustum();
-                this.projScreenMatrix = new THREE.Matrix4();
-                this.cameraDirection = new THREE.Vector3();
-                this.tempVector = new THREE.Vector3();
-                this.tempSphere = new THREE.Sphere();
-            }
-            
-            update() {
-                this.projScreenMatrix.multiplyMatrices(
-                    this.camera.projectionMatrix,
-                    this.camera.matrixWorldInverse
-                );
-                this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
-                this.camera.getWorldDirection(this.cameraDirection);
-            }
-            
-            // Check if object is in frustum
-            isVisible(object, boundingRadius = 5) {
-                if (!CONFIG.CULLING_ENABLED) return true;
-                
-                // Get world position
-                this.tempVector.setFromMatrixPosition(object.matrixWorld);
-                
-                // Create bounding sphere
-                this.tempSphere.center.copy(this.tempVector);
-                this.tempSphere.radius = boundingRadius;
-                
-                return this.frustum.intersectsSphere(this.tempSphere);
-            }
-            
-            // Check if object is behind camera (more aggressive culling)
-            isBehindCamera(objectPosition, cameraPosition, margin = 10) {
-                if (!CONFIG.BEHIND_CAMERA_CULL) return false;
-                
-                this.tempVector.subVectors(objectPosition, cameraPosition);
-                const dot = this.tempVector.dot(this.cameraDirection);
-                
-                // Object is behind camera if dot product is negative (with margin)
-                return dot < -margin;
-            }
-            
-            // Get distance from camera
-            getDistanceToCamera(objectPosition, cameraPosition) {
-                return objectPosition.distanceTo(cameraPosition);
-            }
-            
-            // Get LOD level based on distance
-            getLODLevel(distance) {
-                if (!CONFIG.LOD_ENABLED) return 0;
-                
-                if (distance < CONFIG.LOD_DISTANCES[0]) return 0; // High detail
-                if (distance < CONFIG.LOD_DISTANCES[1]) return 1; // Medium detail
-                if (distance < CONFIG.LOD_DISTANCES[2]) return 2; // Low detail
-                return 3; // Very low / culled
-            }
-        }
-        
-        // ============================================
-        // LOD MANAGER - Manages level of detail for objects
-        // ============================================
-        
-        class LODManager {
-            constructor() {
-                this.lodObjects = new Map(); // Map<object, { levels: [], currentLevel: number }>
-            }
-            
-            // Register an object with multiple LOD levels
-            register(object, levels) {
-                // levels = [{ distance: 0, detail: 'high' }, { distance: 60, detail: 'low' }, ...]
-                this.lodObjects.set(object, {
-                    levels: levels,
-                    currentLevel: 0,
-                    visible: true
-                });
-            }
-            
-            // Update visibility and detail level
-            update(object, distance, isInFrustum) {
-                const lodData = this.lodObjects.get(object);
-                if (!lodData) return;
-                
-                // Determine if should be visible
-                const shouldBeVisible = isInFrustum && distance < CONFIG.VIEW_DISTANCE;
-                
-                if (lodData.visible !== shouldBeVisible) {
-                    lodData.visible = shouldBeVisible;
-                    object.visible = shouldBeVisible;
-                }
-                
-                if (!shouldBeVisible) return;
-                
-                // Determine LOD level
-                let newLevel = 0;
-                for (let i = 0; i < lodData.levels.length; i++) {
-                    if (distance >= lodData.levels[i].distance) {
-                        newLevel = i;
-                    }
-                }
-                
-                // Apply LOD changes if level changed
-                if (newLevel !== lodData.currentLevel) {
-                    this.applyLOD(object, lodData.levels[newLevel]);
-                    lodData.currentLevel = newLevel;
-                }
-            }
-            
-            applyLOD(object, levelConfig) {
-                // Apply LOD-specific settings
-                object.traverse(child => {
-                    if (child.isMesh) {
-                        // Reduce shadow casting at distance
-                        if (levelConfig.shadows !== undefined) {
-                            child.castShadow = levelConfig.shadows;
-                            child.receiveShadow = levelConfig.shadows;
-                        }
-                        
-                        // Simplify materials at distance
-                        if (levelConfig.simpleMaterial && child.material) {
-                            if (!child.userData.originalMaterial) {
-                                child.userData.originalMaterial = child.material;
-                            }
-                            // Could swap to simpler material here
-                        }
-                    }
-                });
-            }
-        }
 
         // ============================================
         // PORTFOLIO DATA - Fun & Engaging
@@ -1033,12 +832,6 @@
                 this.collisionSystem = new CollisionSystem();
                 this.vehiclePhysics = new VehiclePhysics();
                 
-                // Performance Optimization Systems
-                this.frustumCuller = null; // Initialized after camera
-                this.spatialPartition = new SpatialPartition();
-                this.lodManager = new LODManager();
-                this.cullableObjects = []; // Objects that can be culled
-                
                 this.state = {
                     playerMode: 'driving',
                     cameraMode: 'follow',
@@ -1299,9 +1092,6 @@
                     0.1,
                     this.state.quality === 'ultra' ? 1500 : this.state.quality === 'high' ? 1000 : 500
                 );
-                
-                // Initialize Frustum Culler after camera is created
-                this.frustumCuller = new FrustumCuller(this.camera);
                 
                 // Renderer with PBR support
                 this.renderer = new THREE.WebGLRenderer({
@@ -2984,13 +2774,6 @@
                     treeGroup.position.set(x, 0, z);
                     treeGroup.rotation.y = Math.random() * Math.PI * 2;
                     
-                    // 🎯 PERFORMANCE: Mark as cullable with bounding radius
-                    treeGroup.userData.cullable = true;
-                    treeGroup.userData.boundingRadius = 10 * scale;
-                    
-                    // Add to spatial partition for efficient queries
-                    this.spatialPartition.add(treeGroup, x, z);
-                    
                     this.collisionSystem.addTree({ x, z });
                     this.treePositions.push({ x, z });
                     
@@ -3977,9 +3760,6 @@
                 this.checkSectionProximity();
                 this.updateAnimations();
                 
-                // 🎯 PERFORMANCE: Update frustum culling (every frame for smooth culling)
-                this.updateFrustumCulling();
-                
                 // Update dust particles
                 this.updateDustParticles(delta);
                 
@@ -4016,152 +3796,6 @@
                 
                 this.frameCount++;
                 this.composer.render();
-            }
-            
-            // 🎯 PERFORMANCE: Frustum Culling - Only render what the camera sees
-            updateFrustumCulling() {
-                if (!this.frustumCuller || !this.camera || !CONFIG.CULLING_ENABLED) return;
-                
-                // Update frustum from current camera
-                this.frustumCuller.update();
-                
-                const cameraPosition = this.camera.position;
-                const carPosition = this.car ? this.car.position : cameraPosition;
-                
-                // Get car's forward direction for behind-camera culling
-                const carDirection = new THREE.Vector3();
-                if (this.car) {
-                    carDirection.set(
-                        Math.sin(this.car.rotation.y),
-                        0,
-                        Math.cos(this.car.rotation.y)
-                    );
-                }
-                
-                // Cull decorations (trees, lamps, etc.)
-                this.decorations.forEach(obj => {
-                    if (!obj.userData.cullable === false) return; // Skip non-cullable
-                    
-                    const objPos = obj.position;
-                    const distance = cameraPosition.distanceTo(objPos);
-                    
-                    // Quick distance check first (cheapest)
-                    if (distance > CONFIG.VIEW_DISTANCE) {
-                        obj.visible = false;
-                        return;
-                    }
-                    
-                    // Behind camera check (cheap)
-                    if (CONFIG.BEHIND_CAMERA_CULL && this.car) {
-                        const toObject = new THREE.Vector3().subVectors(objPos, carPosition);
-                        const dot = toObject.dot(carDirection);
-                        // If object is behind car and far away, cull it
-                        if (dot < -20 && distance > 40) {
-                            obj.visible = false;
-                            return;
-                        }
-                    }
-                    
-                    // Frustum check (most accurate but more expensive)
-                    const boundingRadius = obj.userData.boundingRadius || 10;
-                    const isInFrustum = this.frustumCuller.isVisible(obj, boundingRadius);
-                    
-                    obj.visible = isInFrustum;
-                    
-                    // LOD: Adjust detail based on distance
-                    if (CONFIG.LOD_ENABLED && obj.visible) {
-                        const lodLevel = this.frustumCuller.getLODLevel(distance);
-                        this.applyLODToObject(obj, lodLevel, distance);
-                    }
-                });
-                
-                // Cull buildings (less aggressive - they're important landmarks)
-                this.buildings.forEach(building => {
-                    const objPos = building.position;
-                    const distance = cameraPosition.distanceTo(objPos);
-                    
-                    // Buildings always visible within reasonable range
-                    if (distance < 200) {
-                        building.visible = true;
-                        
-                        // But reduce detail at distance
-                        if (CONFIG.LOD_ENABLED) {
-                            this.applyBuildingLOD(building, distance);
-                        }
-                    } else {
-                        // Far buildings: frustum cull
-                        building.visible = this.frustumCuller.isVisible(building, 25);
-                    }
-                });
-            }
-            
-            // Apply LOD settings to an object
-            applyLODToObject(obj, lodLevel, distance) {
-                // Skip if already at this LOD level
-                if (obj.userData.currentLOD === lodLevel) return;
-                obj.userData.currentLOD = lodLevel;
-                
-                obj.traverse(child => {
-                    if (child.isMesh) {
-                        switch(lodLevel) {
-                            case 0: // High detail (close)
-                                child.castShadow = true;
-                                child.receiveShadow = true;
-                                break;
-                            case 1: // Medium detail
-                                child.castShadow = distance < 40;
-                                child.receiveShadow = true;
-                                break;
-                            case 2: // Low detail (far)
-                                child.castShadow = false;
-                                child.receiveShadow = false;
-                                break;
-                            case 3: // Very low (edge of visibility)
-                                child.castShadow = false;
-                                child.receiveShadow = false;
-                                break;
-                        }
-                    }
-                });
-            }
-            
-            // Apply LOD to buildings (windows, details, shadows)
-            applyBuildingLOD(building, distance) {
-                const lodLevel = this.frustumCuller.getLODLevel(distance);
-                
-                if (building.userData.currentLOD === lodLevel) return;
-                building.userData.currentLOD = lodLevel;
-                
-                building.traverse(child => {
-                    if (child.isMesh) {
-                        // Disable shadows on distant buildings
-                        if (lodLevel >= 2) {
-                            child.castShadow = false;
-                        } else if (lodLevel === 1) {
-                            // Medium distance: only main building casts shadow
-                            child.castShadow = child.geometry && 
-                                child.geometry.parameters && 
-                                (child.geometry.parameters.width > 5 || child.geometry.parameters.height > 5);
-                        } else {
-                            child.castShadow = true;
-                        }
-                        
-                        // Hide small details at distance (window frames, etc.)
-                        if (child.geometry && child.geometry.parameters) {
-                            const size = Math.max(
-                                child.geometry.parameters.width || 0,
-                                child.geometry.parameters.height || 0,
-                                child.geometry.parameters.radius || 0
-                            );
-                            // Hide tiny details at medium+ distance
-                            if (size < 0.2 && lodLevel >= 1) {
-                                child.visible = false;
-                            } else {
-                                child.visible = true;
-                            }
-                        }
-                    }
-                });
             }
             
             updateMovement(delta) {

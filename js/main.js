@@ -2336,27 +2336,31 @@
                 // Building positions with entrance directions
                 const hub = { x: 0, z: 0, entrance: 'south', radius: 12 };
                 const startPos = { x: 0, z: 60, radius: 8 };
+                
+                // All building positions must match PORTFOLIO_DATA exactly!
                 const buildings = [
-                    { x: 70, z: -50, entrance: 'west', radius: 10 },    // Tech Stack
-                    { x: 0, z: -100, entrance: 'north', radius: 10 },   // Projects  
-                    { x: -70, z: 50, entrance: 'east', radius: 10 },    // Experience
-                    { x: 70, z: 50, entrance: 'west', radius: 10 }      // Contact
+                    { x: 70, z: -50, radius: 10 },    // Tech Stack
+                    { x: 0, z: -100, radius: 10 },    // Projects  
+                    { x: -70, z: 50, radius: 10 },    // Experience
+                    { x: 70, z: 50, radius: 10 }      // Contact
                 ];
                 
-                // Create road from start to hub
+                // Create road from start to hub (spawn point to center)
                 this.createRoadSegment(startPos, hub, roadWidth, roadHeight, roadMaterial, roadTexture, startPos.radius, hub.radius);
                 
-                // Create roads from hub to each building entrance
-                buildings.forEach(building => {
+                // Create roads from hub to EACH building
+                for (let i = 0; i < buildings.length; i++) {
+                    const building = buildings[i];
+                    console.log('Creating road to building at', building.x, building.z);
                     this.createRoadSegment(hub, building, roadWidth, roadHeight, roadMaterial, roadTexture, hub.radius, building.radius);
-                });
+                }
                 
-                // Create intersections
+                // Create intersections at hub, start, and each building
                 this.createIntersection(hub.x, hub.z, hub.radius, roadMaterial);
                 this.createIntersection(startPos.x, startPos.z, startPos.radius, roadMaterial);
-                buildings.forEach(b => {
-                    this.createIntersection(b.x, b.z, b.radius, roadMaterial);
-                });
+                for (let i = 0; i < buildings.length; i++) {
+                    this.createIntersection(buildings[i].x, buildings[i].z, buildings[i].radius, roadMaterial);
+                }
             }
             
             createRoadSegment(from, to, width, height, material, texture, fromRadius = 8, toRadius = 8) {

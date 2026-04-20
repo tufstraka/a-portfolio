@@ -1433,6 +1433,17 @@
                 this.dustParticlePool = null;
                 this.smokeParticlePool = null;
                 
+                // Skid marks system
+                this.skidMarks = [];
+                this.maxSkidMarks = 100;
+                
+                // Day/night cycle
+                this.dayTime = 0.35; // Start at mid-morning (0-1, 0.5 = noon)
+                this.daySpeed = 0.01; // Full cycle in ~100 seconds
+                
+                // Ambient sounds
+                this.ambientPlaying = false;
+                
                 this.state = {
                     playerMode: 'driving',
                     cameraMode: 'follow',
@@ -1545,6 +1556,24 @@
             
             updateLoadingProgress(percent) {
                 document.getElementById('loadingBar').style.width = `${percent}%`;
+                
+                // Show random loading tips
+                const tips = [
+                    '💡 Use SHIFT for turbo boost!',
+                    '🎮 Press J to jump over obstacles',
+                    '🏢 Drive to buildings to see my work',
+                    '🌅 Watch the day/night cycle',
+                    '🎨 Graphics adapt to your device',
+                    '🚗 Drift by turning sharply at speed',
+                    '🗺️ Check the minimap for directions',
+                    '⏎ Press SPACE near buildings to enter'
+                ];
+                
+                const tipEl = document.querySelector('.loading-subtitle');
+                if (tipEl && percent < 100) {
+                    const tip = tips[Math.floor(Math.random() * tips.length)];
+                    tipEl.textContent = tip;
+                }
             }
             
             // ============================================
@@ -2968,6 +2997,12 @@
                 
                 this.car = carGroup;
                 this.scene.add(this.car);
+                
+                // Add headlights to car
+                this.createHeadlights();
+                
+                // Start ambient sounds
+                this.startAmbientSounds();
             }
             
             initializeSound() {
@@ -4825,10 +4860,20 @@
                 
                 if (this.frameCount % 5 === 0) {
                     this.updateMinimap();
+                    this.updateBuildingPreviews();
                 }
                 
                 if (this.frameCount % 30 === 0) {
                     this.updateFPS();
+                }
+                
+                // Update day/night cycle
+                this.updateDayNightCycle(delta);
+                this.updateHeadlights();
+                
+                // Update skid marks (fade out)
+                if (this.frameCount % 10 === 0) {
+                    this.updateSkidMarks();
                 }
                 
                 // 🎨 Update film grain time for animated noise
@@ -5084,15 +5129,30 @@
                 }
                 this.state.wasAirborne = physicsState.isAirborne;
                 
-                // Spawn dust when drifting/skidding on grass - less frequent
-                if (physicsState.isGrounded && !physicsState.isOnRoad && Math.abs(physicsState.speed) > 10) {
-                    if (Math.random() < 0.1) {
-                        this.spawnDustBurst(
-                            this.car.position.x - Math.sin(this.car.rotation.y) * 2,
-                            0.1,
-                            this.car.position.z - Math.cos(this.car.rotation.y) * 2,
-                            0.3
-                        );
+                // Spawn dust and skid marks when drifting/skidding
+                if (physicsState.isGrounded && Math.abs(physicsState.speed) > 10) {
+                    const isDrifting = Math.abs(physicsState.angularVelocity) > 0.5 || !physicsState.isOnRoad;
+                    
+                    if (isDrifting) {
+                        // Skid marks on road
+                        if (physicsState.isOnRoad && Math.random() < 0.3) {
+                            this.createSkidMark(
+                                this.car.position.x,
+                                this.car.position.z,
+                                this.car.rotation.y,
+                                Math.min(Math.abs(physicsState.speed) / 20, 1)
+                            );
+                        }
+                        
+                        // Dust on grass
+                        if (!physicsState.isOnRoad && Math.random() < 0.1) {
+                            this.spawnDustBurst(
+                                this.car.position.x - Math.sin(this.car.rotation.y) * 2,
+                                0.1,
+                                this.car.position.z - Math.cos(this.car.rotation.y) * 2,
+                                0.3
+                            );
+                        }
                     }
                 }
             }
@@ -5542,6 +5602,7 @@
                     if (pos.x < -10 || pos.x > canvas.width + 10 || pos.y < -10 || pos.y > canvas.height + 10) return;
                     
                     const color = '#' + new THREE.Color(section.userData.color).getHexString();
+                    const icon = section.userData.icon || '📍';
                     
                     // Glow effect
                     ctx.shadowColor = color;
@@ -5549,7 +5610,7 @@
                     
                     ctx.fillStyle = color;
                     ctx.beginPath();
-                    ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
+                    ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
                     ctx.fill();
                     
                     ctx.shadowBlur = 0;
@@ -5558,6 +5619,12 @@
                     ctx.strokeStyle = 'white';
                     ctx.lineWidth = 2;
                     ctx.stroke();
+                    
+                    // Icon in center
+                    ctx.font = '10px Arial';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(icon, pos.x, pos.y);
                 });
                 
                 // Draw player (always at center)
@@ -5628,6 +5695,271 @@
                             this.showToast('⚙️', 'Quality Adjusted', `Raised to ${newLevel}`);
                         }
                     }
+                }
+            }
+            
+            // ============================================
+            // SKID MARKS SYSTEM
+            // ============================================
+            
+            createSkidMark(x, z, rotation, intensity = 1) {
+                if (this.skidMarks.length >= this.maxSkidMarks) {
+                    // Remove oldest skid mark
+                    const oldest = this.skidMarks.shift();
+                    this.scene.remove(oldest);
+                    oldest.geometry.dispose();
+                    oldest.material.dispose();
+                }
+                
+                const skidGeom = new THREE.PlaneGeometry(0.3, 2);
+                const skidMat = new THREE.MeshBasicMaterial({
+                    color: 0x1a1a1a,
+                    transparent: true,
+                    opacity: 0.6 * intensity,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                });
+                
+                const skid = new THREE.Mesh(skidGeom, skidMat);
+                skid.rotation.x = -Math.PI / 2;
+                skid.rotation.z = rotation;
+                skid.position.set(x, 0.02, z);
+                skid.userData.createdAt = performance.now();
+                skid.userData.fadeTime = 10000; // Fade over 10 seconds
+                
+                this.scene.add(skid);
+                this.skidMarks.push(skid);
+            }
+            
+            updateSkidMarks() {
+                const now = performance.now();
+                
+                for (let i = this.skidMarks.length - 1; i >= 0; i--) {
+                    const skid = this.skidMarks[i];
+                    const age = now - skid.userData.createdAt;
+                    const fadeProgress = age / skid.userData.fadeTime;
+                    
+                    if (fadeProgress >= 1) {
+                        this.scene.remove(skid);
+                        skid.geometry.dispose();
+                        skid.material.dispose();
+                        this.skidMarks.splice(i, 1);
+                    } else {
+                        skid.material.opacity = 0.6 * (1 - fadeProgress);
+                    }
+                }
+            }
+            
+            // ============================================
+            // DAY/NIGHT CYCLE
+            // ============================================
+            
+            updateDayNightCycle(delta) {
+                this.dayTime += delta * this.daySpeed;
+                if (this.dayTime > 1) this.dayTime -= 1;
+                
+                // Calculate sun position (arc across sky)
+                const sunAngle = this.dayTime * Math.PI * 2 - Math.PI / 2;
+                const sunHeight = Math.sin(sunAngle);
+                const sunX = Math.cos(sunAngle) * 150;
+                const sunY = Math.max(sunHeight * 150, -50);
+                
+                if (this.sunLight) {
+                    this.sunLight.position.set(sunX, sunY, 100);
+                    
+                    // Adjust sun intensity based on height
+                    const dayIntensity = Math.max(0, sunHeight);
+                    this.sunLight.intensity = 1.5 + dayIntensity * 1.5;
+                    
+                    // Sun color: warm at sunrise/sunset, white at noon
+                    const warmth = 1 - Math.abs(sunHeight);
+                    const r = 1;
+                    const g = 0.95 - warmth * 0.3;
+                    const b = 0.9 - warmth * 0.5;
+                    this.sunLight.color.setRGB(r, g, b);
+                }
+                
+                // Update sky colors
+                if (this.skyMaterial) {
+                    const isNight = sunHeight < 0;
+                    
+                    if (isNight) {
+                        // Night sky
+                        this.skyMaterial.uniforms.topColor.value.setHex(0x0a0a20);
+                        this.skyMaterial.uniforms.bottomColor.value.setHex(0x1a1a3a);
+                    } else {
+                        // Day sky - interpolate based on sun height
+                        const t = sunHeight;
+                        // Dawn/dusk colors
+                        const dawnTop = new THREE.Color(0x1e3a5f);
+                        const dawnBottom = new THREE.Color(0xff7b4a);
+                        const dayTop = new THREE.Color(0x1e5799);
+                        const dayBottom = new THREE.Color(0x7ec8e3);
+                        
+                        if (t < 0.3) {
+                            // Sunrise/sunset
+                            const blend = t / 0.3;
+                            this.skyMaterial.uniforms.topColor.value.lerpColors(dawnTop, dayTop, blend);
+                            this.skyMaterial.uniforms.bottomColor.value.lerpColors(dawnBottom, dayBottom, blend);
+                        } else {
+                            this.skyMaterial.uniforms.topColor.value.copy(dayTop);
+                            this.skyMaterial.uniforms.bottomColor.value.copy(dayBottom);
+                        }
+                    }
+                }
+                
+                // Update ambient light
+                if (this.ambientLight) {
+                    const intensity = 0.3 + Math.max(0, sunHeight) * 0.5;
+                    this.ambientLight.intensity = intensity;
+                }
+                
+                // Update fog color to match sky
+                if (this.scene.fog && this.skyMaterial) {
+                    this.scene.fog.color.copy(this.skyMaterial.uniforms.bottomColor.value);
+                }
+            }
+            
+            // ============================================
+            // AMBIENT SOUNDS
+            // ============================================
+            
+            startAmbientSounds() {
+                if (this.ambientPlaying || !this.audioContext) return;
+                
+                // Birds chirping (random high-pitched tones)
+                this.birdInterval = setInterval(() => {
+                    if (Math.random() > 0.7) {
+                        this.playBirdSound();
+                    }
+                }, 3000);
+                
+                // Wind (filtered noise)
+                this.createWindSound();
+                
+                this.ambientPlaying = true;
+            }
+            
+            playBirdSound() {
+                if (!this.audioContext || this.audioContext.state === 'suspended') return;
+                
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+                
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(2000 + Math.random() * 1000, this.audioContext.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1500 + Math.random() * 500, this.audioContext.currentTime + 0.1);
+                
+                gain.gain.setValueAtTime(0.02, this.audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.3);
+                
+                osc.connect(gain);
+                gain.connect(this.audioContext.destination);
+                
+                osc.start();
+                osc.stop(this.audioContext.currentTime + 0.3);
+            }
+            
+            createWindSound() {
+                if (!this.audioContext) return;
+                
+                // Create noise buffer for wind
+                const bufferSize = this.audioContext.sampleRate * 2;
+                const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+                const data = buffer.getChannelData(0);
+                
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                
+                this.windNoise = this.audioContext.createBufferSource();
+                this.windNoise.buffer = buffer;
+                this.windNoise.loop = true;
+                
+                const windFilter = this.audioContext.createBiquadFilter();
+                windFilter.type = 'lowpass';
+                windFilter.frequency.value = 400;
+                
+                const windGain = this.audioContext.createGain();
+                windGain.gain.value = 0.03;
+                
+                this.windNoise.connect(windFilter);
+                windFilter.connect(windGain);
+                windGain.connect(this.audioContext.destination);
+                
+                this.windNoise.start();
+            }
+            
+            // ============================================
+            // CAR HEADLIGHTS
+            // ============================================
+            
+            createHeadlights() {
+                if (!this.car) return;
+                
+                // Left headlight
+                this.leftHeadlight = new THREE.SpotLight(0xffffcc, 0, 50, Math.PI / 6, 0.5);
+                this.leftHeadlight.position.set(-0.6, 0.5, 2.5);
+                this.car.add(this.leftHeadlight);
+                this.leftHeadlight.target.position.set(-0.6, 0, 10);
+                this.car.add(this.leftHeadlight.target);
+                
+                // Right headlight
+                this.rightHeadlight = new THREE.SpotLight(0xffffcc, 0, 50, Math.PI / 6, 0.5);
+                this.rightHeadlight.position.set(0.6, 0.5, 2.5);
+                this.car.add(this.rightHeadlight);
+                this.rightHeadlight.target.position.set(0.6, 0, 10);
+                this.car.add(this.rightHeadlight.target);
+            }
+            
+            updateHeadlights() {
+                if (!this.leftHeadlight || !this.rightHeadlight) return;
+                
+                // Turn on headlights at night
+                const isNight = this.dayTime < 0.25 || this.dayTime > 0.75;
+                const intensity = isNight ? 2 : 0;
+                
+                this.leftHeadlight.intensity = intensity;
+                this.rightHeadlight.intensity = intensity;
+            }
+            
+            // ============================================
+            // BUILDING PREVIEWS (on hover/approach)
+            // ============================================
+            
+            updateBuildingPreviews() {
+                const indicator = document.getElementById('sectionIndicator');
+                if (!indicator || !this.car) return;
+                
+                // Find nearest building
+                let nearest = null;
+                let nearestDist = Infinity;
+                
+                this.sections.forEach(section => {
+                    const dx = this.car.position.x - section.position.x;
+                    const dz = this.car.position.z - section.position.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    
+                    if (dist < nearestDist && dist < 30) {
+                        nearestDist = dist;
+                        nearest = section;
+                    }
+                });
+                
+                if (nearest && nearest.userData) {
+                    indicator.style.display = 'block';
+                    const titleEl = indicator.querySelector('.section-indicator-title');
+                    const hintEl = indicator.querySelector('.section-indicator-hint');
+                    const dotEl = indicator.querySelector('.section-indicator-dot');
+                    
+                    if (titleEl) titleEl.textContent = nearest.userData.icon + ' ' + nearest.userData.title;
+                    if (hintEl) hintEl.textContent = nearestDist < 15 ? 'Press SPACE to enter' : `${Math.round(nearestDist)}m away`;
+                    if (dotEl) dotEl.style.color = '#' + new THREE.Color(nearest.userData.color).getHexString();
+                    
+                    this.state.currentSection = nearest;
+                } else {
+                    indicator.style.display = 'none';
+                    this.state.currentSection = null;
                 }
             }
             

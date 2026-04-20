@@ -2373,87 +2373,97 @@
                 const dirX = dx / length;
                 const dirZ = dz / length;
                 
-                // Shorten road from each end to connect with intersections (use actual radii)
-                const startOffset = fromRadius - 1; // Overlap slightly into intersection
-                const endOffset = toRadius - 1;
-                const shortenedLength = length - startOffset - endOffset;
-                if (shortenedLength <= 0) return;
+                // Road extends INTO intersections for seamless connection
+                // No shortening - let the road go all the way
+                const roadLength = length;
                 
-                // Calculate true center of shortened road
-                const centerX = from.x + dirX * (startOffset + shortenedLength / 2);
-                const centerZ = from.z + dirZ * (startOffset + shortenedLength / 2);
+                // Calculate center
+                const centerX = from.x + dx / 2;
+                const centerZ = from.z + dz / 2;
                 
                 // Set texture repeat based on road length
                 const textureCopy = texture.clone();
-                textureCopy.repeat.set(width / 10, shortenedLength / 10);
+                textureCopy.repeat.set(width / 10, roadLength / 10);
                 textureCopy.needsUpdate = true;
                 
                 const roadMat = material.clone();
                 roadMat.map = textureCopy;
                 
-                const roadGeom = new THREE.BoxGeometry(width, height, shortenedLength);
+                // Road is slightly below intersections so they blend on top
+                const roadGeom = new THREE.BoxGeometry(width, height, roadLength);
                 const road = new THREE.Mesh(roadGeom, roadMat);
                 
-                road.position.set(centerX, height / 2 + 0.01, centerZ); // Slightly raised
+                road.position.set(centerX, height / 2, centerZ);
                 road.rotation.y = -angle;
                 road.receiveShadow = true;
                 this.scene.add(road);
                 
-                // Add road markings
-                this.addRoadMarkings(from, to, length, angle, shortenedLength, width, startOffset);
+                // Add road markings (skip the parts under intersections)
+                this.addRoadMarkings(from, to, length, angle, roadLength, width, fromRadius, toRadius);
             }
             
-            addRoadMarkings(from, to, length, angle, roadLength, roadWidth, startOffset = 8) {
+            addRoadMarkings(from, to, length, angle, roadLength, roadWidth, fromRadius = 8, toRadius = 8) {
                 const dx = to.x - from.x;
                 const dz = to.z - from.z;
                 const dirX = dx / length;
                 const dirZ = dz / length;
                 
+                // Markings only in the middle section (not under intersections)
+                const markingStart = fromRadius + 2;
+                const markingEnd = length - toRadius - 2;
+                const markingLength = markingEnd - markingStart;
+                
+                if (markingLength <= 0) return; // Too short for markings
+                
                 // White dashed center line
                 const dashLength = 4;
                 const gapLength = 4;
-                const numDashes = Math.floor((roadLength - 4) / (dashLength + gapLength));
+                const numDashes = Math.floor(markingLength / (dashLength + gapLength));
                 
                 const lineMaterial = new THREE.MeshBasicMaterial({ 
                     color: 0xFFFFFF,
                     transparent: true,
                     opacity: 0.9,
-                    polygonOffset: true,       // Fix z-fighting with road
+                    polygonOffset: true,
                     polygonOffsetFactor: -2,
                     polygonOffsetUnits: -2
                 });
                 
-                // Calculate center of road segment
-                const centerX = from.x + dirX * (startOffset + roadLength / 2);
-                const centerZ = from.z + dirZ * (startOffset + roadLength / 2);
+                // Start position for markings
+                const startX = from.x + dirX * markingStart;
+                const startZ = from.z + dirZ * markingStart;
                 
                 for (let i = 0; i < numDashes; i++) {
-                    // Position dashes relative to road center
-                    const dashOffset = (i - (numDashes - 1) / 2) * (dashLength + gapLength);
+                    const progress = (i * (dashLength + gapLength) + dashLength / 2) / markingLength;
+                    if (progress > 1) break;
                     
                     const dashGeom = new THREE.BoxGeometry(0.2, 0.02, dashLength);
                     const dash = new THREE.Mesh(dashGeom, lineMaterial);
                     
                     dash.position.set(
-                        centerX + dirX * dashOffset,
+                        startX + dirX * progress * markingLength,
                         0.08,
-                        centerZ + dirZ * dashOffset
+                        startZ + dirZ * progress * markingLength
                     );
                     dash.rotation.y = -angle;
                     this.scene.add(dash);
                 }
                 
-                // Solid white edge lines
+                // Edge lines - also shortened to avoid intersections
+                const edgeLength = markingLength;
+                const edgeCenterX = from.x + dirX * (markingStart + markingLength / 2);
+                const edgeCenterZ = from.z + dirZ * (markingStart + markingLength / 2);
+                
                 [-1, 1].forEach(side => {
-                    const edgeGeom = new THREE.BoxGeometry(0.15, 0.02, roadLength);
+                    const edgeGeom = new THREE.BoxGeometry(0.15, 0.02, edgeLength);
                     const edge = new THREE.Mesh(edgeGeom, lineMaterial);
                     
                     const offset = (roadWidth / 2 - 0.3) * side;
                     
                     edge.position.set(
-                        centerX + Math.cos(angle) * offset,
+                        edgeCenterX + Math.cos(angle) * offset,
                         0.08,
-                        centerZ - Math.sin(angle) * offset
+                        edgeCenterZ - Math.sin(angle) * offset
                     );
                     edge.rotation.y = -angle;
                     this.scene.add(edge);
@@ -2461,26 +2471,23 @@
             }
             
             createIntersection(x, z, radius, material) {
-                const geometry = new THREE.CylinderGeometry(radius, radius, 0.06, 48); // Slightly thicker
+                // Flat circle that sits on top of roads for smooth blending
+                const geometry = new THREE.CircleGeometry(radius, 48);
                 
                 const intersectionMat = material ? material.clone() : new THREE.MeshStandardMaterial({
                     color: 0x2a2a2a,
                     roughness: 0.9,
-                    metalness: 0.0,
-                    polygonOffset: true,       // Fix z-fighting
-                    polygonOffsetFactor: -1,
-                    polygonOffsetUnits: -1
+                    metalness: 0.0
                 });
                 
-                // Ensure cloned material also has polygon offset
-                if (material) {
-                    intersectionMat.polygonOffset = true;
-                    intersectionMat.polygonOffsetFactor = -1;
-                    intersectionMat.polygonOffsetUnits = -1;
-                }
+                // Intersection sits slightly above roads
+                intersectionMat.polygonOffset = true;
+                intersectionMat.polygonOffsetFactor = -2;
+                intersectionMat.polygonOffsetUnits = -2;
                 
                 const intersection = new THREE.Mesh(geometry, intersectionMat);
-                intersection.position.set(x, 0.035, z); // Raised slightly more
+                intersection.rotation.x = -Math.PI / 2; // Lay flat
+                intersection.position.set(x, 0.06, z);
                 intersection.receiveShadow = true;
                 this.scene.add(intersection);
             }

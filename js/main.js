@@ -1599,22 +1599,8 @@
             }
             
             triggerScreenShake(intensity = 1) {
-                if (this.state.quality === 'low') return; // Skip on low quality
-                
-                // 🎥 NEW: Use camera shake system for smoother shake
-                if (this.cameraShake) {
-                    this.cameraShake.addTrauma(intensity * 0.5);
-                }
-                
-                // Also trigger CSS shake for UI elements
-                const container = document.getElementById('gameContainer');
-                container.style.animation = 'none';
-                container.offsetHeight; // Trigger reflow
-                container.style.animation = `shake ${0.2 + intensity * 0.1}s ease-out`;
-                
-                setTimeout(() => {
-                    container.style.animation = 'none';
-                }, 300);
+                // Screen shake disabled - was causing discomfort
+                return;
             }
             
             setBoostLines(active) {
@@ -2073,9 +2059,20 @@
                 const length = Math.sqrt(dx * dx + dz * dz);
                 const angle = Math.atan2(dx, dz);
                 
-                // Shorten road to not overlap intersections
-                const shortenedLength = length - 16;
+                // Direction unit vector
+                const dirX = dx / length;
+                const dirZ = dz / length;
+                
+                // Shorten road from each end to connect smoothly with intersections
+                const intersectionRadius = 8; // Match intersection sizes
+                const startOffset = intersectionRadius;
+                const endOffset = intersectionRadius;
+                const shortenedLength = length - startOffset - endOffset;
                 if (shortenedLength <= 0) return;
+                
+                // Calculate true center of shortened road
+                const centerX = from.x + dirX * (startOffset + shortenedLength / 2);
+                const centerZ = from.z + dirZ * (startOffset + shortenedLength / 2);
                 
                 // Set texture repeat based on road length
                 const textureCopy = texture.clone();
@@ -2088,27 +2085,25 @@
                 const roadGeom = new THREE.BoxGeometry(width, height, shortenedLength);
                 const road = new THREE.Mesh(roadGeom, roadMat);
                 
-                road.position.set(
-                    from.x + dx / 2,
-                    height / 2,
-                    from.z + dz / 2
-                );
+                road.position.set(centerX, height / 2 + 0.01, centerZ); // Slightly raised
                 road.rotation.y = -angle;
                 road.receiveShadow = true;
                 this.scene.add(road);
                 
                 // Add road markings
-                this.addRoadMarkings(from, to, length, angle, shortenedLength, width);
+                this.addRoadMarkings(from, to, length, angle, shortenedLength, width, startOffset);
             }
             
-            addRoadMarkings(from, to, length, angle, roadLength, roadWidth) {
+            addRoadMarkings(from, to, length, angle, roadLength, roadWidth, startOffset = 8) {
                 const dx = to.x - from.x;
                 const dz = to.z - from.z;
+                const dirX = dx / length;
+                const dirZ = dz / length;
                 
                 // White dashed center line
                 const dashLength = 4;
                 const gapLength = 4;
-                const numDashes = Math.floor((roadLength - 8) / (dashLength + gapLength));
+                const numDashes = Math.floor((roadLength - 4) / (dashLength + gapLength));
                 
                 const lineMaterial = new THREE.MeshBasicMaterial({ 
                     color: 0xFFFFFF,
@@ -2119,16 +2114,21 @@
                     polygonOffsetUnits: -2
                 });
                 
+                // Calculate center of road segment
+                const centerX = from.x + dirX * (startOffset + roadLength / 2);
+                const centerZ = from.z + dirZ * (startOffset + roadLength / 2);
+                
                 for (let i = 0; i < numDashes; i++) {
-                    const progress = (8 + i * (dashLength + gapLength) + dashLength / 2) / length;
+                    // Position dashes relative to road center
+                    const dashOffset = (i - (numDashes - 1) / 2) * (dashLength + gapLength);
                     
                     const dashGeom = new THREE.BoxGeometry(0.2, 0.02, dashLength);
                     const dash = new THREE.Mesh(dashGeom, lineMaterial);
                     
                     dash.position.set(
-                        from.x + dx * progress,
-                        0.06,
-                        from.z + dz * progress
+                        centerX + dirX * dashOffset,
+                        0.08,
+                        centerZ + dirZ * dashOffset
                     );
                     dash.rotation.y = -angle;
                     this.scene.add(dash);
@@ -2140,13 +2140,11 @@
                     const edge = new THREE.Mesh(edgeGeom, lineMaterial);
                     
                     const offset = (roadWidth / 2 - 0.3) * side;
-                    const midX = from.x + dx / 2;
-                    const midZ = from.z + dz / 2;
                     
                     edge.position.set(
-                        midX + Math.cos(angle) * offset,
-                        0.06,
-                        midZ - Math.sin(angle) * offset
+                        centerX + Math.cos(angle) * offset,
+                        0.08,
+                        centerZ - Math.sin(angle) * offset
                     );
                     edge.rotation.y = -angle;
                     this.scene.add(edge);
@@ -5130,7 +5128,7 @@
             
             updateMinimap() {
                 const canvas = document.getElementById('miniMapCanvas');
-                if (!canvas) return;
+                if (!canvas || !this.car) return;
                 
                 const ctx = canvas.getContext('2d');
                 if (!ctx) return;
@@ -5157,9 +5155,18 @@
                 
                 const cx = canvas.width / 2;
                 const cy = canvas.height / 2;
-                const scale = 1.8;
                 
-                // Draw roads - hub and spoke from center
+                // Use actual car position for tracking
+                const carX = this.car.position.x;
+                const carZ = this.car.position.z;
+                const carAngle = this.car.rotation.y;
+                
+                // Scale: map world units to minimap pixels
+                // World is roughly -120 to +120 in x, -120 to +120 in z
+                // Minimap is ~150px, so scale = 150 / 240 ≈ 0.6
+                const scale = 0.55;
+                
+                // Draw roads - hub and spoke from center (relative to car for centered view)
                 ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
                 ctx.lineWidth = 4;
                 
@@ -5172,24 +5179,37 @@
                     { x: 70, z: 50 }     // Contact
                 ];
                 
+                // Convert world position to minimap position (car-centered)
+                const toMinimap = (worldX, worldZ) => {
+                    return {
+                        x: cx + (worldX - carX) * scale,
+                        y: cy + (worldZ - carZ) * scale
+                    };
+                };
+                
                 // Draw start road
+                const startMini = toMinimap(startPos.x, startPos.z);
+                const hubMini = toMinimap(hub.x, hub.z);
                 ctx.beginPath();
-                ctx.moveTo(cx + startPos.x / scale, cy + startPos.z / scale);
-                ctx.lineTo(cx + hub.x / scale, cy + hub.z / scale);
+                ctx.moveTo(startMini.x, startMini.y);
+                ctx.lineTo(hubMini.x, hubMini.y);
                 ctx.stroke();
                 
                 // Draw spoke roads from hub to each building
                 buildings.forEach(building => {
+                    const buildingMini = toMinimap(building.x, building.z);
                     ctx.beginPath();
-                    ctx.moveTo(cx + hub.x / scale, cy + hub.z / scale);
-                    ctx.lineTo(cx + building.x / scale, cy + building.z / scale);
+                    ctx.moveTo(hubMini.x, hubMini.y);
+                    ctx.lineTo(buildingMini.x, buildingMini.y);
                     ctx.stroke();
                 });
                 
                 // Draw buildings with colors
                 this.sections.forEach(section => {
-                    const x = cx + section.position.x / scale;
-                    const y = cy + section.position.z / scale;
+                    const pos = toMinimap(section.position.x, section.position.z);
+                    
+                    // Skip if off-screen
+                    if (pos.x < -10 || pos.x > canvas.width + 10 || pos.y < -10 || pos.y > canvas.height + 10) return;
                     
                     const color = '#' + new THREE.Color(section.userData.color).getHexString();
                     
@@ -5199,7 +5219,7 @@
                     
                     ctx.fillStyle = color;
                     ctx.beginPath();
-                    ctx.arc(x, y, 8, 0, Math.PI * 2);
+                    ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
                     ctx.fill();
                     
                     ctx.shadowBlur = 0;
@@ -5210,17 +5230,13 @@
                     ctx.stroke();
                 });
                 
-                // Draw player
-                const playerPos = this.state.playerMode === 'driving' ? this.car.position : this.character.position;
-                const playerAngle = this.state.playerMode === 'driving' ? this.car.rotation.y : this.character.rotation.y;
-                const px = cx + playerPos.x / scale;
-                const py = cy + playerPos.z / scale;
-                
+                // Draw player (always at center)
                 ctx.save();
-                ctx.translate(px, py);
-                // Fix rotation: Three.js Y-rotation is counter-clockwise from +Z, 
-                // Canvas needs clockwise from -Y (up), so we add PI
-                ctx.rotate(playerAngle + Math.PI);
+                ctx.translate(cx, cy);
+                // Rotate to match car direction
+                // Three.js: +Z is forward, rotation.y is yaw counter-clockwise
+                // Canvas: -Y is up, need to add PI/2 to point up when facing +Z
+                ctx.rotate(-carAngle + Math.PI);
                 
                 // Player indicator with glow
                 ctx.shadowColor = '#6366F1';
@@ -5231,10 +5247,12 @@
                 gradient.addColorStop(1, '#EC4899');
                 ctx.fillStyle = gradient;
                 
+                // Draw arrow pointing in direction of travel
                 ctx.beginPath();
-                ctx.moveTo(0, -8);
-                ctx.lineTo(-5, 6);
-                ctx.lineTo(5, 6);
+                ctx.moveTo(0, -10);   // Front point
+                ctx.lineTo(-6, 8);   // Back left
+                ctx.lineTo(0, 4);    // Back center indent
+                ctx.lineTo(6, 8);    // Back right
                 ctx.closePath();
                 ctx.fill();
                 

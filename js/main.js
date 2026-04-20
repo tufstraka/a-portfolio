@@ -6,7 +6,124 @@
         import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
         import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
         import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
         import { Sky } from 'three/addons/objects/Sky.js';
+
+        // ============================================
+        // CUSTOM SHADERS FOR ENHANCED GRAPHICS
+        // ============================================
+        
+        // Vignette Shader - Darkens edges for cinematic look
+        const VignetteShader = {
+            uniforms: {
+                'tDiffuse': { value: null },
+                'offset': { value: 1.0 },
+                'darkness': { value: 1.0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float offset;
+                uniform float darkness;
+                varying vec2 vUv;
+                void main() {
+                    vec4 texel = texture2D(tDiffuse, vUv);
+                    vec2 uv = (vUv - vec2(0.5)) * vec2(offset);
+                    float vignetteAmount = 1.0 - dot(uv, uv);
+                    vignetteAmount = clamp(pow(vignetteAmount, darkness), 0.0, 1.0);
+                    texel.rgb *= vignetteAmount;
+                    gl_FragColor = texel;
+                }
+            `
+        };
+        
+        // Color Grading Shader - Adjusts contrast, saturation, brightness
+        const ColorGradingShader = {
+            uniforms: {
+                'tDiffuse': { value: null },
+                'brightness': { value: 0.0 },
+                'contrast': { value: 1.0 },
+                'saturation': { value: 1.0 },
+                'gamma': { value: 1.0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float brightness;
+                uniform float contrast;
+                uniform float saturation;
+                uniform float gamma;
+                varying vec2 vUv;
+                
+                vec3 adjustSaturation(vec3 color, float sat) {
+                    float gray = dot(color, vec3(0.2126, 0.7152, 0.0722));
+                    return mix(vec3(gray), color, sat);
+                }
+                
+                void main() {
+                    vec4 texel = texture2D(tDiffuse, vUv);
+                    
+                    // Brightness
+                    texel.rgb += brightness;
+                    
+                    // Contrast
+                    texel.rgb = (texel.rgb - 0.5) * contrast + 0.5;
+                    
+                    // Saturation
+                    texel.rgb = adjustSaturation(texel.rgb, saturation);
+                    
+                    // Gamma correction
+                    texel.rgb = pow(texel.rgb, vec3(1.0 / gamma));
+                    
+                    gl_FragColor = texel;
+                }
+            `
+        };
+        
+        // Film Grain Shader - Subtle noise for cinematic feel
+        const FilmGrainShader = {
+            uniforms: {
+                'tDiffuse': { value: null },
+                'time': { value: 0.0 },
+                'intensity': { value: 0.05 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float time;
+                uniform float intensity;
+                varying vec2 vUv;
+                
+                float rand(vec2 co) {
+                    return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+                
+                void main() {
+                    vec4 texel = texture2D(tDiffuse, vUv);
+                    float noise = rand(vUv + time) * 2.0 - 1.0;
+                    texel.rgb += noise * intensity;
+                    gl_FragColor = texel;
+                }
+            `
+        };
 
         // ============================================
         // CONFIGURATION
@@ -1522,11 +1639,34 @@
                 // Subtle bloom for realistic glow (optimized settings)
                 this.bloomPass = new UnrealBloomPass(
                     new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2),
-                    0.18,  // Strength - subtle
-                    0.4,   // Radius
-                    0.88   // Threshold - only bright spots
+                    0.22,  // Strength - slightly increased for better glow
+                    0.5,   // Radius
+                    0.85   // Threshold - only bright spots
                 );
                 this.composer.addPass(this.bloomPass);
+                
+                // 🎨 NEW: Color Grading for cinematic look
+                this.colorGradingPass = new ShaderPass(ColorGradingShader);
+                this.colorGradingPass.uniforms['brightness'].value = 0.02;  // Slight brightness boost
+                this.colorGradingPass.uniforms['contrast'].value = 1.08;    // Subtle contrast
+                this.colorGradingPass.uniforms['saturation'].value = 1.15;  // Vibrant colors
+                this.colorGradingPass.uniforms['gamma'].value = 1.0;
+                this.composer.addPass(this.colorGradingPass);
+                
+                // 🎨 NEW: Vignette for cinematic edges
+                this.vignettePass = new ShaderPass(VignetteShader);
+                this.vignettePass.uniforms['offset'].value = 0.95;    // How far from center
+                this.vignettePass.uniforms['darkness'].value = 1.4;   // Subtle darkening
+                this.composer.addPass(this.vignettePass);
+                
+                // 🎨 NEW: Film Grain for texture (disabled by default, enable on high quality)
+                this.filmGrainPass = new ShaderPass(FilmGrainShader);
+                this.filmGrainPass.uniforms['intensity'].value = 0.03; // Very subtle
+                this.filmGrainPass.enabled = this.state.quality === 'ultra'; // Only on ultra
+                this.composer.addPass(this.filmGrainPass);
+                
+                // Output pass for proper color space
+                this.composer.addPass(new OutputPass());
             }
             
             async createScene() {
@@ -4140,6 +4280,22 @@
                     this.sunLight.shadow.mapSize.width = quality === 'ultra' ? 4096 : 2048;
                     this.sunLight.shadow.mapSize.height = quality === 'ultra' ? 4096 : 2048;
                 }
+                
+                // 🎨 Update post-processing effects based on quality
+                if (this.colorGradingPass) {
+                    this.colorGradingPass.enabled = quality !== 'low';
+                }
+                if (this.vignettePass) {
+                    this.vignettePass.enabled = quality !== 'low';
+                    // Stronger vignette on ultra
+                    this.vignettePass.uniforms['darkness'].value = quality === 'ultra' ? 1.5 : 1.3;
+                }
+                if (this.filmGrainPass) {
+                    this.filmGrainPass.enabled = quality === 'ultra';
+                }
+                if (this.bloomPass) {
+                    this.bloomPass.enabled = quality !== 'low';
+                }
             }
             
             applyEffects(level) {
@@ -4204,6 +4360,11 @@
                 
                 if (this.frameCount % 30 === 0) {
                     this.updateFPS();
+                }
+                
+                // 🎨 Update film grain time for animated noise
+                if (this.filmGrainPass && this.filmGrainPass.enabled) {
+                    this.filmGrainPass.uniforms['time'].value = this.state.time;
                 }
                 
                 this.frameCount++;

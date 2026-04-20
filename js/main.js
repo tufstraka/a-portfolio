@@ -1692,11 +1692,11 @@
                 // Scene
                 this.scene = new THREE.Scene();
                 
-                // Camera
+                // Camera - Increased near plane to reduce z-fighting
                 this.camera = new THREE.PerspectiveCamera(
                     65,
                     window.innerWidth / window.innerHeight,
-                    0.1,
+                    0.5,  // Increased from 0.1 to reduce z-fighting
                     this.state.quality === 'ultra' ? 1500 : this.state.quality === 'high' ? 1000 : 500
                 );
                 
@@ -1706,13 +1706,14 @@
                 // Initialize Adaptive Quality Manager
                 this.adaptiveQuality = new AdaptiveQualityManager(this);
                 
-                // Renderer with PBR support
+                // Renderer with PBR support and logarithmic depth buffer for z-fighting fix
                 this.renderer = new THREE.WebGLRenderer({
                     antialias: true, // Always enable for sharp edges
                     powerPreference: 'high-performance',
                     precision: this.state.isMobile ? 'mediump' : 'highp',
                     stencil: false,
-                    alpha: false
+                    alpha: false,
+                    logarithmicDepthBuffer: true  // Fixes z-fighting at large distances
                 });
                 
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -2035,6 +2036,9 @@
                     map: roadTexture,
                     roughness: 0.9,
                     metalness: 0.0,
+                    polygonOffset: true,       // Fix z-fighting with ground
+                    polygonOffsetFactor: -1,   // Push roads slightly forward
+                    polygonOffsetUnits: -1
                 });
                 
                 // Building positions with entrance directions
@@ -2109,7 +2113,10 @@
                 const lineMaterial = new THREE.MeshBasicMaterial({ 
                     color: 0xFFFFFF,
                     transparent: true,
-                    opacity: 0.9
+                    opacity: 0.9,
+                    polygonOffset: true,       // Fix z-fighting with road
+                    polygonOffsetFactor: -2,
+                    polygonOffsetUnits: -2
                 });
                 
                 for (let i = 0; i < numDashes; i++) {
@@ -2147,16 +2154,26 @@
             }
             
             createIntersection(x, z, radius, material) {
-                const geometry = new THREE.CylinderGeometry(radius, radius, 0.05, 48);
+                const geometry = new THREE.CylinderGeometry(radius, radius, 0.06, 48); // Slightly thicker
                 
                 const intersectionMat = material ? material.clone() : new THREE.MeshStandardMaterial({
                     color: 0x2a2a2a,
                     roughness: 0.9,
-                    metalness: 0.0
+                    metalness: 0.0,
+                    polygonOffset: true,       // Fix z-fighting
+                    polygonOffsetFactor: -1,
+                    polygonOffsetUnits: -1
                 });
                 
+                // Ensure cloned material also has polygon offset
+                if (material) {
+                    intersectionMat.polygonOffset = true;
+                    intersectionMat.polygonOffsetFactor = -1;
+                    intersectionMat.polygonOffsetUnits = -1;
+                }
+                
                 const intersection = new THREE.Mesh(geometry, intersectionMat);
-                intersection.position.set(x, 0.025, z);
+                intersection.position.set(x, 0.035, z); // Raised slightly more
                 intersection.receiveShadow = true;
                 this.scene.add(intersection);
             }
@@ -3074,13 +3091,16 @@
                                     envMapIntensity: 1.2,
                                     clearcoat: 0.8,
                                     clearcoatRoughness: 0.15,
-                                    depthWrite: false
+                                    depthWrite: false,
+                                    polygonOffset: true,        // Fix z-fighting
+                                    polygonOffsetFactor: -2,
+                                    polygonOffsetUnits: -2
                                 });
                                 
                                 const glassGeom = new THREE.PlaneGeometry(windowWidth - 0.15, windowHeight - 0.15);
                                 const glass = new THREE.Mesh(glassGeom, glassMat);
-                                glass.position.z = 0.06; // Further forward to prevent z-fighting
-                                glass.renderOrder = 1;
+                                glass.position.z = 0.08; // Further forward to prevent z-fighting
+                                glass.renderOrder = 2;   // Render after interior
                                 windowGroup.add(glass);
                                 
                                 // Optional blinds/curtains

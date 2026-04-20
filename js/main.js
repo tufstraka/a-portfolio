@@ -274,6 +274,175 @@
         }
 
         // ============================================
+        // OBJECT POOL - Reuse objects instead of creating/destroying
+        // ============================================
+        
+        class ObjectPool {
+            constructor(createFn, resetFn, initialSize = 20) {
+                this.createFn = createFn;
+                this.resetFn = resetFn;
+                this.pool = [];
+                this.active = new Set();
+                
+                // Pre-populate pool
+                for (let i = 0; i < initialSize; i++) {
+                    this.pool.push(this.createFn());
+                }
+            }
+            
+            get() {
+                let obj;
+                if (this.pool.length > 0) {
+                    obj = this.pool.pop();
+                } else {
+                    obj = this.createFn();
+                }
+                this.active.add(obj);
+                return obj;
+            }
+            
+            release(obj) {
+                if (this.active.has(obj)) {
+                    this.active.delete(obj);
+                    this.resetFn(obj);
+                    this.pool.push(obj);
+                }
+            }
+            
+            releaseAll() {
+                this.active.forEach(obj => {
+                    this.resetFn(obj);
+                    this.pool.push(obj);
+                });
+                this.active.clear();
+            }
+            
+            getActiveCount() {
+                return this.active.size;
+            }
+        }
+
+        // ============================================
+        // ADAPTIVE QUALITY MANAGER
+        // ============================================
+        
+        class AdaptiveQualityManager {
+            constructor(engine) {
+                this.engine = engine;
+                this.fpsHistory = [];
+                this.historySize = 60; // Track last 60 FPS readings
+                this.lastAdjustTime = 0;
+                this.adjustCooldown = 3000; // Wait 3 seconds between adjustments
+                
+                // Quality levels with their settings
+                this.qualityLevels = {
+                    ultra: {
+                        shadowMapSize: 4096,
+                        pixelRatio: Math.min(window.devicePixelRatio, 2),
+                        shadowsEnabled: true,
+                        postProcessing: true,
+                        particleCount: 1.0,
+                        viewDistance: 300,
+                        lodBias: 0
+                    },
+                    high: {
+                        shadowMapSize: 2048,
+                        pixelRatio: Math.min(window.devicePixelRatio, 1.5),
+                        shadowsEnabled: true,
+                        postProcessing: true,
+                        particleCount: 0.7,
+                        viewDistance: 250,
+                        lodBias: 0.5
+                    },
+                    medium: {
+                        shadowMapSize: 1024,
+                        pixelRatio: Math.min(window.devicePixelRatio, 1),
+                        shadowsEnabled: true,
+                        postProcessing: false,
+                        particleCount: 0.4,
+                        viewDistance: 180,
+                        lodBias: 1
+                    },
+                    low: {
+                        shadowMapSize: 512,
+                        pixelRatio: 1,
+                        shadowsEnabled: false,
+                        postProcessing: false,
+                        particleCount: 0.2,
+                        viewDistance: 120,
+                        lodBias: 2
+                    }
+                };
+            }
+            
+            recordFPS(fps) {
+                this.fpsHistory.push(fps);
+                if (this.fpsHistory.length > this.historySize) {
+                    this.fpsHistory.shift();
+                }
+            }
+            
+            getAverageFPS() {
+                if (this.fpsHistory.length === 0) return 60;
+                return this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
+            }
+            
+            shouldDowngrade() {
+                const avgFPS = this.getAverageFPS();
+                const now = performance.now();
+                
+                // Check cooldown
+                if (now - this.lastAdjustTime < this.adjustCooldown) return false;
+                
+                // Downgrade if average FPS below threshold
+                return avgFPS < CONFIG.AUTO_QUALITY_THRESHOLD;
+            }
+            
+            shouldUpgrade() {
+                const avgFPS = this.getAverageFPS();
+                const now = performance.now();
+                
+                // Check cooldown (longer for upgrades)
+                if (now - this.lastAdjustTime < this.adjustCooldown * 2) return false;
+                
+                // Upgrade if average FPS consistently high
+                return avgFPS > 55 && this.fpsHistory.length >= 30;
+            }
+            
+            applyQuality(level) {
+                const settings = this.qualityLevels[level];
+                if (!settings || !this.engine) return;
+                
+                this.lastAdjustTime = performance.now();
+                
+                // Apply pixel ratio
+                if (this.engine.renderer) {
+                    this.engine.renderer.setPixelRatio(settings.pixelRatio);
+                }
+                
+                // Apply shadow settings
+                if (this.engine.renderer) {
+                    this.engine.renderer.shadowMap.enabled = settings.shadowsEnabled;
+                }
+                
+                if (this.engine.sunLight && this.engine.sunLight.shadow) {
+                    this.engine.sunLight.shadow.mapSize.width = settings.shadowMapSize;
+                    this.engine.sunLight.shadow.mapSize.height = settings.shadowMapSize;
+                }
+                
+                // Update view distance
+                CONFIG.VIEW_DISTANCE = settings.viewDistance;
+                
+                // Update LOD bias
+                CONFIG.LOD_DISTANCES = CONFIG.LOD_DISTANCES.map((d, i) => 
+                    [30, 60, 120][i] - settings.lodBias * 10
+                );
+                
+                console.log(`🎮 Quality adjusted to: ${level} (avg FPS: ${Math.round(this.getAverageFPS())})`);
+            }
+        }
+
+        // ============================================
         // PORTFOLIO DATA - Fun & Engaging
         // ============================================
         
@@ -1038,6 +1207,11 @@
                 this.spatialPartition = new SpatialPartition();
                 this.lodManager = new LODManager();
                 this.cullableObjects = []; // Objects that can be culled
+                this.adaptiveQuality = null; // Initialized after engine setup
+                
+                // Object pools for particles
+                this.dustParticlePool = null;
+                this.smokeParticlePool = null;
                 
                 this.state = {
                     playerMode: 'driving',
@@ -1302,6 +1476,9 @@
                 
                 // Initialize Frustum Culler after camera is created
                 this.frustumCuller = new FrustumCuller(this.camera);
+                
+                // Initialize Adaptive Quality Manager
+                this.adaptiveQuality = new AdaptiveQualityManager(this);
                 
                 // Renderer with PBR support
                 this.renderer = new THREE.WebGLRenderer({
@@ -2892,7 +3069,10 @@
             }
             
             createTrees(count) {
-                // Load tree bark texture
+                // 🎯 PERFORMANCE: Use InstancedMesh for massive draw call reduction
+                // Instead of count * meshes per tree = thousands of draw calls
+                // We use 2 InstancedMesh calls (trunks + foliage) = 2 draw calls total!
+                
                 const textureLoader = new THREE.TextureLoader();
                 const barkTexture = textureLoader.load('https://threejs.org/examples/textures/brick_diffuse.jpg');
                 barkTexture.wrapS = THREE.RepeatWrapping;
@@ -2912,7 +3092,13 @@
                     metalness: 0.0
                 });
                 
-                for (let i = 0; i < count; i++) {
+                // Pre-calculate valid tree positions
+                const treePositions = [];
+                const treeScales = [];
+                
+                for (let i = 0; i < count * 2; i++) { // Generate extra to account for rejected positions
+                    if (treePositions.length >= count) break;
+                    
                     const angle = Math.random() * Math.PI * 2;
                     const radius = 50 + Math.random() * 200;
                     
@@ -2930,73 +3116,79 @@
                     }
                     if (tooClose) continue;
                     
-                    const treeGroup = new THREE.Group();
                     const scale = 0.9 + Math.random() * 0.8;
+                    const rotationY = Math.random() * Math.PI * 2;
                     
-                    // Realistic trunk with taper
-                    const trunkGeom = new THREE.CylinderGeometry(
-                        0.25 * scale,  // top radius
-                        0.45 * scale,  // bottom radius (tapered)
-                        5 * scale,     // height
-                        12,            // segments
-                        3              // height segments for better shape
-                    );
-                    const trunk = new THREE.Mesh(trunkGeom, trunkMaterial);
-                    trunk.position.y = 2.5 * scale;
-                    trunk.castShadow = true;
-                    treeGroup.add(trunk);
+                    treePositions.push({ x, z, rotationY });
+                    treeScales.push(scale);
                     
-                    // Detailed crown with multiple layers
-                    const crownLayers = [
-                        { y: 5.5, r: 2.8, segments: 12 },
-                        { y: 6.5, r: 2.5, segments: 10 },
-                        { y: 7.3, r: 2.0, segments: 10 },
-                        { y: 8.0, r: 1.5, segments: 8 }
-                    ];
-                    
-                    crownLayers.forEach(layer => {
-                        const foliageGeom = new THREE.SphereGeometry(
-                            layer.r * scale,
-                            layer.segments,
-                            layer.segments / 2
-                        );
-                        const foliage = new THREE.Mesh(foliageGeom, leafMaterial);
-                        foliage.position.y = layer.y * scale;
-                        foliage.castShadow = true;
-                        foliage.receiveShadow = true;
-                        treeGroup.add(foliage);
-                    });
-                    
-                    // Add some random foliage clusters for natural look
-                    for (let j = 0; j < 3; j++) {
-                        const clusterGeom = new THREE.SphereGeometry(1.2 * scale, 8, 6);
-                        const cluster = new THREE.Mesh(clusterGeom, leafMaterial);
-                        const angleOffset = (j / 3) * Math.PI * 2;
-                        cluster.position.set(
-                            Math.cos(angleOffset) * 1.5 * scale,
-                            5.5 * scale,
-                            Math.sin(angleOffset) * 1.5 * scale
-                        );
-                        cluster.castShadow = true;
-                        treeGroup.add(cluster);
-                    }
-                    
-                    treeGroup.position.set(x, 0, z);
-                    treeGroup.rotation.y = Math.random() * Math.PI * 2;
-                    
-                    // 🎯 PERFORMANCE: Mark as cullable with bounding radius
-                    treeGroup.userData.cullable = true;
-                    treeGroup.userData.boundingRadius = 10 * scale;
-                    
-                    // Add to spatial partition for efficient queries
-                    this.spatialPartition.add(treeGroup, x, z);
-                    
+                    // Register for collision
                     this.collisionSystem.addTree({ x, z });
                     this.treePositions.push({ x, z });
-                    
-                    this.scene.add(treeGroup);
-                    this.decorations.push(treeGroup);
                 }
+                
+                const treeCount = treePositions.length;
+                if (treeCount === 0) return;
+                
+                // Create shared geometries
+                const trunkGeometry = new THREE.CylinderGeometry(0.35, 0.45, 5, 8, 1);
+                const foliageGeometry = new THREE.SphereGeometry(2.5, 8, 6);
+                
+                // Create InstancedMesh for trunks (1 draw call for all trunks!)
+                const trunkInstances = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, treeCount);
+                trunkInstances.castShadow = true;
+                trunkInstances.receiveShadow = true;
+                
+                // Create InstancedMesh for foliage (1 draw call for all foliage!)
+                const foliageInstances = new THREE.InstancedMesh(foliageGeometry, leafMaterial, treeCount);
+                foliageInstances.castShadow = true;
+                foliageInstances.receiveShadow = true;
+                
+                // Matrix for positioning each instance
+                const matrix = new THREE.Matrix4();
+                const position = new THREE.Vector3();
+                const rotation = new THREE.Quaternion();
+                const scale = new THREE.Vector3();
+                
+                // Position each tree instance
+                for (let i = 0; i < treeCount; i++) {
+                    const treePos = treePositions[i];
+                    const treeScale = treeScales[i];
+                    
+                    // Trunk instance
+                    position.set(treePos.x, 2.5 * treeScale, treePos.z);
+                    rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), treePos.rotationY);
+                    scale.set(treeScale, treeScale, treeScale);
+                    matrix.compose(position, rotation, scale);
+                    trunkInstances.setMatrixAt(i, matrix);
+                    
+                    // Foliage instance (positioned above trunk)
+                    position.set(treePos.x, 6.5 * treeScale, treePos.z);
+                    scale.set(treeScale * 1.2, treeScale * 1.2, treeScale * 1.2);
+                    matrix.compose(position, rotation, scale);
+                    foliageInstances.setMatrixAt(i, matrix);
+                }
+                
+                // Mark for GPU update
+                trunkInstances.instanceMatrix.needsUpdate = true;
+                foliageInstances.instanceMatrix.needsUpdate = true;
+                
+                // Store references for culling/LOD
+                trunkInstances.userData.cullable = true;
+                trunkInstances.userData.isInstancedTrees = true;
+                foliageInstances.userData.cullable = true;
+                foliageInstances.userData.isInstancedTrees = true;
+                
+                // Add to scene
+                this.scene.add(trunkInstances);
+                this.scene.add(foliageInstances);
+                
+                // Store references
+                this.treeInstances = { trunks: trunkInstances, foliage: foliageInstances };
+                this.decorations.push(trunkInstances);
+                this.decorations.push(foliageInstances);
+                
+                console.log(`🌳 Trees: ${treeCount} trees rendered with only 2 draw calls (was ${treeCount * 8} draw calls)`);
             }
             
             createDecorations() {
@@ -4749,19 +4941,50 @@
                 const displayFps = Math.min(Math.max(this.fps, 0), 999);
                 document.getElementById('fpsCounter').textContent = `${displayFps} FPS`;
                 
-                // Auto-quality adjustment
-                if (this.fps < CONFIG.AUTO_QUALITY_THRESHOLD && this.state.quality !== 'low') {
-                    if (this.state.quality === 'ultra') {
-                        document.getElementById('qualitySelect').value = 'high';
-                        this.applyQuality('high');
-                    } else if (this.state.quality === 'high') {
-                        document.getElementById('qualitySelect').value = 'medium';
-                        this.applyQuality('medium');
-                    } else if (this.fps < 20) {
-                        document.getElementById('qualitySelect').value = 'low';
-                        this.applyQuality('low');
+                // 🎯 PERFORMANCE: Record FPS for adaptive quality
+                if (this.adaptiveQuality) {
+                    this.adaptiveQuality.recordFPS(this.fps);
+                    
+                    // Check if we should adjust quality
+                    if (this.adaptiveQuality.shouldDowngrade() && this.state.quality !== 'low') {
+                        const levels = ['ultra', 'high', 'medium', 'low'];
+                        const currentIndex = levels.indexOf(this.state.quality);
+                        if (currentIndex < levels.length - 1) {
+                            const newLevel = levels[currentIndex + 1];
+                            document.getElementById('qualitySelect').value = newLevel;
+                            this.applyQuality(newLevel);
+                            this.adaptiveQuality.applyQuality(newLevel);
+                            this.showToast('⚙️', 'Quality Adjusted', `Lowered to ${newLevel} for better performance`);
+                        }
+                    } else if (this.adaptiveQuality.shouldUpgrade() && this.state.quality !== 'ultra') {
+                        const levels = ['ultra', 'high', 'medium', 'low'];
+                        const currentIndex = levels.indexOf(this.state.quality);
+                        if (currentIndex > 0) {
+                            const newLevel = levels[currentIndex - 1];
+                            document.getElementById('qualitySelect').value = newLevel;
+                            this.applyQuality(newLevel);
+                            this.adaptiveQuality.applyQuality(newLevel);
+                            this.showToast('⚙️', 'Quality Adjusted', `Raised to ${newLevel}`);
+                        }
                     }
                 }
+            }
+            
+            // 🎯 PERFORMANCE: Get renderer stats for debugging
+            getPerformanceStats() {
+                if (!this.renderer) return {};
+                
+                const info = this.renderer.info;
+                return {
+                    drawCalls: info.render.calls,
+                    triangles: info.render.triangles,
+                    points: info.render.points,
+                    lines: info.render.lines,
+                    textures: info.memory.textures,
+                    geometries: info.memory.geometries,
+                    fps: this.fps,
+                    quality: this.state.quality
+                };
             }
         }
 

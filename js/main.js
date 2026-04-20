@@ -1743,10 +1743,10 @@
                 
                 // 🎨 NEW: Color Grading for vibrant look
                 this.colorGradingPass = new ShaderPass(ColorGradingShader);
-                this.colorGradingPass.uniforms['brightness'].value = 0.08;  // Brighter
-                this.colorGradingPass.uniforms['contrast'].value = 1.1;     // More contrast
-                this.colorGradingPass.uniforms['saturation'].value = 1.25;  // More vibrant colors
-                this.colorGradingPass.uniforms['gamma'].value = 0.95;       // Slightly brighter mids
+                this.colorGradingPass.uniforms['brightness'].value = 0.1;   // Brighter
+                this.colorGradingPass.uniforms['contrast'].value = 1.15;   // More punch
+                this.colorGradingPass.uniforms['saturation'].value = 1.4;  // Much more vibrant
+                this.colorGradingPass.uniforms['gamma'].value = 0.9;       // Brighter mids
                 this.composer.addPass(this.colorGradingPass);
                 
                 // 🎨 NEW: Vignette for cinematic edges - reduced for brighter look
@@ -1773,17 +1773,17 @@
             }
             
             async createScene() {
-                // Simple gradient sky background
-                this.scene.background = new THREE.Color(0x87CEEB); // Sky blue
+                // Vibrant sky background
+                this.scene.background = new THREE.Color(0x4a90d9); // Richer blue
                 
                 // Create hemisphere sky dome for gradient effect
                 const skyGeo = new THREE.SphereGeometry(1000, 32, 15);
                 this.skyMaterial = new THREE.ShaderMaterial({
                     uniforms: {
-                        topColor: { value: new THREE.Color(0x0077ff) }, // Deep blue
-                        bottomColor: { value: new THREE.Color(0x89CFF0) }, // Light blue
-                        offset: { value: 33 },
-                        exponent: { value: 0.6 }
+                        topColor: { value: new THREE.Color(0x1e5799) },    // Deep rich blue
+                        bottomColor: { value: new THREE.Color(0x7ec8e3) }, // Bright sky blue
+                        offset: { value: 20 },
+                        exponent: { value: 0.4 }
                     },
                     vertexShader: `
                         varying vec3 vWorldPosition;
@@ -1813,12 +1813,12 @@
                 // Add clouds
                 this.createClouds();
                 
-                // Light atmospheric fog
-                const fogColor = new THREE.Color(0xC8E0F0);
-                this.scene.fog = new THREE.FogExp2(fogColor, 0.001);
+                // Reduced fog for less washed-out look
+                const fogColor = new THREE.Color(0x7ec8e3);
+                this.scene.fog = new THREE.FogExp2(fogColor, 0.0005); // Halved fog density
                 
                 // Main directional light (sun)
-                this.sunLight = new THREE.DirectionalLight(0xFFFFF0, 2.0);
+                this.sunLight = new THREE.DirectionalLight(0xFFFFF0, 2.5); // Brighter sun
                 this.sunLight.position.set(100, 150, 100);
                 
                 if (this.state.quality !== 'low') {
@@ -1840,11 +1840,11 @@
                 this.scene.add(this.sunLight);
                 
                 // Ambient light (sky color) - increased for vibrancy
-                this.ambientLight = new THREE.AmbientLight(0x87CEEB, 0.6);
+                this.ambientLight = new THREE.AmbientLight(0x87CEEB, 0.7);
                 this.scene.add(this.ambientLight);
                 
-                // Hemisphere light for realistic outdoor lighting - increased
-                this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3D5C3D, 0.8);
+                // Hemisphere light for realistic outdoor lighting - strong ground bounce
+                this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x4a7c3f, 1.0); // Sky blue + grass green
                 this.scene.add(this.hemiLight);
                 
                 // Ground with custom shader

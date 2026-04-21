@@ -3375,12 +3375,15 @@
                                 const interiorMat = new THREE.MeshBasicMaterial({
                                     color: interiorColor,
                                     side: THREE.FrontSide,
-                                    depthWrite: true
+                                    depthWrite: true,
+                                    polygonOffset: true,
+                                    polygonOffsetFactor: 4,
+                                    polygonOffsetUnits: 4
                                 });
                                 const interiorGeom = new THREE.PlaneGeometry(windowWidth - 0.3, windowHeight - 0.3);
                                 const interior = new THREE.Mesh(interiorGeom, interiorMat);
-                                interior.position.z = -0.25; // Push further back
-                                interior.renderOrder = 0;
+                                interior.position.z = -0.5; // Push much further back
+                                interior.renderOrder = -1;
                                 windowGroup.add(interior);
                                 
                                 // Window frame (dark aluminum)
@@ -3455,15 +3458,15 @@
                                     clearcoat: 0.8,
                                     clearcoatRoughness: 0.15,
                                     depthWrite: false,
-                                    polygonOffset: true,        // Fix z-fighting
-                                    polygonOffsetFactor: -2,
-                                    polygonOffsetUnits: -2
+                                    polygonOffset: true,
+                                    polygonOffsetFactor: -4,
+                                    polygonOffsetUnits: -4
                                 });
                                 
                                 const glassGeom = new THREE.PlaneGeometry(windowWidth - 0.15, windowHeight - 0.15);
                                 const glass = new THREE.Mesh(glassGeom, glassMat);
-                                glass.position.z = 0.08; // Further forward to prevent z-fighting
-                                glass.renderOrder = 2;   // Render after interior
+                                glass.position.z = 0.15; // Much further forward to prevent z-fighting
+                                glass.renderOrder = 10;   // Render well after interior
                                 windowGroup.add(glass);
                                 
                                 // Optional blinds/curtains
@@ -3476,12 +3479,16 @@
                                         color: blindsColor,
                                         roughness: 0.9,
                                         metalness: 0.0,
-                                        side: THREE.DoubleSide
+                                        side: THREE.DoubleSide,
+                                        polygonOffset: true,
+                                        polygonOffsetFactor: 2,
+                                        polygonOffsetUnits: 2
                                     });
                                     
                                     const blindsGeom = new THREE.PlaneGeometry(windowWidth - 0.3, blindsHeight);
                                     const blinds = new THREE.Mesh(blindsGeom, blindsMat);
-                                    blinds.position.set(0, blindsY, -0.05);
+                                    blinds.position.set(0, blindsY, -0.25); // Position between interior and glass
+                                    blinds.renderOrder = 1;
                                     windowGroup.add(blinds);
                                 }
                                 

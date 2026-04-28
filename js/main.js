@@ -793,9 +793,7 @@
                             title: "Previous Roles",
                             items: [
                                 "PaydHQ — Backend for ~30k users, real-time payments",
-                                "Safaricom — SRE at telecom scale, millions of users",
-                                "25% fewer deployment failures, 15% uptime improvement"
-                            ]
+                                "Safaricom — SRE at telecom scale, millions of users"                            ]
                         }
                     ]
                 }

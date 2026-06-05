@@ -226,6 +226,79 @@
         }
 
         // ============================================
+        // COMBO SCORING SYSTEM
+        // ============================================
+        
+        class ComboSystem {
+            constructor() {
+                this.score = parseInt(localStorage.getItem('portfolio_score') || '0');
+                this.multiplier = 1;
+                this.comboTimer = 0;
+                this.comboDecay = 3.0; // seconds before combo resets
+                this.lastDriftTime = 0;
+                this.driftAccum = 0;
+                this.scoreEl = null;
+                this.multiplierEl = null;
+                this.floatContainer = null;
+            }
+            
+            init() {
+                this.scoreEl = document.getElementById('comboScore');
+                this.multiplierEl = document.getElementById('comboMultiplier');
+                this.floatContainer = document.getElementById('floatingScores');
+                this.updateDisplay();
+            }
+            
+            addScore(points, label, x, y) {
+                const actual = Math.round(points * this.multiplier);
+                this.score += actual;
+                this.comboTimer = this.comboDecay;
+                this.multiplier = Math.min(this.multiplier + 0.2, 5);
+                
+                // Save periodically
+                if (this.score % 100 < actual) {
+                    localStorage.setItem('portfolio_score', this.score.toString());
+                }
+                
+                this.updateDisplay();
+                this.showFloatingScore(`+${actual} ${label}`, x, y);
+            }
+            
+            update(delta) {
+                if (this.comboTimer > 0) {
+                    this.comboTimer -= delta;
+                    if (this.comboTimer <= 0) {
+                        this.multiplier = 1;
+                        this.updateDisplay();
+                    }
+                }
+            }
+            
+            updateDisplay() {
+                if (this.scoreEl) this.scoreEl.textContent = this.score;
+                if (this.multiplierEl) {
+                    if (this.multiplier > 1) {
+                        this.multiplierEl.style.display = 'block';
+                        this.multiplierEl.textContent = `x${this.multiplier.toFixed(1)}`;
+                    } else {
+                        this.multiplierEl.style.display = 'none';
+                    }
+                }
+            }
+            
+            showFloatingScore(text, x, y) {
+                if (!this.floatContainer) return;
+                const el = document.createElement('div');
+                el.className = 'floating-score';
+                el.textContent = text;
+                el.style.left = (x || (window.innerWidth - 100)) + 'px';
+                el.style.top = (y || (window.innerHeight - 100)) + 'px';
+                this.floatContainer.appendChild(el);
+                setTimeout(() => el.remove(), 1300);
+            }
+        }
+
+        // ============================================
         // CONFIGURATION
         // ============================================
         
@@ -977,6 +1050,13 @@
                 this.speed = 0;           // Signed speed (+ forward, - backward)
                 this.angularVelocity = 0;
                 
+                // Drift / slip-angle state
+                this.slipAngle = 0;
+                this.rearGrip = 1.0;
+                this.isDrifting = false;
+                this.driftAngle = 0;
+                this.velocityHeading = 0; // Direction velocity is actually moving
+                
                 // Steering
                 this.steerAngle = 0;
                 this.targetSteerAngle = 0;
@@ -1024,61 +1104,57 @@
                 const baseFriction = this.isOnRoad ? CONFIG.ROAD_FRICTION : CONFIG.GRASS_FRICTION;
                 const friction = this.isGrounded ? baseFriction : baseFriction * CONFIG.AIR_CONTROL;
                 
-                // --- STEERING ---
-                this.targetSteerAngle = input.steer * CONFIG.MAX_STEER_ANGLE;
+                // --- SPEED-ADAPTIVE STEERING ---
+                const speedNorm = Math.min(Math.abs(this.speed) / CONFIG.MAX_SPEED, 1.0);
+                const maxAngle = CONFIG.MAX_STEER_ANGLE * (1.0 - speedNorm * 0.55);
+                this.targetSteerAngle = input.steer * maxAngle;
                 
-                // Smooth steering (faster to turn, slower to return)
-                const steerSpeed = Math.abs(this.targetSteerAngle) > Math.abs(this.steerAngle) 
-                    ? CONFIG.STEER_SPEED : CONFIG.STEER_RETURN_SPEED;
+                // Instant response at low speed, damped at high speed
+                const steerResponse = THREE.MathUtils.lerp(12.0, 3.5, speedNorm);
                 this.steerAngle = THREE.MathUtils.lerp(
                     this.steerAngle, 
                     this.targetSteerAngle, 
-                    steerSpeed * delta
+                    steerResponse * delta
                 );
                 
-                // Reduce steering effectiveness at high speed (understeer) and in air
-                const speedFactor = 1 - (Math.abs(this.speed) / CONFIG.MAX_SPEED) * 0.4;
-                const airFactor = this.isGrounded ? 1 : CONFIG.AIR_CONTROL;
-                const effectiveSteer = this.steerAngle * speedFactor * airFactor;
+                // Instant return to center when no input
+                if (Math.abs(input.steer) < 0.01) {
+                    this.steerAngle *= Math.pow(0.001, delta);
+                }
                 
-                // --- ACCELERATION & BRAKING ---
+                const airFactor = this.isGrounded ? 1 : CONFIG.AIR_CONTROL;
+                const effectiveSteer = this.steerAngle * airFactor;
+                
+                // --- NON-LINEAR ACCELERATION & BRAKING ---
                 let accelerationForce = 0;
                 const isMovingForward = this.speed > 0.1;
                 const isMovingBackward = this.speed < -0.1;
                 
-                // Only accelerate when grounded (or reduced in air)
                 const accelMultiplier = this.isGrounded ? 1 : 0.2;
                 
                 if (input.throttle > 0) {
-                    // Accelerating forward
                     const maxSpeed = input.boost ? CONFIG.MAX_SPEED * CONFIG.BOOST_MULTIPLIER : CONFIG.MAX_SPEED;
+                    // Non-linear power curve: explosive start, tapering at top
+                    const powerCurve = 1.0 - Math.pow(Math.abs(this.speed) / maxSpeed, 1.8);
                     if (this.speed < maxSpeed) {
-                        accelerationForce = CONFIG.ACCELERATION * input.throttle * friction * accelMultiplier;
-                        if (input.boost) accelerationForce *= 1.3;
+                        accelerationForce = CONFIG.ACCELERATION * input.throttle * friction * accelMultiplier * Math.max(powerCurve, 0.1);
+                        if (input.boost) accelerationForce *= 1.5;
                     }
                 } else if (input.brake > 0) {
                     if (isMovingForward) {
-                        // Braking while moving forward
                         accelerationForce = -CONFIG.BRAKE_FORCE * input.brake * friction * accelMultiplier;
                     } else if (this.speed > -CONFIG.REVERSE_MAX_SPEED) {
-                        // Reversing
                         accelerationForce = -CONFIG.ACCELERATION * 0.5 * input.brake * friction * accelMultiplier;
                     }
                 }
                 
                 // --- RESISTANCE FORCES ---
-                // Rolling resistance (only when grounded)
                 const rollingResistance = this.isGrounded 
                     ? -Math.sign(this.speed) * CONFIG.ROLLING_RESISTANCE * CONFIG.CAR_MASS * CONFIG.GRAVITY
                     : 0;
-                
-                // Air resistance (quadratic)
                 const airResistance = -CONFIG.AIR_RESISTANCE * this.speed * Math.abs(this.speed);
                 
-                // Total acceleration
                 const totalAcceleration = accelerationForce + (rollingResistance + airResistance) / CONFIG.CAR_MASS;
-                
-                // Update speed
                 this.speed += totalAcceleration * delta;
                 
                 // Natural stop at very low speeds
@@ -1087,60 +1163,79 @@
                     if (Math.abs(this.speed) < 0.01) this.speed = 0;
                 }
                 
-                // --- TURNING ---
+                // --- TURNING WITH SLIP-ANGLE DRIFT ---
                 if (Math.abs(this.speed) > 0.5 && Math.abs(effectiveSteer) > 0.001) {
-                    // Ackermann-ish steering: turn rate depends on speed and steer angle
                     const wheelBase = CONFIG.CAR_LENGTH * 0.6;
                     const tanSteer = Math.tan(Math.abs(effectiveSteer));
-                    // Prevent division by zero or very small numbers
                     const turnRadius = tanSteer > 0.001 ? wheelBase / tanSteer : 1000;
                     const angularVel = this.speed / turnRadius * Math.sign(effectiveSteer);
                     
-                    // Reduced turning in air
                     const turnMultiplier = this.isGrounded ? 1 : CONFIG.AIR_CONTROL;
-                    this.rotation += angularVel * delta * turnMultiplier;
+                    this.angularVelocity = angularVel * turnMultiplier;
+                    this.rotation += this.angularVelocity * delta;
+                } else {
+                    this.angularVelocity *= 0.9; // Decay
                 }
+                
+                // --- SLIP-ANGLE DRIFT PHYSICS ---
+                if (this.isGrounded && Math.abs(this.speed) > 3) {
+                    // Calculate velocity heading vs car heading
+                    this.velocityHeading = Math.atan2(this.velocityX, this.velocityZ);
+                    let rawSlip = this.rotation - this.velocityHeading;
+                    // Normalize to -PI..PI
+                    while (rawSlip > Math.PI) rawSlip -= Math.PI * 2;
+                    while (rawSlip < -Math.PI) rawSlip += Math.PI * 2;
+                    this.slipAngle = rawSlip;
+                    
+                    // Rear grip loss: speed × steer = less grip
+                    const gripLoss = speedNorm * Math.abs(this.steerAngle / CONFIG.MAX_STEER_ANGLE) * 1.8;
+                    // Grass has much less grip
+                    const surfaceGrip = this.isOnRoad ? 1.0 : 0.5;
+                    this.rearGrip = Math.max(0.15, (1.0 - gripLoss) * surfaceGrip);
+                    
+                    // Countersteer recovers grip
+                    if (Math.abs(this.slipAngle) > 0.1 && Math.sign(input.steer) !== Math.sign(this.slipAngle)) {
+                        this.rearGrip = Math.min(1.0, this.rearGrip + 0.4);
+                    }
+                    
+                    // Drift threshold
+                    this.isDrifting = Math.abs(this.slipAngle) > 0.15 && this.rearGrip < 0.7;
+                    this.driftAngle = this.slipAngle;
+                    
+                    // Apply lateral slide when grip is low
+                    if (this.rearGrip < 0.9) {
+                        const slideForce = Math.sin(this.slipAngle) * Math.abs(this.speed) * (1 - this.rearGrip) * 0.4;
+                        this.x += Math.cos(this.rotation) * slideForce * delta;
+                        this.z -= Math.sin(this.rotation) * slideForce * delta;
+                    }
+                } else {
+                    this.slipAngle *= 0.9;
+                    this.rearGrip = 1.0;
+                    this.isDrifting = false;
+                    this.driftAngle = 0;
+                }
+                
+                // --- STRONGER BODY PITCH ON BRAKE ---
+                const brakePitchTarget = (input.brake > 0 && isMovingForward) 
+                    ? -0.1 * Math.min(Math.abs(this.speed) / 15, 1)
+                    : (input.throttle > 0 ? 0.03 * input.throttle : 0);
                 
                 // --- GRAVITY & VERTICAL PHYSICS ---
                 if (!this.isGrounded) {
-                    // Apply gravity
                     this.velocityY -= CONFIG.GRAVITY * delta;
-                    // Terminal velocity cap
                     this.velocityY = Math.max(this.velocityY, -50);
                 }
                 
-                // Update vertical position
                 this.y += this.velocityY * delta;
                 
-                // Ground collision - STRICT enforcement
-                // The ground has slight height variation from terrain
                 const terrainHeight = this.getTerrainHeight(this.x, this.z);
                 
                 if (this.y <= terrainHeight) {
                     this.y = terrainHeight;
                     if (this.velocityY < -2) {
-                        // Hard landing - bounce slightly and lose some speed
                         this.landingImpact = Math.abs(this.velocityY);
                         this.velocityY = Math.abs(this.velocityY) * 0.15;
                         this.speed *= 0.9;
-                        
-                        // ⚡ GAME FEEL: Three-tier impact system
-                        const impactIntensity = this.landingImpact / 15; // Normalize
-                        if (this.landingImpact > 8) {
-                            // Heavy impact
-                            this.triggerScreenShake(0.8);
-                            this.playCollisionSound(1.0);
-                            this.spawnLandingParticles(15);
-                        } else if (this.landingImpact > 4) {
-                            // Medium impact
-                            this.triggerScreenShake(0.4);
-                            this.playCollisionSound(0.6);
-                            this.spawnLandingParticles(8);
-                        } else {
-                            // Light impact
-                            this.triggerScreenShake(0.15);
-                            this.spawnLandingParticles(4);
-                        }
                     } else {
                         this.velocityY = 0;
                         this.landingImpact = 0;
@@ -1151,7 +1246,6 @@
                     this.landingImpact = 0;
                 }
                 
-                // SAFETY: Absolutely never go below terrain or 0
                 this.y = Math.max(this.y, Math.max(0, terrainHeight));
                 
                 // --- UPDATE HORIZONTAL POSITION ---
@@ -1164,57 +1258,75 @@
                 this.x += this.velocityX * delta;
                 this.z += this.velocityZ * delta;
                 
-                // --- COLLISION DETECTION ---
+                // --- COLLISION DETECTION WITH REFLECTION BOUNCE ---
                 const collision = collisionSystem.checkCollision(this.x, this.z, CONFIG.CAR_COLLISION_RADIUS);
                 
                 if (collision.collided) {
                     this.isColliding = true;
                     
-                    // Push car out of collision
+                    // Push car out
                     this.x += collision.pushX;
                     this.z += collision.pushZ;
                     
-                    // Reduce speed on collision (bounce/impact)
-                    this.speed *= (1 - CONFIG.COLLISION_BOUNCE);
+                    // Reflection bounce: deflect velocity off collision normal
+                    const normalLen = Math.sqrt(collision.pushX * collision.pushX + collision.pushZ * collision.pushZ);
+                    if (normalLen > 0.001) {
+                        const nx = collision.pushX / normalLen;
+                        const nz = collision.pushZ / normalLen;
+                        const dot = this.velocityX * nx + this.velocityZ * nz;
+                        if (dot < 0) {
+                            this.velocityX -= 2 * dot * nx * CONFIG.COLLISION_BOUNCE;
+                            this.velocityZ -= 2 * dot * nz * CONFIG.COLLISION_BOUNCE;
+                            // Recalculate speed and rotation from reflected velocity
+                            this.speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityZ * this.velocityZ) * Math.sign(this.speed);
+                            this.speed *= (1 - CONFIG.COLLISION_BOUNCE);
+                            this.rotation = Math.atan2(this.velocityX, this.velocityZ);
+                        }
+                    } else {
+                        this.speed *= (1 - CONFIG.COLLISION_BOUNCE);
+                    }
                     
-                    // Add small random rotation on impact for realism
-                    this.rotation += (Math.random() - 0.5) * 0.1 * Math.abs(this.speed) / CONFIG.MAX_SPEED;
+                    // Larger rotation on impact
+                    this.rotation += (Math.random() - 0.5) * 0.25 * Math.min(Math.abs(this.speed) / CONFIG.MAX_SPEED, 1);
                 } else {
                     this.isColliding = false;
                 }
                 
                 // --- SUSPENSION / BODY DYNAMICS ---
-                // Extra pitch when airborne (nose up slightly)
                 const airPitch = this.isGrounded ? 0 : -0.1;
                 
-                // Body roll (leaning in turns)
+                // Body roll (enhanced during drift)
                 const lateralG = this.speed * this.angularVelocity;
-                const targetRoll = -lateralG * CONFIG.BODY_ROLL_FACTOR;
+                const driftRoll = this.isDrifting ? this.slipAngle * 0.15 : 0;
+                const targetRoll = -lateralG * CONFIG.BODY_ROLL_FACTOR + driftRoll;
                 this.bodyRoll = THREE.MathUtils.lerp(this.bodyRoll, targetRoll, CONFIG.SUSPENSION_DAMPING * delta);
-                this.bodyRoll = THREE.MathUtils.clamp(this.bodyRoll, -0.15, 0.15);
+                this.bodyRoll = THREE.MathUtils.clamp(this.bodyRoll, -0.2, 0.2);
                 
-                // Body pitch (nose dive on brake, squat on accel, up when airborne)
-                const targetPitch = this.isGrounded 
-                    ? -accelerationForce * CONFIG.PITCH_FACTOR * 0.01
-                    : airPitch;
-                this.bodyPitch = THREE.MathUtils.lerp(this.bodyPitch, targetPitch, CONFIG.SUSPENSION_DAMPING * delta);
+                // Body pitch (stronger nose-dive on brake)
+                const targetPitch = this.isGrounded ? brakePitchTarget : airPitch;
+                this.bodyPitch = THREE.MathUtils.lerp(this.bodyPitch, targetPitch, 8 * delta);
                 this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch, -0.15, 0.15);
                 
                 return {
                     x: this.x,
                     z: this.z,
-                    y: this.y + 0.5, // Car height offset
+                    y: this.y + 0.5,
                     rotation: this.rotation,
                     steerAngle: this.steerAngle,
                     bodyRoll: this.bodyRoll,
                     bodyPitch: this.bodyPitch,
                     speed: this.speed,
-                    speedKmh: Math.abs(this.speed * 3.6), // Convert m/s to km/h
+                    speedKmh: Math.abs(this.speed * 3.6),
                     isOnRoad: this.isOnRoad,
                     isColliding: this.isColliding,
                     isGrounded: this.isGrounded,
                     isAirborne: !this.isGrounded,
-                    landingImpact: this.landingImpact
+                    landingImpact: this.landingImpact,
+                    angularVelocity: this.angularVelocity,
+                    isDrifting: this.isDrifting,
+                    slipAngle: this.slipAngle,
+                    rearGrip: this.rearGrip,
+                    driftAngle: this.driftAngle
                 };
             }
         }
@@ -1427,6 +1539,9 @@
                 // Camera shake system
                 this.cameraShake = new CameraShake();
                 
+                // Combo scoring system
+                this.combo = new ComboSystem();
+                
                 // Object pools for particles
                 this.dustParticlePool = null;
                 this.smokeParticlePool = null;
@@ -1509,6 +1624,7 @@
                     this.updateLoadingProgress(80);
                     
                     this.setupEventListeners();
+                    this.combo.init();
                     this.updateLoadingProgress(90);
                     
                     // Position car at start
@@ -1626,8 +1742,9 @@
             }
             
             triggerScreenShake(intensity = 1) {
-                // Screen shake disabled - was causing discomfort
-                return;
+                if (this.cameraShake) {
+                    this.cameraShake.addTrauma(intensity * 0.4);
+                }
             }
             
             setBoostLines(active) {
@@ -1731,72 +1848,86 @@
                 
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
                 
-                // Adaptive pixel ratio for sharpness without killing performance
-                // Mobile: 1.5x max, Desktop: 2x max (limited to device pixel ratio)
-                const maxPixelRatio = this.state.isMobile ? 1.5 : 2;
+                // Adaptive pixel ratio: aggressive cap for performance
+                const maxPixelRatio = this.state.isMobile ? 1.0 : 
+                    (this.state.quality === 'low' ? 1.0 : 
+                     this.state.quality === 'medium' ? 1.5 : 2);
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
                 
-                // Enhanced shadow mapping
-                this.renderer.shadowMap.enabled = true;
-                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows always
-                this.renderer.shadowMap.autoUpdate = true;
+                // Shadow mapping: quality-dependent
+                this.renderer.shadowMap.enabled = this.state.quality !== 'low';
+                this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
                 
                 // Better color management
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace;
                 this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-                this.renderer.toneMappingExposure = 1.4;  // Brighter exposure
+                this.renderer.toneMappingExposure = 1.2;  // Slightly reduced from 1.4
                 
                 container.appendChild(this.renderer.domElement);
                 
-                // Post-processing for enhanced visuals
+                // Post-processing - quality-dependent pipeline
                 this.composer = new EffectComposer(this.renderer);
                 this.composer.addPass(new RenderPass(this.scene, this.camera));
                 
-                // SMAA anti-aliasing (better than FXAA, works on all devices)
-                const smaaPass = new SMAAPass(
-                    window.innerWidth * this.renderer.getPixelRatio(),
-                    window.innerHeight * this.renderer.getPixelRatio()
-                );
-                this.composer.addPass(smaaPass);
+                // SMAA only on high/ultra (expensive full-screen pass)
+                if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                    const smaaPass = new SMAAPass(
+                        window.innerWidth * this.renderer.getPixelRatio(),
+                        window.innerHeight * this.renderer.getPixelRatio()
+                    );
+                    this.composer.addPass(smaaPass);
+                }
                 
-                // Subtle bloom for realistic glow (optimized settings)
+                // Bloom on medium+ (half-res for performance)
                 this.bloomPass = new UnrealBloomPass(
                     new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2),
-                    0.22,  // Strength - slightly increased for better glow
-                    0.5,   // Radius
-                    0.85   // Threshold - only bright spots
+                    0.2,   // Strength
+                    0.4,   // Radius
+                    0.88   // Threshold - only bright spots
                 );
-                this.composer.addPass(this.bloomPass);
+                if (this.state.quality !== 'low') {
+                    this.composer.addPass(this.bloomPass);
+                }
                 
-                // 🎨 NEW: Color Grading for vibrant look
+                // Color Grading only on high/ultra
                 this.colorGradingPass = new ShaderPass(ColorGradingShader);
-                this.colorGradingPass.uniforms['brightness'].value = 0.1;   // Brighter
-                this.colorGradingPass.uniforms['contrast'].value = 1.15;   // More punch
-                this.colorGradingPass.uniforms['saturation'].value = 1.4;  // Much more vibrant
-                this.colorGradingPass.uniforms['gamma'].value = 0.9;       // Brighter mids
-                this.composer.addPass(this.colorGradingPass);
+                this.colorGradingPass.uniforms['brightness'].value = 0.05;
+                this.colorGradingPass.uniforms['contrast'].value = 1.08;
+                this.colorGradingPass.uniforms['saturation'].value = 1.15;
+                this.colorGradingPass.uniforms['gamma'].value = 0.95;
+                if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                    this.composer.addPass(this.colorGradingPass);
+                }
                 
-                // 🎨 NEW: Vignette for cinematic edges - reduced for brighter look
+                // Vignette only on ultra
                 this.vignettePass = new ShaderPass(VignetteShader);
-                this.vignettePass.uniforms['offset'].value = 1.0;     // Further from center
-                this.vignettePass.uniforms['darkness'].value = 1.0;   // Lighter vignette
-                this.composer.addPass(this.vignettePass);
+                this.vignettePass.uniforms['offset'].value = 1.2;
+                this.vignettePass.uniforms['darkness'].value = 1.2;
+                if (this.state.quality === 'ultra') {
+                    this.composer.addPass(this.vignettePass);
+                }
                 
-                // 🎨 NEW: Film Grain for texture (disabled by default, enable on high quality)
+                // Film Grain only on ultra
                 this.filmGrainPass = new ShaderPass(FilmGrainShader);
-                this.filmGrainPass.uniforms['intensity'].value = 0.03; // Very subtle
-                this.filmGrainPass.enabled = this.state.quality === 'ultra'; // Only on ultra
-                this.composer.addPass(this.filmGrainPass);
+                this.filmGrainPass.uniforms['intensity'].value = 0.02;
+                this.filmGrainPass.enabled = this.state.quality === 'ultra';
+                if (this.state.quality === 'ultra') {
+                    this.composer.addPass(this.filmGrainPass);
+                }
                 
-                // 🎨 NEW: Motion Blur for speed feel
+                // Motion Blur only on high/ultra
                 this.motionBlurPass = new ShaderPass(MotionBlurShader);
                 this.motionBlurPass.uniforms['velocity'].value = 0;
-                this.motionBlurPass.uniforms['maxBlur'].value = 0.015;
-                this.motionBlurPass.enabled = this.state.quality !== 'low';
-                this.composer.addPass(this.motionBlurPass);
+                this.motionBlurPass.uniforms['maxBlur'].value = 0.012;
+                if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                    this.composer.addPass(this.motionBlurPass);
+                }
                 
-                // Output pass for proper color space
+                // Output pass
                 this.composer.addPass(new OutputPass());
+                
+                // Flag: on low quality, bypass composer entirely in animate()
+                this.useComposer = this.state.quality !== 'low';
             }
             
             async createScene() {
@@ -1850,8 +1981,8 @@
                 
                 if (this.state.quality !== 'low') {
                     this.sunLight.castShadow = true;
-                    this.sunLight.shadow.mapSize.width = this.state.isMobile ? 1024 : 2048;
-                    this.sunLight.shadow.mapSize.height = this.state.isMobile ? 1024 : 2048;
+                    this.sunLight.shadow.mapSize.width = this.state.isMobile ? 512 : (this.state.quality === 'low' ? 512 : 1024);
+                    this.sunLight.shadow.mapSize.height = this.state.isMobile ? 512 : (this.state.quality === 'low' ? 512 : 1024);
                     this.sunLight.shadow.bias = -0.0001;
                     this.sunLight.shadow.camera.near = 0.5;
                     this.sunLight.shadow.camera.far = 500;
@@ -4734,6 +4865,7 @@
                 // Track visited section
                 if (!this.state.sectionsVisited.has(title)) {
                     this.state.sectionsVisited.add(title);
+                    if (this.combo) this.combo.addScore(200, '🏢 EXPLORE');
                     
                     // Check if this was the first section
                     if (this.state.sectionsVisited.size === 1 && 
@@ -4776,34 +4908,31 @@
                 this.state.quality = quality;
                 
                 this.renderer.shadowMap.enabled = quality !== 'low';
-                this.camera.far = quality === 'ultra' ? 1500 : quality === 'high' ? 1000 : 500;
+                this.camera.far = quality === 'ultra' ? 1500 : quality === 'high' ? 1000 : 400;
                 this.camera.updateProjectionMatrix();
                 
-                // Update shadow quality
+                // Shadow map size based on quality
                 if (this.sunLight && this.sunLight.shadow) {
-                    this.sunLight.shadow.mapSize.width = quality === 'ultra' ? 4096 : 2048;
-                    this.sunLight.shadow.mapSize.height = quality === 'ultra' ? 4096 : 2048;
+                    const shadowSize = quality === 'ultra' ? 2048 : quality === 'high' ? 1024 : 512;
+                    this.sunLight.shadow.mapSize.width = shadowSize;
+                    this.sunLight.shadow.mapSize.height = shadowSize;
                 }
                 
-                // 🎨 Update post-processing effects based on quality
-                if (this.colorGradingPass) {
-                    this.colorGradingPass.enabled = quality !== 'low';
-                }
-                if (this.vignettePass) {
-                    this.vignettePass.enabled = quality !== 'low';
-                    // Stronger vignette on ultra
-                    this.vignettePass.uniforms['darkness'].value = quality === 'ultra' ? 1.5 : 1.3;
-                }
-                if (this.filmGrainPass) {
-                    this.filmGrainPass.enabled = quality === 'ultra';
-                }
-                if (this.bloomPass) {
-                    this.bloomPass.enabled = quality !== 'low';
-                }
+                // Pixel ratio
+                const maxPR = quality === 'low' ? 1.0 : quality === 'medium' ? 1.5 : 2;
+                this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPR));
+                
+                // On low, bypass composer entirely
+                this.useComposer = quality !== 'low';
+                
+                // Post-processing toggles
+                if (this.colorGradingPass) this.colorGradingPass.enabled = (quality === 'high' || quality === 'ultra');
+                if (this.vignettePass) this.vignettePass.enabled = quality === 'ultra';
+                if (this.filmGrainPass) this.filmGrainPass.enabled = quality === 'ultra';
+                if (this.bloomPass) this.bloomPass.enabled = quality !== 'low';
                 if (this.motionBlurPass) {
-                    this.motionBlurPass.enabled = quality !== 'low';
-                    // Stronger motion blur on ultra
-                    this.motionBlurPass.uniforms['maxBlur'].value = quality === 'ultra' ? 0.02 : 0.012;
+                    this.motionBlurPass.enabled = (quality === 'high' || quality === 'ultra');
+                    this.motionBlurPass.uniforms['maxBlur'].value = quality === 'ultra' ? 0.015 : 0.01;
                 }
             }
             
@@ -4847,6 +4976,21 @@
                 this.checkDrift();
                 this.updateDriftSmoke(delta);
                 
+                // 🎯 COMBO: Update scoring
+                if (this.combo) {
+                    this.combo.update(delta);
+                    // Drift scoring: 10pts/s while drifting
+                    if (this.vehiclePhysics && this.vehiclePhysics.isDrifting) {
+                        this.combo.driftAccum += delta;
+                        if (this.combo.driftAccum >= 0.5) {
+                            this.combo.addScore(10, '💨 DRIFT');
+                            this.combo.driftAccum = 0;
+                        }
+                    } else {
+                        this.combo.driftAccum = 0;
+                    }
+                }
+                
                 // Update interactive objects (cones, barrels)
                 if (this.car && this.interactiveObjects) {
                     this.updateInteractiveObjects(
@@ -4863,7 +5007,7 @@
                     this.checkAchievements();
                 }
                 
-                if (this.frameCount % 5 === 0) {
+                if (this.frameCount % 15 === 0) {
                     this.updateMinimap();
                     this.updateBuildingPreviews();
                 }
@@ -4898,21 +5042,30 @@
                 }
                 
                 this.frameCount++;
-                this.composer.render();
+                
+                // Render: bypass composer on low quality for massive FPS gain
+                if (this.useComposer) {
+                    this.composer.render();
+                } else {
+                    this.renderer.render(this.scene, this.camera);
+                }
             }
             
             // 🎯 PERFORMANCE: Frustum Culling - Only render what the camera sees
             updateFrustumCulling() {
                 if (!this.frustumCuller || !this.camera || !CONFIG.CULLING_ENABLED) return;
                 
-                // Update frustum from current camera
                 this.frustumCuller.update();
                 
                 const cameraPosition = this.camera.position;
                 const carPosition = this.car ? this.car.position : cameraPosition;
                 
-                // Get car's forward direction for behind-camera culling
-                const carDirection = new THREE.Vector3();
+                // Reuse cached vector (avoid per-frame allocation)
+                if (!this._cullDir) this._cullDir = new THREE.Vector3();
+                if (!this._cullToObj) this._cullToObj = new THREE.Vector3();
+                const carDirection = this._cullDir;
+                const toObject = this._cullToObj;
+                
                 if (this.car) {
                     carDirection.set(
                         Math.sin(this.car.rotation.y),
@@ -4921,37 +5074,41 @@
                     );
                 }
                 
-                // Cull decorations (trees, lamps, etc.)
+                // Cull decorations
                 this.decorations.forEach(obj => {
-                    if (!obj.userData.cullable === false) return; // Skip non-cullable
+                    if (obj.userData.cullable === false) return;
                     
                     const objPos = obj.position;
-                    const distance = cameraPosition.distanceTo(objPos);
+                    const dx = cameraPosition.x - objPos.x;
+                    const dz = cameraPosition.z - objPos.z;
+                    const distSq = dx * dx + dz * dz;
                     
-                    // Quick distance check first (cheapest)
-                    if (distance > CONFIG.VIEW_DISTANCE) {
+                    // Quick distance check (no sqrt)
+                    if (distSq > CONFIG.VIEW_DISTANCE * CONFIG.VIEW_DISTANCE) {
                         obj.visible = false;
                         return;
                     }
                     
-                    // Behind camera check (cheap)
+                    // Behind camera check (dot product, no allocation)
                     if (CONFIG.BEHIND_CAMERA_CULL && this.car) {
-                        const toObject = new THREE.Vector3().subVectors(objPos, carPosition);
-                        const dot = toObject.dot(carDirection);
-                        // If object is behind car and far away, cull it
-                        if (dot < -20 && distance > 40) {
+                        const toX = objPos.x - carPosition.x;
+                        const toZ = objPos.z - carPosition.z;
+                        const dot = toX * carDirection.x + toZ * carDirection.z;
+                        if (dot < -20 && distSq > 1600) {
                             obj.visible = false;
                             return;
                         }
                     }
                     
-                    // Frustum check (most accurate but more expensive)
                     const boundingRadius = obj.userData.boundingRadius || 10;
-                    const isInFrustum = this.frustumCuller.isVisible(obj, boundingRadius);
+                    obj.visible = this.frustumCuller.isVisible(obj, boundingRadius);
                     
-                    obj.visible = isInFrustum;
-                    
-                    // LOD: Adjust detail based on distance
+                    if (CONFIG.LOD_ENABLED && obj.visible) {
+                        const distance = Math.sqrt(distSq);
+                        const lodLevel = this.frustumCuller.getLODLevel(distance);
+                        this.applyLODToObject(obj, lodLevel, distance);
+                    }
+                });
                     if (CONFIG.LOD_ENABLED && obj.visible) {
                         const lodLevel = this.frustumCuller.getLODLevel(distance);
                         this.applyLODToObject(obj, lodLevel, distance);
@@ -5066,8 +5223,8 @@
                 if (keys['KeyJ'] && this.state.playerMode === 'driving') {
                     const jumped = this.vehiclePhysics.jump();
                     if (jumped) {
-                        // No screen shake on jump - only on landing
                         this.showToast('🦘', 'Jump!', '');
+                        if (this.combo) this.combo.addScore(50, '⬆️ JUMP');
                     }
                 }
                 
@@ -5115,22 +5272,27 @@
                 // Visual feedback
                 this.setBoostLines(this.state.isBoosting && physicsState.speedKmh > 60);
                 
-                // Collision feedback - only on significant collisions
-                if (physicsState.isColliding && Math.abs(physicsState.speed) > 10) {
-                    this.triggerScreenShake(0.2);
-                    this.spawnDustBurst(this.car.position.x, 0.2, this.car.position.z, 0.3);
-                    // Play collision sound based on speed
-                    const collisionIntensity = Math.min(Math.abs(physicsState.speed) / 20, 1);
-                    this.playCollisionSound(collisionIntensity);
+                // Collision feedback - reflection bounce + sparks
+                if (physicsState.isColliding && Math.abs(physicsState.speed) > 5) {
+                    const intensity = Math.min(Math.abs(physicsState.speed) / 20, 1);
+                    this.triggerScreenShake(0.3 * intensity);
+                    this.spawnDustBurst(this.car.position.x, 0.2, this.car.position.z, 0.5);
+                    this.playCollisionSound(intensity);
                 }
                 
-                // Landing impact with dust burst - only on hard landings
-                if (this.state.wasAirborne && physicsState.isGrounded && physicsState.landingImpact > 3) {
+                // Landing impact with dust burst
+                if (this.state.wasAirborne && physicsState.isGrounded && physicsState.landingImpact > 2) {
                     const intensity = Math.min(physicsState.landingImpact / 8, 1);
-                    this.triggerScreenShake(0.15 * intensity);
+                    this.triggerScreenShake(0.4 * intensity);
                     this.spawnDustBurst(this.car.position.x, 0.1, this.car.position.z, intensity);
-                    // Play landing thud
                     this.playLandingSound(intensity);
+                    this.spawnLandingParticles(Math.ceil(intensity * 12));
+                    // Score for landing
+                    if (physicsState.isOnRoad && physicsState.landingImpact > 4) {
+                        if (this.combo) this.combo.addScore(100, '🎯 PRECISION');
+                    } else if (physicsState.landingImpact > 3) {
+                        if (this.combo) this.combo.addScore(50, '🦘 LAND');
+                    }
                 }
                 this.state.wasAirborne = physicsState.isAirborne;
                 
@@ -5196,16 +5358,34 @@
                 let targetPos = new THREE.Vector3();
                 let lookPos = new THREE.Vector3();
                 
-                // Get mouse camera offset if enabled
                 const mouseYaw = this.mouseCamera ? this.mouseCamera.yaw : 0;
                 const mousePitch = this.mouseCamera ? this.mouseCamera.pitch : 0;
                 
+                // Dynamic speed factor for camera effects
+                const speedNorm = this.vehiclePhysics ? Math.min(Math.abs(this.vehiclePhysics.speed) / CONFIG.MAX_SPEED, 1.0) : 0;
+                const isBoosting = this.state.isBoosting && this.state.input.throttle > 0;
+                
+                // Dynamic FOV: 65° at rest → 80° at max, +5° during boost
+                const targetFOV = 65 + (speedNorm * 15) + (isBoosting ? 5 : 0);
+                this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, 0.04);
+                this.camera.updateProjectionMatrix();
+                
+                // Adaptive lerp: tighter at speed
+                const adaptiveLerp = THREE.MathUtils.lerp(0.04, 0.13, speedNorm);
+                
                 switch (this.state.cameraMode) {
                     case 'follow':
-                        // Base angle from car rotation + mouse yaw offset
-                        const baseAngle = target.rotation.y + mouseYaw;
-                        const heightOffset = this.state.cameraHeight + Math.sin(mousePitch) * this.state.cameraDistance * 0.5;
-                        const distanceOffset = this.state.cameraDistance * Math.cos(mousePitch * 0.5);
+                        // Look-ahead: camera leads turns
+                        const steerLead = this.state.input ? (this.state.input.steer || 0) * speedNorm * 0.3 : 0;
+                        const baseAngle = target.rotation.y + mouseYaw + steerLead;
+                        
+                        // Camera pulls back during boost, drops at speed
+                        const boostPullback = isBoosting ? 4.0 : 0;
+                        const dynamicDist = this.state.cameraDistance + boostPullback - speedNorm * 2;
+                        const dynamicHeight = this.state.cameraHeight - speedNorm * 1.5;
+                        
+                        const heightOffset = dynamicHeight + Math.sin(mousePitch) * dynamicDist * 0.5;
+                        const distanceOffset = dynamicDist * Math.cos(mousePitch * 0.5);
                         
                         targetPos.set(
                             target.position.x - Math.sin(baseAngle) * distanceOffset,
@@ -5254,15 +5434,15 @@
                         break;
                 }
                 
-                // 🏢 CAMERA COLLISION - prevent camera from going inside buildings
+                // Camera collision prevention
                 targetPos = this.preventCameraCollision(target.position, targetPos);
                 
-                this.camera.position.lerp(targetPos, CONFIG.CAMERA_LERP_FACTOR);
+                this.camera.position.lerp(targetPos, adaptiveLerp);
                 
                 const currentDir = new THREE.Vector3();
                 this.camera.getWorldDirection(currentDir);
                 const targetDir = new THREE.Vector3().subVectors(lookPos, this.camera.position).normalize();
-                currentDir.lerp(targetDir, CONFIG.CAMERA_LERP_FACTOR);
+                currentDir.lerp(targetDir, adaptiveLerp);
                 this.camera.lookAt(this.camera.position.clone().add(currentDir));
             }
             
@@ -5333,16 +5513,15 @@
                 }
             }
             
-            // 🚗 DRIFT DETECTION - tire screech and smoke
+            // 🚗 DRIFT DETECTION - now uses physics slip-angle data
             checkDrift() {
                 if (!this.vehiclePhysics || !this.car) return;
                 
                 const speed = Math.abs(this.vehiclePhysics.speed);
-                const steer = Math.abs(this.state.input.steer);
                 const speedKmh = speed * 3.6;
                 
-                // Drift = high speed + hard steering
-                const isDrifting = speedKmh > 40 && steer > 0.7 && this.vehiclePhysics.isGrounded;
+                // Use real drift state from physics
+                const isDrifting = this.vehiclePhysics.isDrifting;
                 
                 if (isDrifting && !this.state.wasDrifting) {
                     // Start drift
@@ -5356,11 +5535,22 @@
                         this.spawnDriftSmoke();
                     }
                     
+                    // Continuous tire audio (modulate existing screech)
+                    if (this.tireScreechGain) {
+                        const driftIntensity = Math.min(Math.abs(this.vehiclePhysics.slipAngle) / 0.8, 1);
+                        this.tireScreechGain.gain.value = 0.05 + driftIntensity * 0.1;
+                    }
+                    
                     // Check for drift achievement
                     const driftDuration = this.state.time - (this.state.driftStartTime || 0);
-                    if (driftDuration > 2 && !this.state.achievements.driftKing) {
-                        this.state.achievements.driftKing = true;
-                        this.showToast('🏎️', 'Drift King!', '2+ second drift!');
+                    if (driftDuration > 2 && !localStorage.getItem('achievement_driftKing')) {
+                        localStorage.setItem('achievement_driftKing', 'true');
+                        this.showToast('💨', 'Drift King!', 'Held a drift for 2+ seconds');
+                    }
+                } else {
+                    // Fade out tire audio
+                    if (this.tireScreechGain) {
+                        this.tireScreechGain.gain.value *= 0.85;
                     }
                 }
                 
@@ -5374,32 +5564,44 @@
                     this.audioContext.resume();
                 }
                 
-                // White noise filtered for tire screech
-                const duration = 0.5;
+                // Continuous tire screech with gain control for drift
+                const duration = 1.5;
                 const bufferSize = this.audioContext.sampleRate * duration;
                 const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
                 const data = buffer.getChannelData(0);
                 
                 for (let i = 0; i < bufferSize; i++) {
-                    data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+                    data[i] = (Math.random() * 2 - 1);
                 }
                 
                 const source = this.audioContext.createBufferSource();
                 source.buffer = buffer;
+                source.loop = false;
                 
                 const filter = this.audioContext.createBiquadFilter();
                 filter.type = 'bandpass';
-                filter.frequency.value = 2000;
-                filter.Q.value = 5;
+                filter.frequency.value = 2500;
+                filter.Q.value = 4;
                 
                 const gain = this.audioContext.createGain();
-                gain.gain.value = 0.08;
+                gain.gain.value = 0.06;
+                
+                // Store reference for continuous modulation
+                this.tireScreechGain = gain;
                 
                 source.connect(filter);
                 filter.connect(gain);
                 gain.connect(this.audioContext.destination);
                 
                 source.start();
+                source.stop(this.audioContext.currentTime + duration);
+                
+                // Clear reference after sound ends
+                setTimeout(() => {
+                    if (this.tireScreechGain === gain) {
+                        this.tireScreechGain = null;
+                    }
+                }, duration * 1000);
             }
             
             spawnDriftSmoke() {

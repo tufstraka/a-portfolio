@@ -1548,7 +1548,7 @@
                 
                 // Skid marks system
                 this.skidMarks = [];
-                this.maxSkidMarks = 100;
+                this.maxSkidMarks = this.state ? (this.state.quality === 'low' ? 20 : 50) : 50;
                 
                 // Day/night cycle
                 this.dayTime = 0.35; // Start at mid-morning (0-1, 0.5 = noon)
@@ -1602,8 +1602,25 @@
             
             detectQuality() {
                 if (this.detectMobile()) return 'low';
-                if (navigator.deviceMemory && navigator.deviceMemory < 4) return 'medium';
+                // Be aggressive for low-end machines (3GB = reported as 4)
+                if (navigator.deviceMemory && navigator.deviceMemory <= 4) return 'low';
+                if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2) return 'low';
                 if (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) return 'medium';
+                // Check GPU via WebGL renderer info
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    if (gl) {
+                        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                        if (debugInfo) {
+                            const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL).toLowerCase();
+                            // Detect integrated/low-end GPUs
+                            if (renderer.includes('intel') || renderer.includes('swiftshader') || renderer.includes('mesa')) {
+                                return 'medium';
+                            }
+                        }
+                    }
+                } catch(e) {}
                 return 'high';
             }
             
@@ -1838,12 +1855,12 @@
                 
                 // Renderer with PBR support and logarithmic depth buffer for z-fighting fix
                 this.renderer = new THREE.WebGLRenderer({
-                    antialias: true, // Always enable for sharp edges
+                    antialias: this.state.quality !== 'low',
                     powerPreference: 'high-performance',
-                    precision: this.state.isMobile ? 'mediump' : 'highp',
+                    precision: this.state.isMobile || this.state.quality === 'low' ? 'mediump' : 'highp',
                     stencil: false,
                     alpha: false,
-                    logarithmicDepthBuffer: true  // Fixes z-fighting at large distances
+                    logarithmicDepthBuffer: this.state.quality !== 'low'
                 });
                 
                 this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1935,7 +1952,8 @@
                 this.scene.background = new THREE.Color(0x4a90d9); // Richer blue
                 
                 // Create hemisphere sky dome for gradient effect
-                const skyGeo = new THREE.SphereGeometry(1000, 32, 15);
+                const skySegs = this.state.quality === 'low' ? 12 : 24;
+                const skyGeo = new THREE.SphereGeometry(1000, skySegs, Math.ceil(skySegs / 2));
                 this.skyMaterial = new THREE.ShaderMaterial({
                     uniforms: {
                         topColor: { value: new THREE.Color(0x1e5799) },    // Deep rich blue
@@ -2046,10 +2064,11 @@
                 ];
                 
                 cloudPositions.forEach(pos => {
-                    // Each cloud is made of multiple overlapping sprites
+                    // Each cloud: fewer sprites on lower quality
                     const cloudCluster = new THREE.Group();
+                    const spriteCount = this.state.quality === 'low' ? 2 : (this.state.quality === 'medium' ? 3 : 5);
                     
-                    for (let i = 0; i < 5; i++) {
+                    for (let i = 0; i < spriteCount; i++) {
                         const spriteMaterial = new THREE.SpriteMaterial({
                             map: cloudTexture,
                             transparent: true,
@@ -2075,7 +2094,8 @@
                 this.scene.add(cloudGroup);
                 
                 // Add visible sun
-                const sunGeo = new THREE.SphereGeometry(30, 32, 32);
+                const sunSegments = this.state.quality === 'low' ? 12 : 24;
+                const sunGeo = new THREE.SphereGeometry(30, sunSegments, sunSegments);
                 const sunMat = new THREE.MeshBasicMaterial({
                     color: 0xFFFAE3,
                     fog: false
@@ -2085,7 +2105,7 @@
                 this.scene.add(this.sunMesh);
                 
                 // Sun glow (larger, transparent)
-                const glowGeo = new THREE.SphereGeometry(50, 32, 32);
+                const glowGeo = new THREE.SphereGeometry(50, sunSegments, sunSegments);
                 const glowMat = new THREE.MeshBasicMaterial({
                     color: 0xFFFFCC,
                     transparent: true,
@@ -2113,7 +2133,8 @@
                 ctx.fillRect(0, 0, 512, 512);
                 
                 // Add grass blade details
-                for (let i = 0; i < 15000; i++) {
+                const grassBladeCount = this.state.quality === 'low' ? 3000 : (this.state.quality === 'medium' ? 8000 : 15000);
+                for (let i = 0; i < grassBladeCount; i++) {
                     const x = Math.random() * 512;
                     const y = Math.random() * 512;
                     const length = 3 + Math.random() * 8;
@@ -2171,7 +2192,8 @@
                 ctx.fillRect(0, 0, 512, 512);
                 
                 // Add aggregate (small stones)
-                for (let i = 0; i < 20000; i++) {
+                const aggregateCount = this.state.quality === 'low' ? 5000 : (this.state.quality === 'medium' ? 10000 : 20000);
+                for (let i = 0; i < aggregateCount; i++) {
                     const x = Math.random() * 512;
                     const y = Math.random() * 512;
                     const size = 0.5 + Math.random() * 2.5;
@@ -2269,7 +2291,8 @@
             async createTerrain() {
                 // Main ground plane with realistic grass texture
                 const groundSize = 2000;
-                const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, 64, 64);
+                const groundSegments = this.state.quality === 'low' ? 8 : (this.state.quality === 'medium' ? 16 : 32);
+                const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, groundSegments, groundSegments);
                 
                 groundGeometry.computeVertexNormals();
                 
@@ -2278,18 +2301,19 @@
                 const grassTexture = new THREE.CanvasTexture(grassCanvas);
                 grassTexture.wrapS = THREE.RepeatWrapping;
                 grassTexture.wrapT = THREE.RepeatWrapping;
-                grassTexture.repeat.set(150, 150);
+                const texRepeat = this.state.quality === 'low' ? 50 : (this.state.quality === 'medium' ? 80 : 120);
+                grassTexture.repeat.set(texRepeat, texRepeat);
                 
                 // Create normal map for grass depth
                 const grassNormalCanvas = this.createGrassNormalMap();
                 const grassNormalMap = new THREE.CanvasTexture(grassNormalCanvas);
                 grassNormalMap.wrapS = THREE.RepeatWrapping;
                 grassNormalMap.wrapT = THREE.RepeatWrapping;
-                grassNormalMap.repeat.set(150, 150);
+                grassNormalMap.repeat.set(texRepeat, texRepeat);
                 
                 const groundMaterial = new THREE.MeshStandardMaterial({
                     map: grassTexture,
-                    normalMap: grassNormalMap,
+                    normalMap: this.state.quality !== 'low' ? grassNormalMap : null,
                     normalScale: new THREE.Vector2(0.5, 0.5),
                     roughness: 0.95,
                     metalness: 0.0
@@ -2321,7 +2345,8 @@
                 ctx.fillRect(0, 0, 256, 256);
                 
                 // Add random normal variations for grass texture
-                for (let i = 0; i < 3000; i++) {
+                const normalGrassCount = this.state.quality === 'low' ? 500 : 2000;
+                for (let i = 0; i < normalGrassCount; i++) {
                     const x = Math.random() * 256;
                     const y = Math.random() * 256;
                     const nx = 128 + (Math.random() - 0.5) * 60;
@@ -2345,7 +2370,8 @@
                 ctx.fillRect(0, 0, 256, 256);
                 
                 // Add aggregate bump variations
-                for (let i = 0; i < 5000; i++) {
+                const normalAsphaltCount = this.state.quality === 'low' ? 1000 : 3000;
+                for (let i = 0; i < normalAsphaltCount; i++) {
                     const x = Math.random() * 256;
                     const y = Math.random() * 256;
                     const size = 1 + Math.random() * 3;
@@ -2372,7 +2398,8 @@
                 ctx.fillRect(0, 0, 256, 256);
                 
                 // Add concrete texture noise
-                for (let i = 0; i < 8000; i++) {
+                const concreteCount = this.state.quality === 'low' ? 2000 : 5000;
+                for (let i = 0; i < concreteCount; i++) {
                     const x = Math.random() * 256;
                     const y = Math.random() * 256;
                     const brightness = 180 + Math.random() * 50;
@@ -2652,21 +2679,23 @@
             
             createRoadTexture() {
                 const canvas = document.createElement('canvas');
-                canvas.width = 2048;
-                canvas.height = 2048;
+                const texSize = this.state.quality === 'low' ? 512 : (this.state.quality === 'medium' ? 1024 : 2048);
+                canvas.width = texSize;
+                canvas.height = texSize;
                 const ctx = canvas.getContext('2d');
                 
                 // Dark asphalt base with slight blue tint
-                const gradient = ctx.createLinearGradient(0, 0, 2048, 0);
+                const gradient = ctx.createLinearGradient(0, 0, texSize, 0);
                 gradient.addColorStop(0, '#2a2a2f');
                 gradient.addColorStop(0.5, '#303035');
                 gradient.addColorStop(1, '#2a2a2f');
                 ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, 2048, 2048);
+                ctx.fillRect(0, 0, texSize, texSize);
                 
-                // Add realistic asphalt texture (aggregate noise) - more particles for 2048x2048
-                for (let i = 0; i < 60000; i++) {
-                    const x = Math.random() * 2048;
+                // Add realistic asphalt texture - particle count scales with texture size
+                const particleCount = Math.round((texSize / 2048) * (texSize / 2048) * 60000);
+                for (let i = 0; i < particleCount; i++) {
+                    const x = Math.random() * texSize;
                     const y = Math.random() * 2048;
                     const size = Math.random() * 3 + 1;
                     const brightness = 35 + Math.random() * 40;
@@ -2849,16 +2878,27 @@
                     carGroup.add(skirt);
                 });
                 
-                // Windshields - realistic glass with proper tint
-                const glassMaterial = new THREE.MeshPhysicalMaterial({
-                    color: 0x1a3a4a,
-                    metalness: 0.0,
-                    roughness: 0.05,
-                    transmission: 0.9,
-                    thickness: 0.2,
-                    transparent: true,
-                    opacity: 0.35
-                });
+                // Windshields - quality-dependent material
+                let glassMaterial;
+                if (this.state.quality === 'low' || this.state.quality === 'medium') {
+                    glassMaterial = new THREE.MeshStandardMaterial({
+                        color: 0x1a3a4a,
+                        metalness: 0.2,
+                        roughness: 0.1,
+                        transparent: true,
+                        opacity: 0.4
+                    });
+                } else {
+                    glassMaterial = new THREE.MeshPhysicalMaterial({
+                        color: 0x1a3a4a,
+                        metalness: 0.0,
+                        roughness: 0.05,
+                        transmission: 0.9,
+                        thickness: 0.2,
+                        transparent: true,
+                        opacity: 0.35
+                    });
+                }
                 
                 // Front windshield (angled)
                 const frontGlassGeom = new THREE.PlaneGeometry(1.75, 1.0);
@@ -3574,23 +3614,35 @@
                                 hMullion.position.set(0, windowHeight * 0.15, 0);
                                 windowGroup.add(hMullion);
                                 
-                                // Glass panes with realistic reflection
-                                const glassMat = new THREE.MeshPhysicalMaterial({
-                                    color: hasLightsOn ? 0x6699aa : 0x88aabb,
-                                    metalness: 0.0,
-                                    roughness: 0.05,
-                                    transmission: hasLightsOn ? 0.3 : 0.6,
-                                    thickness: 0.05,
-                                    transparent: true,
-                                    opacity: hasLightsOn ? 0.6 : 0.85,
-                                    envMapIntensity: 1.2,
-                                    clearcoat: 0.8,
-                                    clearcoatRoughness: 0.15,
-                                    depthWrite: false,
-                                    polygonOffset: true,
-                                    polygonOffsetFactor: -4,
-                                    polygonOffsetUnits: -4
-                                });
+                                // Glass: use cheap material on low/medium, physical only on high/ultra
+                                let glassMat;
+                                if (this.state.quality === 'low' || this.state.quality === 'medium') {
+                                    glassMat = new THREE.MeshStandardMaterial({
+                                        color: hasLightsOn ? 0x6699aa : 0x88aabb,
+                                        metalness: 0.3,
+                                        roughness: 0.1,
+                                        transparent: true,
+                                        opacity: hasLightsOn ? 0.6 : 0.8,
+                                        depthWrite: false
+                                    });
+                                } else {
+                                    glassMat = new THREE.MeshPhysicalMaterial({
+                                        color: hasLightsOn ? 0x6699aa : 0x88aabb,
+                                        metalness: 0.0,
+                                        roughness: 0.05,
+                                        transmission: hasLightsOn ? 0.3 : 0.6,
+                                        thickness: 0.05,
+                                        transparent: true,
+                                        opacity: hasLightsOn ? 0.6 : 0.85,
+                                        envMapIntensity: 1.2,
+                                        clearcoat: 0.8,
+                                        clearcoatRoughness: 0.15,
+                                        depthWrite: false,
+                                        polygonOffset: true,
+                                        polygonOffsetFactor: -4,
+                                        polygonOffsetUnits: -4
+                                    });
+                                }
                                 
                                 const glassGeom = new THREE.PlaneGeometry(windowWidth - 0.15, windowHeight - 0.15);
                                 const glass = new THREE.Mesh(glassGeom, glassMat);
@@ -3829,13 +3881,15 @@
             
             loadEnvironmentDetails() {
                 // Trees
-                this.createTrees(this.state.quality === 'ultra' ? 50 : this.state.quality === 'high' ? 30 : 15);
+                this.createTrees(this.state.quality === 'ultra' ? 40 : this.state.quality === 'high' ? 25 : this.state.quality === 'medium' ? 12 : 6);
                 
                 // Decorative elements
                 this.createDecorations();
                 
-                // Interactive objects (cones, barrels)
-                this.createInteractiveObjects();
+                // Interactive objects (cones, barrels) - skip on low
+                if (this.state.quality !== 'low') {
+                    this.createInteractiveObjects();
+                }
                 
                 // Particles (only on high/ultra)
                 if (this.state.quality === 'ultra' || this.state.quality === 'high') {
@@ -3967,18 +4021,24 @@
             }
             
             createDecorations() {
-                // Street lamps along roads
+                // Street lamps using InstancedMesh for massive draw call reduction
                 const lampMaterial = new THREE.MeshStandardMaterial({
                     color: 0x333333,
                     metalness: 0.8,
                     roughness: 0.3
                 });
+                const lightMat = new THREE.MeshStandardMaterial({
+                    color: 0xFFFFAA,
+                    emissive: 0xFFFFAA,
+                    emissiveIntensity: 0.5
+                });
                 
+                // Collect all lamp positions first
+                const lampPositions = [];
                 const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
                 
                 positions.forEach((pos, i) => {
                     const nextPos = positions[(i + 1) % positions.length];
-                    
                     const dx = nextPos.x - pos.x;
                     const dz = nextPos.z - pos.z;
                     const length = Math.sqrt(dx * dx + dz * dz);
@@ -3988,50 +4048,54 @@
                         const t = j / steps;
                         const x = pos.x + dx * t;
                         const z = pos.z + dz * t;
-                        
-                        // Offset to side of road
                         const perpX = -dz / length * 8;
                         const perpZ = dx / length * 8;
+                        const angle = Math.atan2(dx, dz);
                         
                         [-1, 1].forEach(side => {
-                            const lampGroup = new THREE.Group();
-                            
-                            // Pole
-                            const poleGeom = new THREE.CylinderGeometry(0.15, 0.2, 8, 8);
-                            const pole = new THREE.Mesh(poleGeom, lampMaterial);
-                            pole.position.y = 4;
-                            pole.castShadow = this.state.quality !== 'low';
-                            lampGroup.add(pole);
-                            
-                            // Arm
-                            const armGeom = new THREE.BoxGeometry(2, 0.1, 0.1);
-                            const arm = new THREE.Mesh(armGeom, lampMaterial);
-                            arm.position.set(1, 8, 0);
-                            lampGroup.add(arm);
-                            
-                            // Light fixture
-                            const lightFixtureGeom = new THREE.SphereGeometry(0.4, 12, 8);
-                            const lightFixtureMat = new THREE.MeshStandardMaterial({
-                                color: 0xFFFFAA,
-                                emissive: 0xFFFFAA,
-                                emissiveIntensity: 0.5
+                            lampPositions.push({
+                                x: x + perpX * side,
+                                z: z + perpZ * side,
+                                angle
                             });
-                            const lightFixture = new THREE.Mesh(lightFixtureGeom, lightFixtureMat);
-                            lightFixture.position.set(2, 7.8, 0);
-                            lampGroup.add(lightFixture);
-                            
-                            lampGroup.position.set(x + perpX * side, 0, z + perpZ * side);
-                            lampGroup.lookAt(x, 0, z);
-                            
-                            this.scene.add(lampGroup);
                         });
                     }
                 });
+                
+                const count = lampPositions.length;
+                if (count === 0) return;
+                
+                // Instanced pole (1 draw call for all poles)
+                const poleGeom = new THREE.CylinderGeometry(0.15, 0.2, 8, 6, 1);
+                const poleInstances = new THREE.InstancedMesh(poleGeom, lampMaterial, count);
+                poleInstances.castShadow = this.state.quality !== 'low';
+                
+                // Instanced light fixtures
+                const lightGeom = new THREE.SphereGeometry(0.4, 8, 6);
+                const lightInstances = new THREE.InstancedMesh(lightGeom, lightMat, count);
+                
+                const matrix = new THREE.Matrix4();
+                
+                for (let i = 0; i < count; i++) {
+                    const p = lampPositions[i];
+                    // Pole
+                    matrix.makeTranslation(p.x, 4, p.z);
+                    poleInstances.setMatrixAt(i, matrix);
+                    // Light fixture at top
+                    matrix.makeTranslation(p.x, 7.8, p.z);
+                    lightInstances.setMatrixAt(i, matrix);
+                }
+                
+                poleInstances.instanceMatrix.needsUpdate = true;
+                lightInstances.instanceMatrix.needsUpdate = true;
+                
+                this.scene.add(poleInstances);
+                this.scene.add(lightInstances);
             }
             
             createParticles() {
-                // Floating particles (dust/pollen)
-                const count = 500;
+                // Floating particles - reduced count for performance
+                const count = this.state.quality === 'low' ? 50 : (this.state.quality === 'medium' ? 150 : 300);
                 const positions = new Float32Array(count * 3);
                 
                 for (let i = 0; i < count; i++) {
@@ -5016,9 +5080,11 @@
                     this.updateFPS();
                 }
                 
-                // Update day/night cycle
-                this.updateDayNightCycle(delta);
-                this.updateHeadlights();
+                // Update day/night cycle (skip on low for perf)
+                if (this.state.quality !== 'low') {
+                    this.updateDayNightCycle(delta);
+                    this.updateHeadlights();
+                }
                 
                 // Update skid marks (fade out)
                 if (this.frameCount % 10 === 0) {

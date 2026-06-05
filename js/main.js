@@ -3538,291 +3538,301 @@
                     building.receiveShadow = true;
                     sectionGroup.add(building);
                     
-                    // Create realistic windows with frames, mullions, and interior glow
+                    // Create windows - complexity varies by quality
                     const floorsCount = Math.floor(buildingHeight / 3.5);
-                    const windowsPerFloor = 4;
                     const windowWidth = 3.2;
                     const windowHeight = 2.6;
                     
-                    for (let floor = 0; floor < floorsCount; floor++) {
-                        const y = 2.5 + floor * 3.5;
-                        
+                    if (this.state.quality === 'low') {
+                        // LOW: Use a single canvas texture on each building face with painted windows
+                        // This replaces ~672 meshes per building with 4 textured planes
+                        const windowsPerFloor = 4;
                         for (let side = 0; side < 4; side++) {
-                            for (let i = 0; i < windowsPerFloor; i++) {
-                                // Create window group
-                                const windowGroup = new THREE.Group();
-                                
-                                // Randomize if this window has lights on (interior glow)
-                                const hasLightsOn = Math.random() > 0.35;
-                                const hasBlinds = Math.random() > 0.6;
-                                const blindsPartial = hasBlinds && Math.random() > 0.5;
-                                
-                                // Interior backing (warm glow when lights on) - pushed back to prevent z-fighting
-                                const interiorColor = hasLightsOn ? 
-                                    (Math.random() > 0.5 ? 0xFFF4E0 : 0xFFE4B5) : // warm white or soft yellow
-                                    0x1a1a2e; // dark interior
-                                const interiorMat = new THREE.MeshBasicMaterial({
-                                    color: interiorColor,
-                                    side: THREE.FrontSide,
-                                    depthWrite: true,
-                                    polygonOffset: true,
-                                    polygonOffsetFactor: 4,
-                                    polygonOffsetUnits: 4
-                                });
-                                const interiorGeom = new THREE.PlaneGeometry(windowWidth - 0.3, windowHeight - 0.3);
-                                const interior = new THREE.Mesh(interiorGeom, interiorMat);
-                                interior.position.z = -0.5; // Push much further back
-                                interior.renderOrder = -1;
-                                windowGroup.add(interior);
-                                
-                                // Window frame (dark aluminum)
-                                const frameMat = new THREE.MeshStandardMaterial({
-                                    color: 0x2a2a2a,
-                                    metalness: 0.8,
-                                    roughness: 0.3
-                                });
-                                
-                                // Outer frame
-                                const frameThickness = 0.08;
-                                const frameDepth = 0.12;
-                                
-                                // Top frame
-                                const topFrame = new THREE.Mesh(
-                                    new THREE.BoxGeometry(windowWidth, frameThickness, frameDepth),
-                                    frameMat
-                                );
-                                topFrame.position.set(0, windowHeight / 2, 0);
-                                windowGroup.add(topFrame);
-                                
-                                // Bottom frame
-                                const bottomFrame = new THREE.Mesh(
-                                    new THREE.BoxGeometry(windowWidth, frameThickness, frameDepth),
-                                    frameMat
-                                );
-                                bottomFrame.position.set(0, -windowHeight / 2, 0);
-                                windowGroup.add(bottomFrame);
-                                
-                                // Left frame
-                                const leftFrame = new THREE.Mesh(
-                                    new THREE.BoxGeometry(frameThickness, windowHeight, frameDepth),
-                                    frameMat
-                                );
-                                leftFrame.position.set(-windowWidth / 2, 0, 0);
-                                windowGroup.add(leftFrame);
-                                
-                                // Right frame
-                                const rightFrame = new THREE.Mesh(
-                                    new THREE.BoxGeometry(frameThickness, windowHeight, frameDepth),
-                                    frameMat
-                                );
-                                rightFrame.position.set(windowWidth / 2, 0, 0);
-                                windowGroup.add(rightFrame);
-                                
-                                // Center mullion (vertical divider)
-                                const mullion = new THREE.Mesh(
-                                    new THREE.BoxGeometry(frameThickness * 0.7, windowHeight - frameThickness * 2, frameDepth),
-                                    frameMat
-                                );
-                                mullion.position.set(0, 0, 0);
-                                windowGroup.add(mullion);
-                                
-                                // Horizontal mullion (creates 4-pane effect)
-                                const hMullion = new THREE.Mesh(
-                                    new THREE.BoxGeometry(windowWidth - frameThickness * 2, frameThickness * 0.7, frameDepth),
-                                    frameMat
-                                );
-                                hMullion.position.set(0, windowHeight * 0.15, 0);
-                                windowGroup.add(hMullion);
-                                
-                                // Glass: use cheap material on low/medium, physical only on high/ultra
-                                let glassMat;
-                                if (this.state.quality === 'low' || this.state.quality === 'medium') {
-                                    glassMat = new THREE.MeshStandardMaterial({
-                                        color: hasLightsOn ? 0x6699aa : 0x88aabb,
-                                        metalness: 0.3,
-                                        roughness: 0.1,
-                                        transparent: true,
-                                        opacity: hasLightsOn ? 0.6 : 0.8,
-                                        depthWrite: false
-                                    });
-                                } else {
-                                    glassMat = new THREE.MeshPhysicalMaterial({
-                                        color: hasLightsOn ? 0x6699aa : 0x88aabb,
-                                        metalness: 0.0,
-                                        roughness: 0.05,
-                                        transmission: hasLightsOn ? 0.3 : 0.6,
-                                        thickness: 0.05,
-                                        transparent: true,
-                                        opacity: hasLightsOn ? 0.6 : 0.85,
-                                        envMapIntensity: 1.2,
-                                        clearcoat: 0.8,
-                                        clearcoatRoughness: 0.15,
-                                        depthWrite: false,
-                                        polygonOffset: true,
-                                        polygonOffsetFactor: -4,
-                                        polygonOffsetUnits: -4
-                                    });
+                            const faceWidth = (side < 2) ? buildingWidth : buildingDepth;
+                            const faceHeight = buildingHeight;
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 256;
+                            canvas.height = Math.round(256 * (faceHeight / faceWidth));
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = 'transparent';
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            
+                            // Paint windows onto texture
+                            const cellW = canvas.width / windowsPerFloor;
+                            const cellH = canvas.height / floorsCount;
+                            for (let f = 0; f < floorsCount; f++) {
+                                for (let w = 0; w < windowsPerFloor; w++) {
+                                    const hasLight = Math.random() > 0.35;
+                                    ctx.fillStyle = hasLight ? 
+                                        (Math.random() > 0.5 ? '#FFF4E0' : '#FFE4B5') : '#1a1a2e';
+                                    const wx = w * cellW + cellW * 0.15;
+                                    const wy = (floorsCount - 1 - f) * cellH + cellH * 0.15;
+                                    const ww = cellW * 0.7;
+                                    const wh = cellH * 0.7;
+                                    ctx.fillRect(wx, wy, ww, wh);
+                                    // Simple frame
+                                    ctx.strokeStyle = '#2a2a2a';
+                                    ctx.lineWidth = 2;
+                                    ctx.strokeRect(wx, wy, ww, wh);
                                 }
-                                
-                                const glassGeom = new THREE.PlaneGeometry(windowWidth - 0.15, windowHeight - 0.15);
-                                const glass = new THREE.Mesh(glassGeom, glassMat);
-                                glass.position.z = 0.15; // Much further forward to prevent z-fighting
-                                glass.renderOrder = 10;   // Render well after interior
-                                windowGroup.add(glass);
-                                
-                                // Optional blinds/curtains
-                                if (hasBlinds) {
-                                    const blindsHeight = blindsPartial ? windowHeight * 0.4 : windowHeight - 0.3;
-                                    const blindsY = blindsPartial ? windowHeight / 2 - blindsHeight / 2 - 0.1 : 0;
-                                    const blindsColor = Math.random() > 0.5 ? 0xF5F5DC : 0xE8E8E8;
+                            }
+                            
+                            const tex = new THREE.CanvasTexture(canvas);
+                            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+                            const plane = new THREE.Mesh(new THREE.PlaneGeometry(faceWidth, faceHeight), mat);
+                            plane.position.y = faceHeight / 2;
+                            const offset = ((side < 2) ? buildingDepth : buildingWidth) / 2 + 0.06;
+                            switch(side) {
+                                case 0: plane.position.z = offset; break;
+                                case 1: plane.position.z = -offset; plane.rotation.y = Math.PI; break;
+                                case 2: plane.position.x = -offset; plane.rotation.y = Math.PI / 2; break;
+                                case 3: plane.position.x = offset; plane.rotation.y = -Math.PI / 2; break;
+                            }
+                            sectionGroup.add(plane);
+                        }
+                    } else if (this.state.quality === 'medium') {
+                        // MEDIUM: Single plane per window (interior + glass only, no frames/mullions/sill/blinds)
+                        // ~2 meshes per window instead of 8-10 → ~336 total vs ~3360
+                        const windowsPerFloor = 3; // Fewer windows on medium
+                        for (let floor = 0; floor < floorsCount; floor++) {
+                            const y = 2.5 + floor * 3.5;
+                            for (let side = 0; side < 4; side++) {
+                                for (let i = 0; i < windowsPerFloor; i++) {
+                                    const hasLightsOn = Math.random() > 0.35;
+                                    const interiorColor = hasLightsOn ? 
+                                        (Math.random() > 0.5 ? 0xFFF4E0 : 0xFFE4B5) : 0x1a1a2e;
                                     
-                                    const blindsMat = new THREE.MeshStandardMaterial({
-                                        color: blindsColor,
-                                        roughness: 0.9,
-                                        metalness: 0.0,
-                                        side: THREE.DoubleSide,
+                                    // Single combined window plane (interior + border via shader isn't worth it, use 2 planes)
+                                    const interiorMat = new THREE.MeshBasicMaterial({
+                                        color: interiorColor,
                                         polygonOffset: true,
                                         polygonOffsetFactor: 2,
                                         polygonOffsetUnits: 2
                                     });
+                                    const interior = new THREE.Mesh(
+                                        new THREE.PlaneGeometry(windowWidth - 0.3, windowHeight - 0.3),
+                                        interiorMat
+                                    );
                                     
-                                    const blindsGeom = new THREE.PlaneGeometry(windowWidth - 0.3, blindsHeight);
-                                    const blinds = new THREE.Mesh(blindsGeom, blindsMat);
-                                    blinds.position.set(0, blindsY, -0.25); // Position between interior and glass
-                                    blinds.renderOrder = 1;
-                                    windowGroup.add(blinds);
+                                    const glassMat = new THREE.MeshBasicMaterial({
+                                        color: hasLightsOn ? 0x6699aa : 0x88aabb,
+                                        transparent: true,
+                                        opacity: hasLightsOn ? 0.5 : 0.7,
+                                        depthWrite: false
+                                    });
+                                    const glass = new THREE.Mesh(
+                                        new THREE.PlaneGeometry(windowWidth, windowHeight),
+                                        glassMat
+                                    );
+                                    glass.position.z = 0.1;
+                                    
+                                    const windowGroup = new THREE.Group();
+                                    windowGroup.add(interior);
+                                    windowGroup.add(glass);
+                                    
+                                    // Position
+                                    const offset = (side === 0 || side === 1) ? buildingDepth / 2 + 0.05 : buildingWidth / 2 + 0.05;
+                                    const xPos = (i - windowsPerFloor / 2 + 0.5) * 4;
+                                    switch(side) {
+                                        case 0: windowGroup.position.set(xPos, y, offset); break;
+                                        case 1: windowGroup.position.set(-xPos, y, -offset); windowGroup.rotation.y = Math.PI; break;
+                                        case 2: windowGroup.position.set(-offset, y, xPos); windowGroup.rotation.y = Math.PI / 2; break;
+                                        case 3: windowGroup.position.set(offset, y, -xPos); windowGroup.rotation.y = -Math.PI / 2; break;
+                                    }
+                                    sectionGroup.add(windowGroup);
                                 }
-                                
-                                // Window sill
-                                const sillMat = new THREE.MeshStandardMaterial({
-                                    color: 0x808080,
-                                    metalness: 0.3,
-                                    roughness: 0.6
-                                });
-                                const sill = new THREE.Mesh(
-                                    new THREE.BoxGeometry(windowWidth + 0.2, 0.06, 0.25),
-                                    sillMat
-                                );
-                                sill.position.set(0, -windowHeight / 2 - 0.03, 0.1);
-                                windowGroup.add(sill);
-                                
-                                // Position window on building
-                                const offset = (side === 0 || side === 1) ? buildingDepth / 2 + 0.05 : buildingWidth / 2 + 0.05;
-                                const xPos = (i - windowsPerFloor / 2 + 0.5) * 4;
-                                
-                                switch(side) {
-                                    case 0:
-                                        windowGroup.position.set(xPos, y, offset);
-                                        break;
-                                    case 1:
-                                        windowGroup.position.set(-xPos, y, -offset);
-                                        windowGroup.rotation.y = Math.PI;
-                                        break;
-                                    case 2:
-                                        windowGroup.position.set(-offset, y, xPos);
-                                        windowGroup.rotation.y = Math.PI / 2;
-                                        break;
-                                    case 3:
-                                        windowGroup.position.set(offset, y, -xPos);
-                                        windowGroup.rotation.y = -Math.PI / 2;
-                                        break;
+                            }
+                        }
+                    } else {
+                        // HIGH/ULTRA: Full detail windows with frames, mullions, glass, blinds, sills
+                        const windowsPerFloor = 4;
+                        for (let floor = 0; floor < floorsCount; floor++) {
+                            const y = 2.5 + floor * 3.5;
+                            for (let side = 0; side < 4; side++) {
+                                for (let i = 0; i < windowsPerFloor; i++) {
+                                    const windowGroup = new THREE.Group();
+                                    const hasLightsOn = Math.random() > 0.35;
+                                    const hasBlinds = Math.random() > 0.6;
+                                    const blindsPartial = hasBlinds && Math.random() > 0.5;
+                                    
+                                    // Interior backing
+                                    const interiorColor = hasLightsOn ? 
+                                        (Math.random() > 0.5 ? 0xFFF4E0 : 0xFFE4B5) : 0x1a1a2e;
+                                    const interiorMat = new THREE.MeshBasicMaterial({
+                                        color: interiorColor,
+                                        side: THREE.FrontSide,
+                                        depthWrite: true,
+                                        polygonOffset: true,
+                                        polygonOffsetFactor: 4,
+                                        polygonOffsetUnits: 4
+                                    });
+                                    const interior = new THREE.Mesh(
+                                        new THREE.PlaneGeometry(windowWidth - 0.3, windowHeight - 0.3), interiorMat
+                                    );
+                                    interior.position.z = -0.5;
+                                    interior.renderOrder = -1;
+                                    windowGroup.add(interior);
+                                    
+                                    // Frame
+                                    const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8, roughness: 0.3 });
+                                    const frameThickness = 0.08, frameDepth = 0.12;
+                                    [[0, windowHeight/2, 0, windowWidth, frameThickness, frameDepth],
+                                     [0, -windowHeight/2, 0, windowWidth, frameThickness, frameDepth],
+                                     [-windowWidth/2, 0, 0, frameThickness, windowHeight, frameDepth],
+                                     [windowWidth/2, 0, 0, frameThickness, windowHeight, frameDepth]].forEach(([x,y,z,w,h,d]) => {
+                                        const f = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), frameMat);
+                                        f.position.set(x,y,z);
+                                        windowGroup.add(f);
+                                    });
+                                    
+                                    // Mullions
+                                    const mullion = new THREE.Mesh(
+                                        new THREE.BoxGeometry(frameThickness*0.7, windowHeight - frameThickness*2, frameDepth), frameMat
+                                    );
+                                    windowGroup.add(mullion);
+                                    const hMullion = new THREE.Mesh(
+                                        new THREE.BoxGeometry(windowWidth - frameThickness*2, frameThickness*0.7, frameDepth), frameMat
+                                    );
+                                    hMullion.position.y = windowHeight * 0.15;
+                                    windowGroup.add(hMullion);
+                                    
+                                    // Glass
+                                    const glassMat = new THREE.MeshPhysicalMaterial({
+                                        color: hasLightsOn ? 0x6699aa : 0x88aabb,
+                                        metalness: 0.0, roughness: 0.05,
+                                        transmission: hasLightsOn ? 0.3 : 0.6,
+                                        thickness: 0.05, transparent: true,
+                                        opacity: hasLightsOn ? 0.6 : 0.85,
+                                        envMapIntensity: 1.2, clearcoat: 0.8,
+                                        clearcoatRoughness: 0.15, depthWrite: false
+                                    });
+                                    const glass = new THREE.Mesh(
+                                        new THREE.PlaneGeometry(windowWidth - 0.15, windowHeight - 0.15), glassMat
+                                    );
+                                    glass.position.z = 0.15;
+                                    glass.renderOrder = 10;
+                                    windowGroup.add(glass);
+                                    
+                                    // Blinds
+                                    if (hasBlinds) {
+                                        const blindsHeight = blindsPartial ? windowHeight * 0.4 : windowHeight - 0.3;
+                                        const blindsY = blindsPartial ? windowHeight/2 - blindsHeight/2 - 0.1 : 0;
+                                        const blinds = new THREE.Mesh(
+                                            new THREE.PlaneGeometry(windowWidth - 0.3, blindsHeight),
+                                            new THREE.MeshStandardMaterial({
+                                                color: Math.random() > 0.5 ? 0xF5F5DC : 0xE8E8E8,
+                                                roughness: 0.9, side: THREE.DoubleSide
+                                            })
+                                        );
+                                        blinds.position.set(0, blindsY, -0.25);
+                                        blinds.renderOrder = 1;
+                                        windowGroup.add(blinds);
+                                    }
+                                    
+                                    // Sill
+                                    const sill = new THREE.Mesh(
+                                        new THREE.BoxGeometry(windowWidth + 0.2, 0.06, 0.25),
+                                        new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.3, roughness: 0.6 })
+                                    );
+                                    sill.position.set(0, -windowHeight/2 - 0.03, 0.1);
+                                    windowGroup.add(sill);
+                                    
+                                    // Position
+                                    const offset = (side === 0 || side === 1) ? buildingDepth/2 + 0.05 : buildingWidth/2 + 0.05;
+                                    const xPos = (i - windowsPerFloor/2 + 0.5) * 4;
+                                    switch(side) {
+                                        case 0: windowGroup.position.set(xPos, y, offset); break;
+                                        case 1: windowGroup.position.set(-xPos, y, -offset); windowGroup.rotation.y = Math.PI; break;
+                                        case 2: windowGroup.position.set(-offset, y, xPos); windowGroup.rotation.y = Math.PI/2; break;
+                                        case 3: windowGroup.position.set(offset, y, -xPos); windowGroup.rotation.y = -Math.PI/2; break;
+                                    }
+                                    sectionGroup.add(windowGroup);
                                 }
-                                
-                                sectionGroup.add(windowGroup);
                             }
                         }
                     }
                     
-                    // Ground floor entrance area - recessed
+                    // Building details - quality-gated
                     const entranceWidth = 12;
                     const entranceHeight = 5;
                     const entranceDepth = 2;
                     
-                    // Entrance recess (darker)
-                    const entranceGeom = new THREE.BoxGeometry(entranceWidth, entranceHeight, entranceDepth);
-                    const entranceMat = new THREE.MeshStandardMaterial({
-                        color: new THREE.Color(data.color).multiplyScalar(0.3),
-                        roughness: 0.7,
-                        metalness: 0.2
-                    });
-                    const entrance = new THREE.Mesh(entranceGeom, entranceMat);
-                    entrance.position.set(0, entranceHeight / 2, buildingDepth / 2 - entranceDepth / 2);
-                    sectionGroup.add(entrance);
+                    if (this.state.quality !== 'low') {
+                        // Entrance recess (darker)
+                        const entranceGeom = new THREE.BoxGeometry(entranceWidth, entranceHeight, entranceDepth);
+                        const entranceMat = new THREE.MeshStandardMaterial({
+                            color: new THREE.Color(data.color).multiplyScalar(0.3),
+                            roughness: 0.7,
+                            metalness: 0.2
+                        });
+                        const entrance = new THREE.Mesh(entranceGeom, entranceMat);
+                        entrance.position.set(0, entranceHeight / 2, buildingDepth / 2 - entranceDepth / 2);
+                        sectionGroup.add(entrance);
+                        
+                        // Doors - use standard material instead of physical
+                        const doorWidth = 2.5;
+                        const doorHeight = 4;
+                        const doorMaterial = new THREE.MeshStandardMaterial({
+                            color: 0x1a1a1a,
+                            metalness: 0.9,
+                            roughness: 0.1,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const leftDoorGeom = new THREE.BoxGeometry(doorWidth, doorHeight, 0.1);
+                        const leftDoor = new THREE.Mesh(leftDoorGeom, doorMaterial);
+                        leftDoor.position.set(-doorWidth / 2 - 0.1, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.1);
+                        sectionGroup.add(leftDoor);
+                        const rightDoor = new THREE.Mesh(leftDoorGeom, doorMaterial);
+                        rightDoor.position.set(doorWidth / 2 + 0.1, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.1);
+                        sectionGroup.add(rightDoor);
+                    }
                     
-                    // Modern glass entrance doors (double doors)
-                    const doorWidth = 2.5;
-                    const doorHeight = 4;
-                    const doorMaterial = new THREE.MeshPhysicalMaterial({
-                        color: 0x1a1a1a,
-                        metalness: 0.9,
-                        roughness: 0.1,
-                        transmission: 0.7,
-                        thickness: 0.1
-                    });
+                    if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                        // Door frames, canopy, pillars only on high+
+                        const doorWidth = 2.5;
+                        const doorHeight = 4;
+                        const frameMat = new THREE.MeshStandardMaterial({
+                            color: 0xC0C0C0, metalness: 0.95, roughness: 0.1
+                        });
+                        [-doorWidth - 0.2, 0, doorWidth + 0.2].forEach(x => {
+                            const frame = new THREE.Mesh(
+                                new THREE.BoxGeometry(0.15, doorHeight + 0.5, 0.15), frameMat
+                            );
+                            frame.position.set(x, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.15);
+                            sectionGroup.add(frame);
+                        });
+                        const topFrame = new THREE.Mesh(
+                            new THREE.BoxGeometry(doorWidth * 2 + 0.6, 0.15, 0.15), frameMat
+                        );
+                        topFrame.position.set(0, doorHeight + 0.5, buildingDepth / 2 + 0.15);
+                        sectionGroup.add(topFrame);
+                        
+                        // Canopy
+                        const canopy = new THREE.Mesh(
+                            new THREE.BoxGeometry(entranceWidth + 2, 0.3, 5),
+                            new THREE.MeshStandardMaterial({ color: data.color, metalness: 0.6, roughness: 0.3 })
+                        );
+                        canopy.position.set(0, entranceHeight + 1, buildingDepth / 2 + 1);
+                        canopy.castShadow = true;
+                        sectionGroup.add(canopy);
+                        
+                        // Canopy pillars
+                        [-5, 5].forEach(x => {
+                            const pillar = new THREE.Mesh(
+                                new THREE.CylinderGeometry(0.2, 0.2, entranceHeight + 1, 8), frameMat
+                            );
+                            pillar.position.set(x, (entranceHeight + 1) / 2, buildingDepth / 2 + 3);
+                            sectionGroup.add(pillar);
+                        });
+                    }
                     
-                    // Left door
-                    const leftDoorGeom = new THREE.BoxGeometry(doorWidth, doorHeight, 0.1);
-                    const leftDoor = new THREE.Mesh(leftDoorGeom, doorMaterial);
-                    leftDoor.position.set(-doorWidth / 2 - 0.1, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.1);
-                    sectionGroup.add(leftDoor);
-                    
-                    // Right door
-                    const rightDoor = new THREE.Mesh(leftDoorGeom, doorMaterial);
-                    rightDoor.position.set(doorWidth / 2 + 0.1, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.1);
-                    sectionGroup.add(rightDoor);
-                    
-                    // Door frames (stainless steel)
-                    const frameMat = new THREE.MeshStandardMaterial({
-                        color: 0xC0C0C0,
-                        metalness: 0.95,
-                        roughness: 0.1
-                    });
-                    
-                    // Vertical frames
-                    [-doorWidth - 0.2, 0, doorWidth + 0.2].forEach(x => {
-                        const frameGeom = new THREE.BoxGeometry(0.15, doorHeight + 0.5, 0.15);
-                        const frame = new THREE.Mesh(frameGeom, frameMat);
-                        frame.position.set(x, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.15);
-                        sectionGroup.add(frame);
-                    });
-                    
-                    // Top frame (horizontal)
-                    const topFrameGeom = new THREE.BoxGeometry(doorWidth * 2 + 0.6, 0.15, 0.15);
-                    const topFrame = new THREE.Mesh(topFrameGeom, frameMat);
-                    topFrame.position.set(0, doorHeight + 0.5, buildingDepth / 2 + 0.15);
-                    sectionGroup.add(topFrame);
-                    
-                    // Entrance canopy (modern overhang)
-                    const canopyGeom = new THREE.BoxGeometry(entranceWidth + 2, 0.3, 5);
-                    const canopyMat = new THREE.MeshStandardMaterial({
-                        color: data.color,
-                        metalness: 0.6,
-                        roughness: 0.3
-                    });
-                    const canopy = new THREE.Mesh(canopyGeom, canopyMat);
-                    canopy.position.set(0, entranceHeight + 1, buildingDepth / 2 + 1);
-                    canopy.castShadow = true;
-                    sectionGroup.add(canopy);
-                    
-                    // Canopy supports (pillars)
-                    [-5, 5].forEach(x => {
-                        const pillarGeom = new THREE.CylinderGeometry(0.2, 0.2, entranceHeight + 1, 16);
-                        const pillar = new THREE.Mesh(pillarGeom, frameMat);
-                        pillar.position.set(x, (entranceHeight + 1) / 2, buildingDepth / 2 + 3);
-                        pillar.castShadow = true;
-                        sectionGroup.add(pillar);
-                    });
-                    
-                    // Building name sign above entrance
+                    // Building name sign (always shown - needed for navigation)
                     const signWidth = 10;
                     const signHeight = 1.5;
                     const signGeom = new THREE.BoxGeometry(signWidth, signHeight, 0.3);
-                    const signMat = new THREE.MeshStandardMaterial({
-                        color: 0xFFFFFF,
-                        emissive: 0xFFFFFF,
-                        emissiveIntensity: 0.3,
-                        metalness: 0.1,
-                        roughness: 0.8
+                    const signMat = new THREE.MeshBasicMaterial({
+                        color: 0xFFFFFF
                     });
                     const sign = new THREE.Mesh(signGeom, signMat);
                     sign.position.set(0, entranceHeight + 2.5, buildingDepth / 2 + 0.2);
@@ -3830,54 +3840,42 @@
                     
                     // Sign text
                     const signCanvas = document.createElement('canvas');
-                    signCanvas.width = 512;
-                    signCanvas.height = 80;
+                    signCanvas.width = this.state.quality === 'low' ? 256 : 512;
+                    signCanvas.height = this.state.quality === 'low' ? 40 : 80;
                     const ctx = signCanvas.getContext('2d');
-                    
-                    // Background
                     ctx.fillStyle = '#' + new THREE.Color(data.color).getHexString();
-                    ctx.fillRect(0, 0, 512, 80);
-                    
-                    // Text
+                    ctx.fillRect(0, 0, signCanvas.width, signCanvas.height);
                     ctx.fillStyle = 'white';
-                    ctx.font = 'bold 48px Arial, sans-serif';
+                    ctx.font = `bold ${signCanvas.height * 0.6}px Arial, sans-serif`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(`${data.icon} ${title.toUpperCase()}`, 256, 40);
-                    
+                    ctx.fillText(`${data.icon} ${title.toUpperCase()}`, signCanvas.width / 2, signCanvas.height / 2);
                     const signTexture = new THREE.CanvasTexture(signCanvas);
                     const signTextMat = new THREE.MeshBasicMaterial({ map: signTexture });
-                    const signTextGeom = new THREE.PlaneGeometry(signWidth - 0.2, signHeight - 0.2);
-                    const signText = new THREE.Mesh(signTextGeom, signTextMat);
+                    const signText = new THREE.Mesh(
+                        new THREE.PlaneGeometry(signWidth - 0.2, signHeight - 0.2), signTextMat
+                    );
                     signText.position.set(0, entranceHeight + 2.5, buildingDepth / 2 + 0.36);
                     sectionGroup.add(signText);
                     
-                    // Rooftop with mechanical units
-                    const roofWidth = buildingWidth + 2;
-                    const roofDepth = buildingDepth + 2;
-                    const roofGeom = new THREE.BoxGeometry(roofWidth, 1, roofDepth);
-                    const roofMat = new THREE.MeshStandardMaterial({
-                        color: 0x2a2a2a,
-                        metalness: 0.5,
-                        roughness: 0.6
-                    });
-                    const roof = new THREE.Mesh(roofGeom, roofMat);
+                    // Roof (always, simple)
+                    const roof = new THREE.Mesh(
+                        new THREE.BoxGeometry(buildingWidth + 2, 1, buildingDepth + 2),
+                        new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.5, roughness: 0.6 })
+                    );
                     roof.position.y = buildingHeight + 0.5;
-                    roof.castShadow = true;
                     sectionGroup.add(roof);
                     
-                    // HVAC units on roof
-                    for (let i = 0; i < 4; i++) {
-                        const hvacGeom = new THREE.BoxGeometry(2.5, 1.8, 2);
-                        const hvacMat = new THREE.MeshStandardMaterial({
-                            color: 0x555555,
-                            metalness: 0.7,
-                            roughness: 0.4
-                        });
-                        const hvac = new THREE.Mesh(hvacGeom, hvacMat);
-                        hvac.position.set((i - 1.5) * 5, buildingHeight + 1.9, -5);
-                        hvac.castShadow = true;
-                        sectionGroup.add(hvac);
+                    // HVAC units only on high+
+                    if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                        for (let i = 0; i < 4; i++) {
+                            const hvac = new THREE.Mesh(
+                                new THREE.BoxGeometry(2.5, 1.8, 2),
+                                new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.4 })
+                            );
+                            hvac.position.set((i - 1.5) * 5, buildingHeight + 1.9, -5);
+                            sectionGroup.add(hvac);
+                        }
                     }
                     
                     // Position the section

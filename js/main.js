@@ -3549,6 +3549,7 @@
                 const treeCount = this.state.quality === 'low' ? 8 : this.state.quality === 'medium' ? 18 : 35;
                 this.createStylizedTrees(treeCount);
                 this.createScatteredProps();
+                this.createInteractiveObjects(); // always — core gameplay
                 this.freezeStaticObjects();
             }
 
@@ -3690,15 +3691,12 @@
             }
             
             freezeStaticObjects() {
-                // Buildings, ground, roads, trees, lamps are all static
-                // Disabling matrixAutoUpdate saves a matrix multiplication per object per frame
                 this.scene.traverse(obj => {
-                    // Skip the car, camera, and dynamic objects
-                    if (obj === this.car || obj.userData.dynamic) return;
-                    if (obj.parent === this.car) return;
-                    
+                    // Skip dynamic objects (interactive items, car, particles)
+                    if (obj.userData.dynamic) return;
+                    if (obj === this.car || obj.parent === this.car) return;
                     obj.matrixAutoUpdate = false;
-                    obj.updateMatrix(); // One final update
+                    obj.updateMatrix();
                 });
             }
             
@@ -4019,194 +4017,329 @@
             }
             
             createInteractiveObjects() {
-                // Traffic cones
-                const coneMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xFF6B35,
-                    roughness: 0.7
-                });
-                const coneStripeMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xFFFFFF,
-                    roughness: 0.7
-                });
-                
                 this.interactiveObjects = [];
-                
-                // Place cones around the map
-                const conePositions = [
-                    { x: 10, z: 55 }, { x: -10, z: 55 },
-                    { x: 15, z: 50 }, { x: -15, z: 50 },
-                    { x: 50, z: 0 }, { x: -50, z: 0 },
-                    { x: 0, z: -30 }, { x: 5, z: -30 }, { x: -5, z: -30 },
+
+                // ── Wooden crates (breakable) ──────────────────────────────────
+                const cratePositions = [
+                    { x: 10, z: 52 }, { x: -10, z: 52 },
+                    { x: 15, z: 46 }, { x: -15, z: 46 },
+                    { x: 30, z: 20 }, { x: -30, z: 20 },
+                    { x: 0, z: -28 }, { x: 6, z: -32 }, { x: -6, z: -32 },
                 ];
-                
-                conePositions.forEach(pos => {
-                    const coneGroup = new THREE.Group();
-                    
-                    // Cone body
-                    const coneGeom = new THREE.ConeGeometry(0.4, 1.2, 8);
-                    const cone = new THREE.Mesh(coneGeom, coneMaterial);
-                    cone.position.y = 0.6;
-                    coneGroup.add(cone);
-                    
-                    // White stripes
-                    const stripe1 = new THREE.Mesh(
-                        new THREE.TorusGeometry(0.28, 0.06, 8, 16),
-                        coneStripeMaterial
-                    );
-                    stripe1.rotation.x = Math.PI / 2;
-                    stripe1.position.y = 0.4;
-                    coneGroup.add(stripe1);
-                    
-                    const stripe2 = new THREE.Mesh(
-                        new THREE.TorusGeometry(0.18, 0.05, 8, 16),
-                        coneStripeMaterial
-                    );
-                    stripe2.rotation.x = Math.PI / 2;
-                    stripe2.position.y = 0.8;
-                    coneGroup.add(stripe2);
-                    
-                    // Base
-                    const base = new THREE.Mesh(
-                        new THREE.BoxGeometry(0.8, 0.1, 0.8),
-                        coneMaterial
-                    );
-                    base.position.y = 0.05;
-                    coneGroup.add(base);
-                    
-                    coneGroup.position.set(pos.x, 0, pos.z);
-                    coneGroup.userData = {
-                        type: 'cone',
-                        velocityX: 0,
-                        velocityZ: 0,
-                        velocityY: 0,
-                        angularVel: 0,
-                        grounded: true
-                    };
-                    
-                    this.scene.add(coneGroup);
-                    this.interactiveObjects.push(coneGroup);
+                cratePositions.forEach(pos => {
+                    this.spawnCrate(pos.x, pos.z);
                 });
-                
-                // Barrels
-                const barrelMaterial = new THREE.MeshStandardMaterial({
-                    color: 0x2D3436,
-                    roughness: 0.8,
-                    metalness: 0.3
-                });
-                const barrelRingMaterial = new THREE.MeshStandardMaterial({
-                    color: 0xFDCB6E,
-                    roughness: 0.6,
-                    metalness: 0.4
-                });
-                
+
+                // ── Oil barrels (heavy, roll) ───────────────────────────────────
                 const barrelPositions = [
-                    { x: 25, z: 40 }, { x: 27, z: 40 },
-                    { x: -25, z: 40 }, { x: -27, z: 40 },
-                    { x: 40, z: -20 }, { x: -40, z: -20 },
+                    { x: 25, z: 38 }, { x: 28, z: 38 },
+                    { x: -25, z: 38 }, { x: -28, z: 38 },
+                    { x: 40, z: -18 }, { x: -40, z: -18 },
                 ];
-                
                 barrelPositions.forEach(pos => {
-                    const barrelGroup = new THREE.Group();
-                    
-                    // Main barrel
-                    const barrelGeom = new THREE.CylinderGeometry(0.6, 0.6, 1.5, 16);
-                    const barrel = new THREE.Mesh(barrelGeom, barrelMaterial);
-                    barrel.position.y = 0.75;
-                    barrelGroup.add(barrel);
-                    
-                    // Yellow warning rings
-                    const ring1 = new THREE.Mesh(
-                        new THREE.TorusGeometry(0.62, 0.08, 8, 16),
-                        barrelRingMaterial
-                    );
-                    ring1.rotation.x = Math.PI / 2;
-                    ring1.position.y = 0.3;
-                    barrelGroup.add(ring1);
-                    
-                    const ring2 = new THREE.Mesh(
-                        new THREE.TorusGeometry(0.62, 0.08, 8, 16),
-                        barrelRingMaterial
-                    );
-                    ring2.rotation.x = Math.PI / 2;
-                    ring2.position.y = 1.2;
-                    barrelGroup.add(ring2);
-                    
-                    barrelGroup.position.set(pos.x, 0, pos.z);
-                    barrelGroup.userData = {
-                        type: 'barrel',
-                        velocityX: 0,
-                        velocityZ: 0,
-                        velocityY: 0,
-                        angularVel: 0,
-                        grounded: true,
-                        mass: 2 // Heavier than cones
-                    };
-                    
-                    this.scene.add(barrelGroup);
-                    this.interactiveObjects.push(barrelGroup);
+                    this.spawnBarrel(pos.x, pos.z);
+                });
+
+                // ── Bowling pins cluster ────────────────────────────────────────
+                const pinBase = { x: 0, z: -55 };
+                const pinOffsets = [
+                    {x:0,z:0},{x:-1.2,z:1.4},{x:1.2,z:1.4},
+                    {x:-2.4,z:2.8},{x:0,z:2.8},{x:2.4,z:2.8},
+                ];
+                pinOffsets.forEach(o => {
+                    this.spawnPin(pinBase.x + o.x, pinBase.z + o.z);
                 });
             }
-            
+
+            spawnCrate(x, z) {
+                const size = 1.1 + Math.random() * 0.3;
+                const group = new THREE.Group();
+
+                // Wood planks — MeshLambertMaterial with painted canvas
+                const canvas = document.createElement('canvas');
+                canvas.width = canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#c8a060';  ctx.fillRect(0,0,128,128);
+                // plank lines
+                ctx.strokeStyle = '#7a5030'; ctx.lineWidth = 3;
+                [16,48,80,112].forEach(y => { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(128,y); ctx.stroke(); });
+                [32,96].forEach(x2 => { ctx.beginPath(); ctx.moveTo(x2,0); ctx.lineTo(x2,128); ctx.stroke(); });
+                // subtle grain
+                ctx.strokeStyle = 'rgba(100,60,20,0.18)'; ctx.lineWidth = 1;
+                for (let i = 0; i < 12; i++) {
+                    const y0 = Math.random()*128;
+                    ctx.beginPath(); ctx.moveTo(0,y0); ctx.lineTo(128,y0+Math.random()*8-4); ctx.stroke();
+                }
+                const tex = new THREE.CanvasTexture(canvas);
+                const mat = new THREE.MeshLambertMaterial({ map: tex });
+
+                const body = new THREE.Mesh(new THREE.BoxGeometry(size,size,size), mat);
+                body.position.y = size/2;
+                body.castShadow = true;
+                group.add(body);
+
+                // Metal corner brackets
+                const bracketMat = new THREE.MeshLambertMaterial({ color: 0x888880 });
+                const bs = size * 0.18;
+                [[1,1],[1,-1],[-1,1],[-1,-1]].forEach(([sx,sz]) => {
+                    const b = new THREE.Mesh(new THREE.BoxGeometry(bs, bs, size * 1.02), bracketMat);
+                    b.position.set(sx*(size/2 - bs/2 + 0.01), size/2, 0);
+                    group.add(b);
+                    const b2 = new THREE.Mesh(new THREE.BoxGeometry(size * 1.02, bs, bs), bracketMat);
+                    b2.position.set(0, size/2, sz*(size/2 - bs/2 + 0.01));
+                    group.add(b2);
+                });
+
+                group.position.set(x, 0, z);
+                group.userData = {
+                    type: 'crate', breakable: true, broken: false,
+                    size,
+                    spawnX: x, spawnZ: z,
+                    velocityX:0, velocityZ:0, velocityY:0,
+                    angularVelX:0, angularVelZ:0,
+                    grounded: true, mass: 1.2,
+                    collisionRadius: size * 0.7
+                };
+                group.userData.dynamic = true;
+                this.scene.add(group);
+                this.interactiveObjects.push(group);
+                return group;
+            }
+
+            spawnBarrel(x, z) {
+                const group = new THREE.Group();
+
+                // Painted metal barrel
+                const canvas = document.createElement('canvas');
+                canvas.width = 64; canvas.height = 128;
+                const ctx = canvas.getContext('2d');
+                // body gradient
+                const grd = ctx.createLinearGradient(0,0,64,0);
+                grd.addColorStop(0,'#1a2a1a'); grd.addColorStop(0.4,'#2d4a2d');
+                grd.addColorStop(0.6,'#2d4a2d'); grd.addColorStop(1,'#1a2a1a');
+                ctx.fillStyle = grd; ctx.fillRect(0,0,64,128);
+                // hazard stripes
+                ctx.fillStyle = '#e8c020';
+                [20,55,90].forEach(y => ctx.fillRect(0,y,64,8));
+                // rivet dots
+                ctx.fillStyle = '#888'; 
+                [[8,10],[56,10],[8,118],[56,118]].forEach(([rx,ry]) => {
+                    ctx.beginPath(); ctx.arc(rx,ry,3,0,Math.PI*2); ctx.fill();
+                });
+                const tex = new THREE.CanvasTexture(canvas);
+
+                const bodyMat = new THREE.MeshLambertMaterial({ map: tex });
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,1.4,16), bodyMat);
+                body.position.y = 0.7;
+                body.castShadow = true;
+                group.add(body);
+
+                // Metal rings
+                const ringMat = new THREE.MeshLambertMaterial({ color: 0x909090, metalness: 0.8 });
+                [0.25, 0.7, 1.15].forEach(y => {
+                    const ring = new THREE.Mesh(
+                        new THREE.TorusGeometry(0.57, 0.05, 8, 20), ringMat
+                    );
+                    ring.rotation.x = Math.PI/2;
+                    ring.position.y = y;
+                    group.add(ring);
+                });
+
+                // Lid
+                const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.57,0.57,0.08,16), ringMat);
+                lid.position.y = 1.44;
+                group.add(lid);
+
+                group.position.set(x, 0, z);
+                group.userData = {
+                    type: 'barrel', breakable: false, broken: false,
+                    spawnX: x, spawnZ: z,
+                    velocityX:0, velocityZ:0, velocityY:0,
+                    angularVelX:0, angularVelZ:0,
+                    grounded: true, mass: 3.0,
+                    collisionRadius: 0.65
+                };
+                group.userData.dynamic = true;
+                this.scene.add(group);
+                this.interactiveObjects.push(group);
+                return group;
+            }
+
+            spawnPin(x, z) {
+                const group = new THREE.Group();
+                const mat = new THREE.MeshLambertMaterial({ color: 0xf8f8f5 });
+                const redMat = new THREE.MeshLambertMaterial({ color: 0xcc2020 });
+
+                // Pin body (lathe-style with segments)
+                const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.28, 1.1, 12), mat);
+                body.position.y = 0.55;
+                group.add(body);
+                // Neck
+                const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.22, 0.25, 12), mat);
+                neck.position.y = 1.1;
+                group.add(neck);
+                // Head ball
+                const head = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 8), mat);
+                head.position.y = 1.45;
+                group.add(head);
+                // Red stripe
+                const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.04, 8, 16), redMat);
+                stripe.rotation.x = Math.PI/2;
+                stripe.position.y = 0.9;
+                group.add(stripe);
+
+                group.position.set(x, 0, z);
+                group.userData = {
+                    type: 'pin', breakable: false, broken: false,
+                    spawnX: x, spawnZ: z,
+                    velocityX:0, velocityZ:0, velocityY:0,
+                    angularVelX:0, angularVelZ:0,
+                    grounded: true, mass: 0.6,
+                    collisionRadius: 0.3
+                };
+                group.userData.dynamic = true;
+                this.scene.add(group);
+                this.interactiveObjects.push(group);
+                return group;
+            }
+
+            breakCrate(obj) {
+                if (obj.userData.broken) return;
+                obj.userData.broken = true;
+
+                const pos = obj.position.clone();
+                const size = obj.userData.size || 1.1;
+
+                // Spawn 6 debris chunks
+                const debrisMat = new THREE.MeshLambertMaterial({ color: 0xb8903a });
+                const darkMat  = new THREE.MeshLambertMaterial({ color: 0x7a5030 });
+                for (let i = 0; i < 6; i++) {
+                    const s = size * (0.2 + Math.random() * 0.3);
+                    const chunk = new THREE.Mesh(
+                        new THREE.BoxGeometry(s, s * (0.5 + Math.random()), s),
+                        i % 2 === 0 ? debrisMat : darkMat
+                    );
+                    chunk.position.copy(pos);
+                    chunk.position.y += size * 0.5;
+                    chunk.userData = {
+                        type: 'debris', dynamic: true,
+                        velocityX: (Math.random()-0.5) * 8,
+                        velocityZ: (Math.random()-0.5) * 8,
+                        velocityY: 4 + Math.random() * 4,
+                        angularVelX: (Math.random()-0.5) * 15,
+                        angularVelZ: (Math.random()-0.5) * 15,
+                        grounded: false,
+                        life: 4.0  // seconds before fade
+                    };
+                    this.scene.add(chunk);
+                    this.interactiveObjects.push(chunk);
+                }
+
+                // Remove the crate itself
+                this.scene.remove(obj);
+                const idx = this.interactiveObjects.indexOf(obj);
+                if (idx !== -1) this.interactiveObjects.splice(idx, 1);
+                obj.traverse(c => { if (c.isMesh) { c.geometry.dispose(); c.material.dispose(); }});
+
+                this.spawnDustBurst(pos.x, 0.3, pos.z, 1.0);
+                this.triggerScreenShake(0.4);
+            }
+
             updateInteractiveObjects(delta, carX, carZ, carSpeed, carRotation) {
                 if (!this.interactiveObjects) return;
-                
+
                 const carRadius = CONFIG.CAR_COLLISION_RADIUS;
-                
-                this.interactiveObjects.forEach(obj => {
+
+                for (let i = this.interactiveObjects.length - 1; i >= 0; i--) {
+                    const obj = this.interactiveObjects[i];
                     const data = obj.userData;
-                    
-                    // Check collision with car
+
+                    // ── Debris lifetime fade ────────────────────────────────────
+                    if (data.type === 'debris') {
+                        data.life -= delta;
+                        if (data.life <= 0) {
+                            this.scene.remove(obj);
+                            this.interactiveObjects.splice(i, 1);
+                            obj.traverse(c => { if (c.isMesh) { c.geometry.dispose(); c.material.dispose(); }});
+                            continue;
+                        }
+                        if (data.life < 1.0) {
+                            obj.traverse(c => {
+                                if (c.isMesh && c.material) c.material.opacity = data.life;
+                                if (c.isMesh && c.material) c.material.transparent = true;
+                            });
+                        }
+                    }
+
+                    // ── Car collision ───────────────────────────────────────────
                     const dx = obj.position.x - carX;
                     const dz = obj.position.z - carZ;
-                    const dist = Math.sqrt(dx * dx + dz * dz);
-                    const objRadius = data.type === 'barrel' ? 0.8 : 0.5;
-                    
-                    if (dist < carRadius + objRadius && Math.abs(carSpeed) > 1) {
-                        // Hit! Apply force
-                        const force = Math.abs(carSpeed) * (data.mass || 1) * 0.5;
-                        const nx = dx / dist;
-                        const nz = dz / dist;
-                        
-                        data.velocityX = nx * force + Math.sin(carRotation) * carSpeed * 0.3;
-                        data.velocityZ = nz * force + Math.cos(carRotation) * carSpeed * 0.3;
-                        data.velocityY = Math.random() * 3 + 1;
-                        data.angularVel = (Math.random() - 0.5) * 10;
+                    const distSq = dx*dx + dz*dz;
+                    const collR = data.collisionRadius || 0.5;
+                    const minDist = carRadius + collR;
+
+                    if (distSq < minDist * minDist && Math.abs(carSpeed) > 1) {
+                        const dist = Math.sqrt(distSq);
+                        const nx = dist > 0.001 ? dx/dist : 1;
+                        const nz = dist > 0.001 ? dz/dist : 0;
+
+                        // Break crate on impact
+                        if (data.breakable && !data.broken && Math.abs(carSpeed) > 4) {
+                            this.breakCrate(obj);
+                            // Push car back slightly
+                            if (this.vehiclePhysics) this.vehiclePhysics.speed *= 0.75;
+                            continue;
+                        }
+
+                        // Push object away
+                        const force = Math.abs(carSpeed) / (data.mass || 1) * 0.6;
+                        data.velocityX = nx * force + Math.sin(carRotation) * Math.abs(carSpeed) * 0.2;
+                        data.velocityZ = nz * force + Math.cos(carRotation) * Math.abs(carSpeed) * 0.2;
+                        data.velocityY = Math.random() * 2 + 0.5;
+                        data.angularVelX = (Math.random()-0.5) * 12;
+                        data.angularVelZ = (Math.random()-0.5) * 8;
                         data.grounded = false;
-                        
-                        // Spawn dust
-                        this.spawnDustBurst(obj.position.x, 0.2, obj.position.z, 0.5);
+
+                        // Push car back (solid collision)
+                        if (this.vehiclePhysics) {
+                            this.vehiclePhysics.x -= nx * 0.15;
+                            this.vehiclePhysics.z -= nz * 0.15;
+                            this.vehiclePhysics.speed *= 0.85;
+                        }
+
+                        this.spawnDustBurst(obj.position.x, 0.1, obj.position.z, 0.3);
                     }
-                    
-                    // Physics update
-                    if (!data.grounded || Math.abs(data.velocityX) > 0.1 || Math.abs(data.velocityZ) > 0.1) {
-                        // Apply velocity
+
+                    // ── Physics integration ─────────────────────────────────────
+                    if (!data.grounded || Math.abs(data.velocityX) > 0.05 ||
+                        Math.abs(data.velocityZ) > 0.05 || data.velocityY !== 0) {
+
                         obj.position.x += data.velocityX * delta;
                         obj.position.z += data.velocityZ * delta;
                         obj.position.y += data.velocityY * delta;
-                        
+
                         // Gravity
-                        data.velocityY -= 15 * delta;
-                        
-                        // Ground collision
+                        if (!data.grounded) data.velocityY -= 18 * delta;
+
+                        // Ground
                         if (obj.position.y <= 0) {
                             obj.position.y = 0;
-                            data.velocityY = -data.velocityY * 0.3;
-                            if (Math.abs(data.velocityY) < 0.5) {
-                                data.velocityY = 0;
-                                data.grounded = true;
-                            }
+                            data.velocityY = Math.abs(data.velocityY) * 0.3;
+                            if (data.velocityY < 0.5) { data.velocityY = 0; data.grounded = true; }
                         }
-                        
+
                         // Friction
-                        data.velocityX *= 0.98;
-                        data.velocityZ *= 0.98;
-                        
-                        // Rotation
-                        obj.rotation.x += data.angularVel * delta;
-                        obj.rotation.z += data.angularVel * delta * 0.5;
-                        data.angularVel *= 0.98;
+                        const friction = data.grounded ? 0.94 : 0.995;
+                        data.velocityX *= friction;
+                        data.velocityZ *= friction;
+
+                        // Angular
+                        obj.rotation.x += data.angularVelX * delta;
+                        obj.rotation.z += data.angularVelZ * delta;
+                        data.angularVelX *= 0.96;
+                        data.angularVelZ *= 0.96;
                     }
-                });
+                }
             }
             
             setupEventListeners() {
@@ -4966,80 +5099,37 @@
             // 🎯 PERFORMANCE: Frustum Culling - Only render what the camera sees
             updateFrustumCulling() {
                 if (!this.frustumCuller || !this.camera || !CONFIG.CULLING_ENABLED) return;
-                
+
                 this.frustumCuller.update();
-                
-                const cameraPosition = this.camera.position;
-                const carPosition = this.car ? this.car.position : cameraPosition;
-                
-                // Reuse cached vector (avoid per-frame allocation)
-                if (!this._cullDir) this._cullDir = new THREE.Vector3();
-                if (!this._cullToObj) this._cullToObj = new THREE.Vector3();
-                const carDirection = this._cullDir;
-                const toObject = this._cullToObj;
-                
-                if (this.car) {
-                    carDirection.set(
-                        Math.sin(this.car.rotation.y),
-                        0,
-                        Math.cos(this.car.rotation.y)
-                    );
-                }
-                
-                // Cull decorations
+
+                const camPos = this.camera.position;
+
+                // Cull decorations only (trees, rocks — not signs or interactive objects)
                 this.decorations.forEach(obj => {
-                    if (obj.userData.cullable === false) return;
-                    
-                    const objPos = obj.position;
-                    const dx = cameraPosition.x - objPos.x;
-                    const dz = cameraPosition.z - objPos.z;
-                    const distSq = dx * dx + dz * dz;
-                    
-                    // Quick distance check (no sqrt)
-                    if (distSq > CONFIG.VIEW_DISTANCE * CONFIG.VIEW_DISTANCE) {
+                    if (obj.userData.cullable === false || obj.userData.dynamic) return;
+
+                    const p = obj.position;
+                    const dx = camPos.x - p.x;
+                    const dz = camPos.z - p.z;
+                    const distSq = dx*dx + dz*dz;
+                    const vd = CONFIG.VIEW_DISTANCE;
+
+                    if (distSq > vd * vd) {
                         obj.visible = false;
-                        return;
-                    }
-                    
-                    // Behind camera check (dot product, no allocation)
-                    if (CONFIG.BEHIND_CAMERA_CULL && this.car) {
-                        const toX = objPos.x - carPosition.x;
-                        const toZ = objPos.z - carPosition.z;
-                        const dot = toX * carDirection.x + toZ * carDirection.z;
-                        if (dot < -20 && distSq > 1600) {
-                            obj.visible = false;
-                            return;
-                        }
-                    }
-                    
-                    const boundingRadius = obj.userData.boundingRadius || 10;
-                    obj.visible = this.frustumCuller.isVisible(obj, boundingRadius);
-                    
-                    if (CONFIG.LOD_ENABLED && obj.visible) {
-                        const distance = Math.sqrt(distSq);
-                        const lodLevel = this.frustumCuller.getLODLevel(distance);
-                        this.applyLODToObject(obj, lodLevel, distance);
-                    }
-                });
-                
-                // Cull buildings (less aggressive - they're important landmarks)
-                this.buildings.forEach(building => {
-                    const objPos = building.position;
-                    const distance = cameraPosition.distanceTo(objPos);
-                    
-                    // Buildings always visible within reasonable range
-                    if (distance < 200) {
-                        building.visible = true;
-                        
-                        // But reduce detail at distance
-                        if (CONFIG.LOD_ENABLED) {
-                            this.applyBuildingLOD(building, distance);
-                        }
                     } else {
-                        // Far buildings: frustum cull
-                        building.visible = this.frustumCuller.isVisible(building, 25);
+                        // Always restore — frustum culler may have hidden it previously
+                        const br = obj.userData.boundingRadius || 10;
+                        obj.visible = this.frustumCuller.isVisible(obj, br);
                     }
                 });
+
+                // Buildings/signs: never cull — they're landmarks
+                this.buildings.forEach(b => { b.visible = true; });
+
+                // Interactive objects: never cull — physics needs them visible
+                if (this.interactiveObjects) {
+                    this.interactiveObjects.forEach(o => { o.visible = true; });
+                }
             }
             
             // Apply LOD settings to an object

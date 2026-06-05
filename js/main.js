@@ -5175,11 +5175,6 @@
                         this.applyLODToObject(obj, lodLevel, distance);
                     }
                 });
-                    if (CONFIG.LOD_ENABLED && obj.visible) {
-                        const lodLevel = this.frustumCuller.getLODLevel(distance);
-                        this.applyLODToObject(obj, lodLevel, distance);
-                    }
-                });
                 
                 // Cull buildings (less aggressive - they're important landmarks)
                 this.buildings.forEach(building => {

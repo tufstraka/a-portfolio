@@ -366,7 +366,7 @@
             LOD_ENABLED: true,
             LOD_DISTANCES: [30, 60, 120],  // Near, medium, far thresholds
             CHUNK_SIZE: 50,                 // World chunk size for spatial partitioning
-            VIEW_DISTANCE: 250,             // Max render distance
+            VIEW_DISTANCE: 180,             // Max render distance (reduced for perf)
             BEHIND_CAMERA_CULL: true        // Cull objects behind camera
         };
 
@@ -1670,6 +1670,11 @@
                     
                     // Load non-critical assets progressively
                     setTimeout(() => this.loadEnvironmentDetails(), 500);
+                    
+                    // Performance: downgrade materials on low quality
+                    if (this.state.quality === 'low') {
+                        this.downgradeMaterials();
+                    }
                 } catch (error) {
                     console.error('Portfolio initialization failed:', error);
                     // Show error message to user
@@ -1872,8 +1877,11 @@
                 this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
                 
                 // Shadow mapping: quality-dependent
-                this.renderer.shadowMap.enabled = this.state.quality !== 'low';
+                this.renderer.shadowMap.enabled = (this.state.quality === 'high' || this.state.quality === 'ultra');
                 this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+                // Don't auto-update shadow map every frame - huge perf save
+                this.renderer.shadowMap.autoUpdate = false;
+                this.renderer.shadowMap.needsUpdate = true; // Update once on start
                 
                 // Better color management
                 this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1987,41 +1995,50 @@
                 this.scene.add(sky);
                 
                 // Add clouds
-                this.createClouds();
-                
-                // Reduced fog for less washed-out look
-                const fogColor = new THREE.Color(0x7ec8e3);
-                this.scene.fog = new THREE.FogExp2(fogColor, 0.0005); // Halved fog density
-                
-                // Main directional light (sun)
-                this.sunLight = new THREE.DirectionalLight(0xFFFFF0, 2.5); // Brighter sun
-                this.sunLight.position.set(100, 150, 100);
-                
+                // Clouds - skip on low (transparency sorting is expensive)
                 if (this.state.quality !== 'low') {
-                    this.sunLight.castShadow = true;
-                    this.sunLight.shadow.mapSize.width = this.state.isMobile ? 512 : (this.state.quality === 'low' ? 512 : 1024);
-                    this.sunLight.shadow.mapSize.height = this.state.isMobile ? 512 : (this.state.quality === 'low' ? 512 : 1024);
-                    this.sunLight.shadow.bias = -0.0001;
-                    this.sunLight.shadow.camera.near = 0.5;
-                    this.sunLight.shadow.camera.far = 500;
-                    
-                    const d = 150;
-                    this.sunLight.shadow.camera.left = -d;
-                    this.sunLight.shadow.camera.right = d;
-                    this.sunLight.shadow.camera.top = d;
-                    this.sunLight.shadow.camera.bottom = -d;
-                    this.sunLight.shadow.bias = -0.0001;
+                    this.createClouds();
                 }
                 
-                this.scene.add(this.sunLight);
+                // Reduced fog for less washed-out look
+                const fogDensity = this.state.quality === 'low' ? 0.003 : 0.0005;
+                const fogColor = new THREE.Color(this.state.quality === 'low' ? 0x88bb88 : 0x7ec8e3);
+                this.scene.fog = new THREE.FogExp2(fogColor, fogDensity);
                 
-                // Ambient light (sky color) - increased for vibrancy
-                this.ambientLight = new THREE.AmbientLight(0x87CEEB, 0.7);
+                // Main directional light (sun) - skip on low for major perf gain
+                if (this.state.quality !== 'low') {
+                    this.sunLight = new THREE.DirectionalLight(0xFFFFF0, 2.0);
+                    this.sunLight.position.set(100, 150, 100);
+                    
+                    // Shadows only on high/ultra
+                    if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                        this.sunLight.castShadow = true;
+                        const shadowSize = this.state.quality === 'ultra' ? 1024 : 512;
+                        this.sunLight.shadow.mapSize.width = shadowSize;
+                        this.sunLight.shadow.mapSize.height = shadowSize;
+                        this.sunLight.shadow.bias = -0.0001;
+                        this.sunLight.shadow.camera.near = 0.5;
+                        this.sunLight.shadow.camera.far = 300;
+                        const d = 100;
+                        this.sunLight.shadow.camera.left = -d;
+                        this.sunLight.shadow.camera.right = d;
+                        this.sunLight.shadow.camera.top = d;
+                        this.sunLight.shadow.camera.bottom = -d;
+                    }
+                    
+                    this.scene.add(this.sunLight);
+                }
+                
+                // Ambient light - stronger on low to compensate for missing directional
+                const ambientIntensity = this.state.quality === 'low' ? 1.8 : 0.7;
+                this.ambientLight = new THREE.AmbientLight(0xffffff, ambientIntensity);
                 this.scene.add(this.ambientLight);
                 
-                // Hemisphere light for realistic outdoor lighting - strong ground bounce
-                this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x4a7c3f, 1.0); // Sky blue + grass green
-                this.scene.add(this.hemiLight);
+                // Hemisphere light - skip on low (expensive per-vertex computation)
+                if (this.state.quality !== 'low') {
+                    this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x4a7c3f, 0.8);
+                    this.scene.add(this.hemiLight);
+                }
                 
                 // Ground with custom shader
                 await this.createTerrain();
@@ -3168,7 +3185,10 @@
                 this.scene.add(this.car);
                 
                 // Add headlights to car
-                this.createHeadlights();
+                // Headlights only on high/ultra (spotlights are expensive)
+                if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                    this.createHeadlights();
+                }
                 
                 // Start ambient sounds
                 this.startAmbientSounds();
@@ -3895,6 +3915,22 @@
                 if (this.state.quality === 'ultra' || this.state.quality === 'high') {
                     this.createParticles();
                 }
+                
+                // Freeze matrix updates on all static objects (huge perf win)
+                this.freezeStaticObjects();
+            }
+            
+            freezeStaticObjects() {
+                // Buildings, ground, roads, trees, lamps are all static
+                // Disabling matrixAutoUpdate saves a matrix multiplication per object per frame
+                this.scene.traverse(obj => {
+                    // Skip the car, camera, and dynamic objects
+                    if (obj === this.car || obj.userData.dynamic) return;
+                    if (obj.parent === this.car) return;
+                    
+                    obj.matrixAutoUpdate = false;
+                    obj.updateMatrix(); // One final update
+                });
             }
             
             createTrees(count) {
@@ -4972,7 +5008,7 @@
                 this.state.quality = quality;
                 
                 this.renderer.shadowMap.enabled = quality !== 'low';
-                this.camera.far = quality === 'ultra' ? 1500 : quality === 'high' ? 1000 : 400;
+                this.camera.far = quality === 'ultra' ? 1500 : quality === 'high' ? 800 : quality === 'medium' ? 400 : 200;
                 this.camera.updateProjectionMatrix();
                 
                 // Shadow map size based on quality
@@ -5000,6 +5036,40 @@
                 }
             }
             
+            // Downgrade all MeshStandardMaterial to MeshLambertMaterial for massive perf gain
+            downgradeMaterials() {
+                this.scene.traverse(obj => {
+                    if (!obj.isMesh) return;
+                    const mat = obj.material;
+                    if (!mat) return;
+                    
+                    // Skip special materials (custom shaders, basic materials)
+                    if (mat.isShaderMaterial || mat.isMeshBasicMaterial || mat.isMeshLambertMaterial) return;
+                    
+                    // Convert Standard/Physical to Lambert (per-vertex lighting = much cheaper)
+                    const newMat = new THREE.MeshLambertMaterial({
+                        color: mat.color ? mat.color.clone() : new THREE.Color(0x888888),
+                        emissive: mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000),
+                        emissiveIntensity: mat.emissiveIntensity || 0,
+                        map: mat.map || null,
+                        transparent: mat.transparent || false,
+                        opacity: mat.opacity !== undefined ? mat.opacity : 1,
+                        side: mat.side || THREE.FrontSide,
+                        depthWrite: mat.depthWrite !== undefined ? mat.depthWrite : true
+                    });
+                    
+                    obj.material = newMat;
+                    obj.castShadow = false;
+                    obj.receiveShadow = false;
+                    
+                    // Dispose old material
+                    if (mat.normalMap) mat.normalMap.dispose();
+                    if (mat.roughnessMap) mat.roughnessMap.dispose();
+                    if (mat.metalnessMap) mat.metalnessMap.dispose();
+                    mat.dispose();
+                });
+            }
+
             applyEffects(level) {
                 if (!this.bloomPass) return;
                 
@@ -5025,20 +5095,27 @@
                 this.updateCamera();
                 this.updateWheels();
                 this.checkSectionProximity();
-                this.updateAnimations();
+                // Animate particles/signs only on medium+
+                if (this.state.quality !== 'low') {
+                    this.updateAnimations();
+                }
                 
-                // 🎯 PERFORMANCE: Update frustum culling (every frame for smooth culling)
-                this.updateFrustumCulling();
+                // Frustum culling on medium+ only (low has fewer objects + short view)
+                if (this.state.quality !== 'low') {
+                    this.updateFrustumCulling();
+                }
                 
-                // Update dust particles
-                this.updateDustParticles(delta);
-                
-                // ⚡ GAME FEEL: Update landing impact particles
-                this.updateParticles(delta);
+                // Update dust particles (skip on low)
+                if (this.state.quality !== 'low') {
+                    this.updateDustParticles(delta);
+                    this.updateParticles(delta);
+                }
                 
                 // 🚗 DRIFT: Check for drifting and update smoke
                 this.checkDrift();
-                this.updateDriftSmoke(delta);
+                if (this.state.quality !== 'low') {
+                    this.updateDriftSmoke(delta);
+                }
                 
                 // 🎯 COMBO: Update scoring
                 if (this.combo) {

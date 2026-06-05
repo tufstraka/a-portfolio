@@ -930,8 +930,38 @@
                 });
             }
             
-            // Open world - no roads, uniform surface everywhere
-            isOnRoad(x, z) { return true; }
+            // Check if a point is on the road (for friction calculation)
+            isOnRoad(x, z) {
+                // Hub and spoke road layout - explicit positions
+                const hub = { x: 0, z: 0 };        // About Me (center)
+                const startPos = { x: 0, z: 60 };  // Player spawn
+                const buildings = [
+                    { x: 70, z: -50 },   // Tech Stack
+                    { x: 0, z: -100 },   // Projects
+                    { x: -70, z: 50 },   // Experience
+                    { x: 70, z: 50 }     // Contact
+                ];
+                const roadWidth = 7; // Half width for distance check
+                
+                // Check if on start road (start to hub)
+                const distToStartRoad = this.pointToSegmentDistance(x, z, startPos.x, startPos.z, hub.x, hub.z);
+                if (distToStartRoad < roadWidth) return true;
+                
+                // Check if on any spoke road (hub to each building)
+                for (const building of buildings) {
+                    const dist = this.pointToSegmentDistance(x, z, hub.x, hub.z, building.x, building.z);
+                    if (dist < roadWidth) return true;
+                }
+                
+                // Check if at any intersection
+                const allPoints = [startPos, hub, ...buildings];
+                for (const pos of allPoints) {
+                    const distToPoint = Math.sqrt((x - pos.x) ** 2 + (z - pos.z) ** 2);
+                    if (distToPoint < 12) return true; // Intersection radius
+                }
+                
+                return false;
+            }
             
             pointToSegmentDistance(px, pz, x1, z1, x2, z2) {
                 const dx = x2 - x1;
@@ -1926,18 +1956,18 @@
             }
             
             async createScene() {
-                // Bruno Simon style: warm, playful open world
-                this.scene.background = new THREE.Color(0x88c3e8);
-
-                // Simple warm sky gradient
+                // Vibrant sky background
+                this.scene.background = new THREE.Color(0x4a90d9); // Richer blue
+                
+                // Create hemisphere sky dome for gradient effect
                 const skySegs = this.state.quality === 'low' ? 12 : 24;
-                const skyGeo = new THREE.SphereGeometry(800, skySegs, Math.ceil(skySegs / 2));
+                const skyGeo = new THREE.SphereGeometry(1000, skySegs, Math.ceil(skySegs / 2));
                 this.skyMaterial = new THREE.ShaderMaterial({
                     uniforms: {
-                        topColor:    { value: new THREE.Color(0x5ba3d9) }, // soft blue
-                        bottomColor: { value: new THREE.Color(0xf5deb3) }, // sandy horizon
-                        offset:  { value: 30 },
-                        exponent: { value: 0.5 }
+                        topColor: { value: new THREE.Color(0x1e5799) },    // Deep rich blue
+                        bottomColor: { value: new THREE.Color(0x7ec8e3) }, // Bright sky blue
+                        offset: { value: 20 },
+                        exponent: { value: 0.4 }
                     },
                     vertexShader: `
                         varying vec3 vWorldPosition;
@@ -1955,85 +1985,64 @@
                         varying vec3 vWorldPosition;
                         void main() {
                             float h = normalize(vWorldPosition + offset).y;
-                            gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h,0.0),exponent),0.0)),1.0);
+                            gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
                         }
                     `,
                     side: THREE.BackSide
                 });
-                this.scene.add(new THREE.Mesh(skyGeo, this.skyMaterial));
-
-                // Minimal warm fog
-                this.scene.fog = new THREE.FogExp2(0xd4b896, this.state.quality === 'low' ? 0.004 : 0.0018);
-
-                // Sun — warm directional light
-                this.sunLight = new THREE.DirectionalLight(0xffeecc, this.state.quality === 'low' ? 0 : 1.8);
-                this.sunLight.position.set(80, 120, 60);
-                if (this.state.quality === 'high' || this.state.quality === 'ultra') {
-                    this.sunLight.castShadow = true;
-                    const sz = this.state.quality === 'ultra' ? 1024 : 512;
-                    this.sunLight.shadow.mapSize.set(sz, sz);
-                    this.sunLight.shadow.camera.near = 0.5;
-                    this.sunLight.shadow.camera.far = 300;
-                    const d = 120;
-                    Object.assign(this.sunLight.shadow.camera, {left:-d,right:d,top:d,bottom:-d});
-                    this.sunLight.shadow.bias = -0.0001;
-                }
-                this.scene.add(this.sunLight);
-
-                // Warm ambient
-                const ambIntensity = this.state.quality === 'low' ? 2.0 : 0.9;
-                this.ambientLight = new THREE.AmbientLight(0xfff5e0, ambIntensity);
-                this.scene.add(this.ambientLight);
-
-                // Hemisphere: warm sky / sandy ground bounce
+                
+                const sky = new THREE.Mesh(skyGeo, this.skyMaterial);
+                this.scene.add(sky);
+                
+                // Add clouds
+                // Clouds - skip on low (transparency sorting is expensive)
                 if (this.state.quality !== 'low') {
-                    this.hemiLight = new THREE.HemisphereLight(0x88c3e8, 0xd4a96a, 0.6);
+                    this.createClouds();
+                }
+                
+                // Reduced fog for less washed-out look
+                const fogDensity = this.state.quality === 'low' ? 0.003 : 0.0005;
+                const fogColor = new THREE.Color(this.state.quality === 'low' ? 0x88bb88 : 0x7ec8e3);
+                this.scene.fog = new THREE.FogExp2(fogColor, fogDensity);
+                
+                // Main directional light (sun) - skip on low for major perf gain
+                if (this.state.quality !== 'low') {
+                    this.sunLight = new THREE.DirectionalLight(0xFFFFF0, 2.0);
+                    this.sunLight.position.set(100, 150, 100);
+                    
+                    // Shadows only on high/ultra
+                    if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                        this.sunLight.castShadow = true;
+                        const shadowSize = this.state.quality === 'ultra' ? 1024 : 512;
+                        this.sunLight.shadow.mapSize.width = shadowSize;
+                        this.sunLight.shadow.mapSize.height = shadowSize;
+                        this.sunLight.shadow.bias = -0.0001;
+                        this.sunLight.shadow.camera.near = 0.5;
+                        this.sunLight.shadow.camera.far = 300;
+                        const d = 100;
+                        this.sunLight.shadow.camera.left = -d;
+                        this.sunLight.shadow.camera.right = d;
+                        this.sunLight.shadow.camera.top = d;
+                        this.sunLight.shadow.camera.bottom = -d;
+                    }
+                    
+                    this.scene.add(this.sunLight);
+                }
+                
+                // Ambient light - stronger on low to compensate for missing directional
+                const ambientIntensity = this.state.quality === 'low' ? 1.8 : 0.7;
+                this.ambientLight = new THREE.AmbientLight(0xffffff, ambientIntensity);
+                this.scene.add(this.ambientLight);
+                
+                // Hemisphere light - skip on low (expensive per-vertex computation)
+                if (this.state.quality !== 'low') {
+                    this.hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x4a7c3f, 0.8);
                     this.scene.add(this.hemiLight);
                 }
-
-                // Flat sandy ground
-                this.createGround();
+                
+                // Ground with custom shader
+                await this.createTerrain();
             }
-
-            createGround() {
-                // Bruno Simon style: large flat warm-sand ground plane
-                const size = 1200;
-                const geo = new THREE.PlaneGeometry(size, size, 1, 1);
-
-                // Paint a subtle sandy canvas texture
-                const canvas = document.createElement('canvas');
-                canvas.width = canvas.height = 512;
-                const ctx = canvas.getContext('2d');
-
-                // Base sand color
-                ctx.fillStyle = '#c9a96e';
-                ctx.fillRect(0, 0, 512, 512);
-
-                // Subtle noise / variation
-                for (let i = 0; i < 4000; i++) {
-                    const x = Math.random() * 512;
-                    const y = Math.random() * 512;
-                    const r = 1 + Math.random() * 3;
-                    const bright = Math.random() > 0.5;
-                    ctx.fillStyle = bright ? 'rgba(255,220,150,0.12)' : 'rgba(150,100,40,0.08)';
-                    ctx.beginPath();
-                    ctx.arc(x, y, r, 0, Math.PI * 2);
-                    ctx.fill();
-                }
-
-                const tex = new THREE.CanvasTexture(canvas);
-                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-                tex.repeat.set(20, 20);
-
-                const mat = new THREE.MeshLambertMaterial({ map: tex });
-                const ground = new THREE.Mesh(geo, mat);
-                ground.rotation.x = -Math.PI / 2;
-                ground.receiveShadow = true;
-                this.scene.add(ground);
-            }
-
-            // stub — terrain replaced by flat ground above
-            async createTerrain() {}
             
             createClouds() {
                 // Create fluffy clouds using sprites
@@ -2296,6 +2305,50 @@
                 return canvas;
             }
             
+            async createTerrain() {
+                // Main ground plane with realistic grass texture
+                const groundSize = 2000;
+                const groundSegments = this.state.quality === 'low' ? 8 : (this.state.quality === 'medium' ? 16 : 32);
+                const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize, groundSegments, groundSegments);
+                
+                groundGeometry.computeVertexNormals();
+                
+                // Use procedural grass texture
+                const grassCanvas = this.createGrassTexture();
+                const grassTexture = new THREE.CanvasTexture(grassCanvas);
+                grassTexture.wrapS = THREE.RepeatWrapping;
+                grassTexture.wrapT = THREE.RepeatWrapping;
+                const texRepeat = this.state.quality === 'low' ? 50 : (this.state.quality === 'medium' ? 80 : 120);
+                grassTexture.repeat.set(texRepeat, texRepeat);
+                
+                // Create normal map for grass depth
+                const grassNormalCanvas = this.createGrassNormalMap();
+                const grassNormalMap = new THREE.CanvasTexture(grassNormalCanvas);
+                grassNormalMap.wrapS = THREE.RepeatWrapping;
+                grassNormalMap.wrapT = THREE.RepeatWrapping;
+                grassNormalMap.repeat.set(texRepeat, texRepeat);
+                
+                const groundMaterial = new THREE.MeshStandardMaterial({
+                    map: grassTexture,
+                    normalMap: this.state.quality !== 'low' ? grassNormalMap : null,
+                    normalScale: new THREE.Vector2(0.5, 0.5),
+                    roughness: 0.95,
+                    metalness: 0.0
+                });
+                
+                const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+                ground.rotation.x = -Math.PI / 2;
+                ground.position.y = -0.05;
+                ground.receiveShadow = true;
+                ground.renderOrder = 0;
+                this.scene.add(ground);
+                
+                // Store ground reference
+                this.ground = ground;
+                
+                // Road
+                this.createRoads();
+            }
             
             // Simple normal map for grass
             createGrassNormalMap() {
@@ -2454,8 +2507,62 @@
             }
             
             createRoads() {
-                // No roads in Bruno Simon style — open sandy world
-                // Dirt paths are just visual on the ground texture
+                // Roads only lead to building entrances
+                const roadWidth = 10;
+                const roadHeight = 0.05;
+                
+                // Use the realistic asphalt texture generator
+                const roadCanvas = this.createAsphaltTexture();
+                
+                const roadTexture = new THREE.CanvasTexture(roadCanvas);
+                roadTexture.wrapS = THREE.RepeatWrapping;
+                roadTexture.wrapT = THREE.RepeatWrapping;
+                
+                // Create normal map for asphalt bumps
+                const asphaltNormalCanvas = this.createAsphaltNormalMap();
+                const asphaltNormalMap = new THREE.CanvasTexture(asphaltNormalCanvas);
+                asphaltNormalMap.wrapS = THREE.RepeatWrapping;
+                asphaltNormalMap.wrapT = THREE.RepeatWrapping;
+                
+                const roadMaterial = new THREE.MeshStandardMaterial({
+                    map: roadTexture,
+                    normalMap: asphaltNormalMap,
+                    normalScale: new THREE.Vector2(0.3, 0.3),
+                    roughness: 0.85,
+                    metalness: 0.0,
+                    polygonOffset: true,       // Fix z-fighting with ground
+                    polygonOffsetFactor: -1,   // Push roads slightly forward
+                    polygonOffsetUnits: -1
+                });
+                
+                // Building positions with entrance directions
+                const hub = { x: 0, z: 0, entrance: 'south', radius: 12 };
+                const startPos = { x: 0, z: 60, radius: 8 };
+                
+                // All building positions must match PORTFOLIO_DATA exactly!
+                const buildings = [
+                    { x: 70, z: -50, radius: 10 },    // Tech Stack
+                    { x: 0, z: -100, radius: 10 },    // Projects  
+                    { x: -70, z: 50, radius: 10 },    // Experience
+                    { x: 70, z: 50, radius: 10 }      // Contact
+                ];
+                
+                // Create road from start to hub (spawn point to center)
+                this.createRoadSegment(startPos, hub, roadWidth, roadHeight, roadMaterial, roadTexture, startPos.radius, hub.radius);
+                
+                // Create roads from hub to EACH building
+                for (let i = 0; i < buildings.length; i++) {
+                    const building = buildings[i];
+                    console.log('Creating road to building at', building.x, building.z);
+                    this.createRoadSegment(hub, building, roadWidth, roadHeight, roadMaterial, roadTexture, hub.radius, building.radius);
+                }
+                
+                // Create intersections at hub, start, and each building
+                this.createIntersection(hub.x, hub.z, hub.radius, roadMaterial);
+                this.createIntersection(startPos.x, startPos.z, startPos.radius, roadMaterial);
+                for (let i = 0; i < buildings.length; i++) {
+                    this.createIntersection(buildings[i].x, buildings[i].z, buildings[i].radius, roadMaterial);
+                }
             }
             
             createRoadSegment(from, to, width, height, material, texture, fromRadius = 8, toRadius = 8) {
@@ -3386,307 +3493,429 @@
             }
             
             createPortfolioSections() {
-                // Bruno Simon style: billboard signs on posts, not buildings
-                // Each section gets: colored ground zone + billboard post + sign face with content
-
-                const postMat = new THREE.MeshLambertMaterial({ color: 0x8B6914 }); // wood
-                const frameMat = new THREE.MeshLambertMaterial({ color: 0xf0ece0 }); // off-white board
-
+                // Create procedural building texture (concrete/panels)
+                const buildingCanvas = this.createBuildingTexture();
+                const buildingTexture = new THREE.CanvasTexture(buildingCanvas);
+                buildingTexture.wrapS = THREE.RepeatWrapping;
+                buildingTexture.wrapT = THREE.RepeatWrapping;
+                
+                // Create normal map for building depth
+                const buildingNormalCanvas = this.createBuildingNormalMap();
+                const buildingNormalMap = new THREE.CanvasTexture(buildingNormalCanvas);
+                buildingNormalMap.wrapS = THREE.RepeatWrapping;
+                buildingNormalMap.wrapT = THREE.RepeatWrapping;
+                
                 Object.entries(PORTFOLIO_DATA).forEach(([title, data]) => {
-                    const group = new THREE.Group();
-
-                    // ── Ground zone marker (flat colored circle)
-                    const zoneGeo = new THREE.CylinderGeometry(8, 8, 0.08, 32);
-                    const zoneMat = new THREE.MeshLambertMaterial({
-                        color: data.color,
-                        transparent: true, opacity: 0.35
+                    const sectionGroup = new THREE.Group();
+                    
+                    // Realistic modern office building - taller and more imposing
+                    const buildingHeight = 35 + Math.random() * 15;
+                    const buildingWidth = 18;
+                    const buildingDepth = 20;
+                    
+                    // Main building tower - use cloned texture for individual repeat
+                    const thisBuildingTexture = buildingTexture.clone();
+                    thisBuildingTexture.repeat.set(4, Math.floor(buildingHeight / 4));
+                    thisBuildingTexture.needsUpdate = true;
+                    
+                    const thisBuildingNormal = buildingNormalMap.clone();
+                    thisBuildingNormal.repeat.set(4, Math.floor(buildingHeight / 4));
+                    thisBuildingNormal.needsUpdate = true;
+                    
+                    const buildingGeom = new THREE.BoxGeometry(buildingWidth, buildingHeight, buildingDepth);
+                    const buildingMaterial = new THREE.MeshStandardMaterial({
+                        map: thisBuildingTexture,
+                        normalMap: thisBuildingNormal,
+                        normalScale: new THREE.Vector2(0.3, 0.3),
+                        color: new THREE.Color(data.color).multiplyScalar(0.8),
+                        metalness: 0.15,
+                        roughness: 0.75
                     });
-                    const zone = new THREE.Mesh(zoneGeo, zoneMat);
-                    zone.position.y = 0.05;
-                    group.add(zone);
-
-                    // ── Two wooden posts
-                    const postGeo = new THREE.CylinderGeometry(0.15, 0.18, 8, 8);
-                    [-2.2, 2.2].forEach(x => {
-                        const post = new THREE.Mesh(postGeo, postMat);
-                        post.position.set(x, 4, 0);
-                        post.castShadow = true;
-                        group.add(post);
-                    });
-
-                    // ── Sign board
-                    const boardW = 7, boardH = 4.5;
-                    const boardGeo = new THREE.BoxGeometry(boardW, boardH, 0.22);
-                    const board = new THREE.Mesh(boardGeo, frameMat);
-                    board.position.set(0, 7, 0);
-                    board.castShadow = true;
-                    group.add(board);
-
-                    // ── Sign face: painted canvas texture
-                    const canvas = document.createElement('canvas');
-                    canvas.width = 512; canvas.height = 320;
-                    const ctx = canvas.getContext('2d');
-
-                    // Background — section color
-                    const hex = '#' + new THREE.Color(data.color).getHexString();
-                    ctx.fillStyle = hex;
-                    ctx.fillRect(0, 0, 512, 320);
-
-                    // Slight vignette border
-                    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
-                    ctx.lineWidth = 12;
-                    ctx.strokeRect(6, 6, 500, 308);
-
-                    // Icon
-                    ctx.font = '64px Arial';
-                    ctx.textAlign = 'center';
-                    ctx.fillText(data.icon, 256, 90);
-
-                    // Title
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 52px Arial, sans-serif';
-                    ctx.fillText(title.toUpperCase(), 256, 160);
-
-                    // Intro subtitle (truncated)
-                    ctx.font = '22px Arial, sans-serif';
-                    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-                    const intro = data.content.intro;
-                    const maxW = 460;
-                    // Word-wrap into 2 lines max
-                    const words = intro.split(' ');
-                    let line = '', lines = [];
-                    for (const w of words) {
-                        const test = line + (line ? ' ' : '') + w;
-                        if (ctx.measureText(test).width > maxW && line) {
-                            lines.push(line); line = w;
-                            if (lines.length >= 2) break;
-                        } else { line = test; }
+                    
+                    const building = new THREE.Mesh(buildingGeom, buildingMaterial);
+                    building.position.y = buildingHeight / 2;
+                    building.castShadow = true;
+                    building.receiveShadow = true;
+                    sectionGroup.add(building);
+                    
+                    // Create windows - complexity varies by quality
+                    const floorsCount = Math.floor(buildingHeight / 3.5);
+                    const windowWidth = 3.2;
+                    const windowHeight = 2.6;
+                    
+                    if (this.state.quality === 'low') {
+                        // LOW: Use a single canvas texture on each building face with painted windows
+                        // This replaces ~672 meshes per building with 4 textured planes
+                        const windowsPerFloor = 4;
+                        for (let side = 0; side < 4; side++) {
+                            const faceWidth = (side < 2) ? buildingWidth : buildingDepth;
+                            const faceHeight = buildingHeight;
+                            const canvas = document.createElement('canvas');
+                            canvas.width = 256;
+                            canvas.height = Math.round(256 * (faceHeight / faceWidth));
+                            const ctx = canvas.getContext('2d');
+                            ctx.fillStyle = 'transparent';
+                            ctx.clearRect(0, 0, canvas.width, canvas.height);
+                            
+                            // Paint windows onto texture
+                            const cellW = canvas.width / windowsPerFloor;
+                            const cellH = canvas.height / floorsCount;
+                            for (let f = 0; f < floorsCount; f++) {
+                                for (let w = 0; w < windowsPerFloor; w++) {
+                                    const hasLight = Math.random() > 0.35;
+                                    ctx.fillStyle = hasLight ? 
+                                        (Math.random() > 0.5 ? '#FFF4E0' : '#FFE4B5') : '#1a1a2e';
+                                    const wx = w * cellW + cellW * 0.15;
+                                    const wy = (floorsCount - 1 - f) * cellH + cellH * 0.15;
+                                    const ww = cellW * 0.7;
+                                    const wh = cellH * 0.7;
+                                    ctx.fillRect(wx, wy, ww, wh);
+                                    // Simple frame
+                                    ctx.strokeStyle = '#2a2a2a';
+                                    ctx.lineWidth = 2;
+                                    ctx.strokeRect(wx, wy, ww, wh);
+                                }
+                            }
+                            
+                            const tex = new THREE.CanvasTexture(canvas);
+                            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false });
+                            const plane = new THREE.Mesh(new THREE.PlaneGeometry(faceWidth, faceHeight), mat);
+                            plane.position.y = faceHeight / 2;
+                            const offset = ((side < 2) ? buildingDepth : buildingWidth) / 2 + 0.06;
+                            switch(side) {
+                                case 0: plane.position.z = offset; break;
+                                case 1: plane.position.z = -offset; plane.rotation.y = Math.PI; break;
+                                case 2: plane.position.x = -offset; plane.rotation.y = Math.PI / 2; break;
+                                case 3: plane.position.x = offset; plane.rotation.y = -Math.PI / 2; break;
+                            }
+                            sectionGroup.add(plane);
+                        }
+                    } else if (this.state.quality === 'medium') {
+                        // MEDIUM: Single plane per window (interior + glass only, no frames/mullions/sill/blinds)
+                        // ~2 meshes per window instead of 8-10 → ~336 total vs ~3360
+                        const windowsPerFloor = 3; // Fewer windows on medium
+                        for (let floor = 0; floor < floorsCount; floor++) {
+                            const y = 2.5 + floor * 3.5;
+                            for (let side = 0; side < 4; side++) {
+                                for (let i = 0; i < windowsPerFloor; i++) {
+                                    const hasLightsOn = Math.random() > 0.35;
+                                    const interiorColor = hasLightsOn ? 
+                                        (Math.random() > 0.5 ? 0xFFF4E0 : 0xFFE4B5) : 0x1a1a2e;
+                                    
+                                    // Single combined window plane (interior + border via shader isn't worth it, use 2 planes)
+                                    const interiorMat = new THREE.MeshBasicMaterial({
+                                        color: interiorColor,
+                                        polygonOffset: true,
+                                        polygonOffsetFactor: 2,
+                                        polygonOffsetUnits: 2
+                                    });
+                                    const interior = new THREE.Mesh(
+                                        new THREE.PlaneGeometry(windowWidth - 0.3, windowHeight - 0.3),
+                                        interiorMat
+                                    );
+                                    
+                                    const glassMat = new THREE.MeshBasicMaterial({
+                                        color: hasLightsOn ? 0x6699aa : 0x88aabb,
+                                        transparent: true,
+                                        opacity: hasLightsOn ? 0.5 : 0.7,
+                                        depthWrite: false
+                                    });
+                                    const glass = new THREE.Mesh(
+                                        new THREE.PlaneGeometry(windowWidth, windowHeight),
+                                        glassMat
+                                    );
+                                    glass.position.z = 0.1;
+                                    
+                                    const windowGroup = new THREE.Group();
+                                    windowGroup.add(interior);
+                                    windowGroup.add(glass);
+                                    
+                                    // Position
+                                    const offset = (side === 0 || side === 1) ? buildingDepth / 2 + 0.05 : buildingWidth / 2 + 0.05;
+                                    const xPos = (i - windowsPerFloor / 2 + 0.5) * 4;
+                                    switch(side) {
+                                        case 0: windowGroup.position.set(xPos, y, offset); break;
+                                        case 1: windowGroup.position.set(-xPos, y, -offset); windowGroup.rotation.y = Math.PI; break;
+                                        case 2: windowGroup.position.set(-offset, y, xPos); windowGroup.rotation.y = Math.PI / 2; break;
+                                        case 3: windowGroup.position.set(offset, y, -xPos); windowGroup.rotation.y = -Math.PI / 2; break;
+                                    }
+                                    sectionGroup.add(windowGroup);
+                                }
+                            }
+                        }
+                    } else {
+                        // HIGH/ULTRA: Full detail windows with frames, mullions, glass, blinds, sills
+                        const windowsPerFloor = 4;
+                        for (let floor = 0; floor < floorsCount; floor++) {
+                            const y = 2.5 + floor * 3.5;
+                            for (let side = 0; side < 4; side++) {
+                                for (let i = 0; i < windowsPerFloor; i++) {
+                                    const windowGroup = new THREE.Group();
+                                    const hasLightsOn = Math.random() > 0.35;
+                                    const hasBlinds = Math.random() > 0.6;
+                                    const blindsPartial = hasBlinds && Math.random() > 0.5;
+                                    
+                                    // Interior backing
+                                    const interiorColor = hasLightsOn ? 
+                                        (Math.random() > 0.5 ? 0xFFF4E0 : 0xFFE4B5) : 0x1a1a2e;
+                                    const interiorMat = new THREE.MeshBasicMaterial({
+                                        color: interiorColor,
+                                        side: THREE.FrontSide,
+                                        depthWrite: true,
+                                        polygonOffset: true,
+                                        polygonOffsetFactor: 4,
+                                        polygonOffsetUnits: 4
+                                    });
+                                    const interior = new THREE.Mesh(
+                                        new THREE.PlaneGeometry(windowWidth - 0.3, windowHeight - 0.3), interiorMat
+                                    );
+                                    interior.position.z = -0.5;
+                                    interior.renderOrder = -1;
+                                    windowGroup.add(interior);
+                                    
+                                    // Frame
+                                    const frameMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.8, roughness: 0.3 });
+                                    const frameThickness = 0.08, frameDepth = 0.12;
+                                    [[0, windowHeight/2, 0, windowWidth, frameThickness, frameDepth],
+                                     [0, -windowHeight/2, 0, windowWidth, frameThickness, frameDepth],
+                                     [-windowWidth/2, 0, 0, frameThickness, windowHeight, frameDepth],
+                                     [windowWidth/2, 0, 0, frameThickness, windowHeight, frameDepth]].forEach(([x,y,z,w,h,d]) => {
+                                        const f = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), frameMat);
+                                        f.position.set(x,y,z);
+                                        windowGroup.add(f);
+                                    });
+                                    
+                                    // Mullions
+                                    const mullion = new THREE.Mesh(
+                                        new THREE.BoxGeometry(frameThickness*0.7, windowHeight - frameThickness*2, frameDepth), frameMat
+                                    );
+                                    windowGroup.add(mullion);
+                                    const hMullion = new THREE.Mesh(
+                                        new THREE.BoxGeometry(windowWidth - frameThickness*2, frameThickness*0.7, frameDepth), frameMat
+                                    );
+                                    hMullion.position.y = windowHeight * 0.15;
+                                    windowGroup.add(hMullion);
+                                    
+                                    // Glass
+                                    const glassMat = new THREE.MeshPhysicalMaterial({
+                                        color: hasLightsOn ? 0x6699aa : 0x88aabb,
+                                        metalness: 0.0, roughness: 0.05,
+                                        transmission: hasLightsOn ? 0.3 : 0.6,
+                                        thickness: 0.05, transparent: true,
+                                        opacity: hasLightsOn ? 0.6 : 0.85,
+                                        envMapIntensity: 1.2, clearcoat: 0.8,
+                                        clearcoatRoughness: 0.15, depthWrite: false
+                                    });
+                                    const glass = new THREE.Mesh(
+                                        new THREE.PlaneGeometry(windowWidth - 0.15, windowHeight - 0.15), glassMat
+                                    );
+                                    glass.position.z = 0.15;
+                                    glass.renderOrder = 10;
+                                    windowGroup.add(glass);
+                                    
+                                    // Blinds
+                                    if (hasBlinds) {
+                                        const blindsHeight = blindsPartial ? windowHeight * 0.4 : windowHeight - 0.3;
+                                        const blindsY = blindsPartial ? windowHeight/2 - blindsHeight/2 - 0.1 : 0;
+                                        const blinds = new THREE.Mesh(
+                                            new THREE.PlaneGeometry(windowWidth - 0.3, blindsHeight),
+                                            new THREE.MeshStandardMaterial({
+                                                color: Math.random() > 0.5 ? 0xF5F5DC : 0xE8E8E8,
+                                                roughness: 0.9, side: THREE.DoubleSide
+                                            })
+                                        );
+                                        blinds.position.set(0, blindsY, -0.25);
+                                        blinds.renderOrder = 1;
+                                        windowGroup.add(blinds);
+                                    }
+                                    
+                                    // Sill
+                                    const sill = new THREE.Mesh(
+                                        new THREE.BoxGeometry(windowWidth + 0.2, 0.06, 0.25),
+                                        new THREE.MeshStandardMaterial({ color: 0x808080, metalness: 0.3, roughness: 0.6 })
+                                    );
+                                    sill.position.set(0, -windowHeight/2 - 0.03, 0.1);
+                                    windowGroup.add(sill);
+                                    
+                                    // Position
+                                    const offset = (side === 0 || side === 1) ? buildingDepth/2 + 0.05 : buildingWidth/2 + 0.05;
+                                    const xPos = (i - windowsPerFloor/2 + 0.5) * 4;
+                                    switch(side) {
+                                        case 0: windowGroup.position.set(xPos, y, offset); break;
+                                        case 1: windowGroup.position.set(-xPos, y, -offset); windowGroup.rotation.y = Math.PI; break;
+                                        case 2: windowGroup.position.set(-offset, y, xPos); windowGroup.rotation.y = Math.PI/2; break;
+                                        case 3: windowGroup.position.set(offset, y, -xPos); windowGroup.rotation.y = -Math.PI/2; break;
+                                    }
+                                    sectionGroup.add(windowGroup);
+                                }
+                            }
+                        }
                     }
-                    if (lines.length < 2 && line) lines.push(line);
-                    lines.forEach((l, i) => ctx.fillText(l, 256, 210 + i * 30));
-
-                    // "HOLD SPACE" hint
-                    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-                    ctx.font = '18px Arial, sans-serif';
-                    ctx.fillText('Hold SPACE to explore ▸', 256, 298);
-
-                    const tex = new THREE.CanvasTexture(canvas);
-                    const faceMat = new THREE.MeshBasicMaterial({ map: tex });
-                    const faceGeo = new THREE.PlaneGeometry(boardW - 0.3, boardH - 0.3);
-                    const face = new THREE.Mesh(faceGeo, faceMat);
-                    face.position.set(0, 7, 0.12);
-                    group.add(face);
-
-                    // ── Small accent decorations: colored cube stack
-                    const accentMat = new THREE.MeshLambertMaterial({ color: data.color });
-                    for (let i = 0; i < 3; i++) {
-                        const size = 0.6 - i * 0.15;
-                        const cube = new THREE.Mesh(
-                            new THREE.BoxGeometry(size, size, size),
-                            accentMat
+                    
+                    // Building details - quality-gated
+                    const entranceWidth = 12;
+                    const entranceHeight = 5;
+                    const entranceDepth = 2;
+                    
+                    if (this.state.quality !== 'low') {
+                        // Entrance recess (darker)
+                        const entranceGeom = new THREE.BoxGeometry(entranceWidth, entranceHeight, entranceDepth);
+                        const entranceMat = new THREE.MeshStandardMaterial({
+                            color: new THREE.Color(data.color).multiplyScalar(0.3),
+                            roughness: 0.7,
+                            metalness: 0.2
+                        });
+                        const entrance = new THREE.Mesh(entranceGeom, entranceMat);
+                        entrance.position.set(0, entranceHeight / 2, buildingDepth / 2 - entranceDepth / 2);
+                        sectionGroup.add(entrance);
+                        
+                        // Doors - use standard material instead of physical
+                        const doorWidth = 2.5;
+                        const doorHeight = 4;
+                        const doorMaterial = new THREE.MeshStandardMaterial({
+                            color: 0x1a1a1a,
+                            metalness: 0.9,
+                            roughness: 0.1,
+                            transparent: true,
+                            opacity: 0.8
+                        });
+                        const leftDoorGeom = new THREE.BoxGeometry(doorWidth, doorHeight, 0.1);
+                        const leftDoor = new THREE.Mesh(leftDoorGeom, doorMaterial);
+                        leftDoor.position.set(-doorWidth / 2 - 0.1, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.1);
+                        sectionGroup.add(leftDoor);
+                        const rightDoor = new THREE.Mesh(leftDoorGeom, doorMaterial);
+                        rightDoor.position.set(doorWidth / 2 + 0.1, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.1);
+                        sectionGroup.add(rightDoor);
+                    }
+                    
+                    if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                        // Door frames, canopy, pillars only on high+
+                        const doorWidth = 2.5;
+                        const doorHeight = 4;
+                        const frameMat = new THREE.MeshStandardMaterial({
+                            color: 0xC0C0C0, metalness: 0.95, roughness: 0.1
+                        });
+                        [-doorWidth - 0.2, 0, doorWidth + 0.2].forEach(x => {
+                            const frame = new THREE.Mesh(
+                                new THREE.BoxGeometry(0.15, doorHeight + 0.5, 0.15), frameMat
+                            );
+                            frame.position.set(x, doorHeight / 2 + 0.2, buildingDepth / 2 + 0.15);
+                            sectionGroup.add(frame);
+                        });
+                        const topFrame = new THREE.Mesh(
+                            new THREE.BoxGeometry(doorWidth * 2 + 0.6, 0.15, 0.15), frameMat
                         );
-                        cube.position.set(4.5 - i * 0.1, 0.3 + i * 0.65, 0.3);
-                        cube.rotation.y = i * 0.4;
-                        group.add(cube);
+                        topFrame.position.set(0, doorHeight + 0.5, buildingDepth / 2 + 0.15);
+                        sectionGroup.add(topFrame);
+                        
+                        // Canopy
+                        const canopy = new THREE.Mesh(
+                            new THREE.BoxGeometry(entranceWidth + 2, 0.3, 5),
+                            new THREE.MeshStandardMaterial({ color: data.color, metalness: 0.6, roughness: 0.3 })
+                        );
+                        canopy.position.set(0, entranceHeight + 1, buildingDepth / 2 + 1);
+                        canopy.castShadow = true;
+                        sectionGroup.add(canopy);
+                        
+                        // Canopy pillars
+                        [-5, 5].forEach(x => {
+                            const pillar = new THREE.Mesh(
+                                new THREE.CylinderGeometry(0.2, 0.2, entranceHeight + 1, 8), frameMat
+                            );
+                            pillar.position.set(x, (entranceHeight + 1) / 2, buildingDepth / 2 + 3);
+                            sectionGroup.add(pillar);
+                        });
                     }
-
-                    // ── Position
-                    group.position.set(data.position.x, 0, data.position.z);
-                    group.userData = {
-                        title,
-                        content: data.content,
-                        color: data.color,
-                        icon: data.icon,
-                        buildingHeight: 9  // used by camera collision
-                    };
-
-                    this.collisionSystem.addBuilding(data.position, 10, 10);
-                    this.sections.push(group);
-                    this.buildings.push(group);
-                    this.scene.add(group);
-                });
-
-                // ── "KEITH KADIMA" name sign near spawn
-                this.createNameSign();
-            }
-
-            createNameSign() {
-                // Large welcome sign near player spawn
-                const canvas = document.createElement('canvas');
-                canvas.width = 1024; canvas.height = 256;
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#2c1810';
-                ctx.fillRect(0, 0, 1024, 256);
-                ctx.fillStyle = '#f5deb3';
-                ctx.font = 'bold 110px Arial, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText('KEITH KADIMA', 512, 128);
-                ctx.font = '36px Arial, sans-serif';
-                ctx.fillStyle = '#c9a96e';
-                ctx.fillText('Software Engineer · Nairobi 🇰🇪 · Drive around to explore', 512, 215);
-
-                const tex = new THREE.CanvasTexture(canvas);
-                const mat = new THREE.MeshBasicMaterial({ map: tex });
-                const geo = new THREE.PlaneGeometry(24, 6);
-                const sign = new THREE.Mesh(geo, mat);
-                sign.position.set(0, 5, 42); // just in front of spawn
-                this.scene.add(sign);
-
-                // Posts for name sign
-                const postMat = new THREE.MeshLambertMaterial({ color: 0x2c1810 });
-                [-11, 11].forEach(x => {
-                    const post = new THREE.Mesh(
-                        new THREE.CylinderGeometry(0.2, 0.25, 7, 8),
-                        postMat
+                    
+                    // Building name sign (always shown - needed for navigation)
+                    const signWidth = 10;
+                    const signHeight = 1.5;
+                    const signGeom = new THREE.BoxGeometry(signWidth, signHeight, 0.3);
+                    const signMat = new THREE.MeshBasicMaterial({
+                        color: 0xFFFFFF
+                    });
+                    const sign = new THREE.Mesh(signGeom, signMat);
+                    sign.position.set(0, entranceHeight + 2.5, buildingDepth / 2 + 0.2);
+                    sectionGroup.add(sign);
+                    
+                    // Sign text
+                    const signCanvas = document.createElement('canvas');
+                    signCanvas.width = this.state.quality === 'low' ? 256 : 512;
+                    signCanvas.height = this.state.quality === 'low' ? 40 : 80;
+                    const ctx = signCanvas.getContext('2d');
+                    ctx.fillStyle = '#' + new THREE.Color(data.color).getHexString();
+                    ctx.fillRect(0, 0, signCanvas.width, signCanvas.height);
+                    ctx.fillStyle = 'white';
+                    ctx.font = `bold ${signCanvas.height * 0.6}px Arial, sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${data.icon} ${title.toUpperCase()}`, signCanvas.width / 2, signCanvas.height / 2);
+                    const signTexture = new THREE.CanvasTexture(signCanvas);
+                    const signTextMat = new THREE.MeshBasicMaterial({ map: signTexture });
+                    const signText = new THREE.Mesh(
+                        new THREE.PlaneGeometry(signWidth - 0.2, signHeight - 0.2), signTextMat
                     );
-                    post.position.set(x, 3.5, 42);
-                    this.scene.add(post);
+                    signText.position.set(0, entranceHeight + 2.5, buildingDepth / 2 + 0.36);
+                    sectionGroup.add(signText);
+                    
+                    // Roof (always, simple)
+                    const roof = new THREE.Mesh(
+                        new THREE.BoxGeometry(buildingWidth + 2, 1, buildingDepth + 2),
+                        new THREE.MeshStandardMaterial({ color: 0x2a2a2a, metalness: 0.5, roughness: 0.6 })
+                    );
+                    roof.position.y = buildingHeight + 0.5;
+                    sectionGroup.add(roof);
+                    
+                    // HVAC units only on high+
+                    if (this.state.quality === 'high' || this.state.quality === 'ultra') {
+                        for (let i = 0; i < 4; i++) {
+                            const hvac = new THREE.Mesh(
+                                new THREE.BoxGeometry(2.5, 1.8, 2),
+                                new THREE.MeshStandardMaterial({ color: 0x555555, metalness: 0.7, roughness: 0.4 })
+                            );
+                            hvac.position.set((i - 1.5) * 5, buildingHeight + 1.9, -5);
+                            sectionGroup.add(hvac);
+                        }
+                    }
+                    
+                    // Position the section
+                    sectionGroup.position.set(data.position.x, 0, data.position.z);
+                    sectionGroup.userData = { 
+                        title, 
+                        content: data.content, 
+                        color: data.color, 
+                        icon: data.icon,
+                        buildingHeight: buildingHeight
+                    };
+                    
+                    // Register building with collision system
+                    this.collisionSystem.addBuilding(data.position, 16, 16);
+                    
+                    this.sections.push(sectionGroup);
+                    this.buildings.push(sectionGroup);
+                    this.scene.add(sectionGroup);
                 });
             }
             
             loadEnvironmentDetails() {
-                const treeCount = this.state.quality === 'low' ? 8 : this.state.quality === 'medium' ? 18 : 35;
-                this.createStylizedTrees(treeCount);
-                this.createScatteredProps();
-                this.freezeStaticObjects();
-            }
-
-            createStylizedTrees(count) {
-                // Low-poly Bruno Simon style trees: cone + cylinder
-                const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8B5E3C });
-                const leaf1Mat = new THREE.MeshLambertMaterial({ color: 0x5a9e3a });
-                const leaf2Mat = new THREE.MeshLambertMaterial({ color: 0x3d7a25 });
-
-                const trunkGeo = new THREE.CylinderGeometry(0.25, 0.38, 3.5, 6);
-                const cone1Geo = new THREE.ConeGeometry(2.2, 3.5, 7);
-                const cone2Geo = new THREE.ConeGeometry(1.7, 2.8, 7);
-
-                const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-                const leaf1Inst = new THREE.InstancedMesh(cone1Geo, leaf1Mat, count);
-                const leaf2Inst = new THREE.InstancedMesh(cone2Geo, leaf2Mat, count);
-
-                const mat4 = new THREE.Matrix4();
-                const pos = new THREE.Vector3();
-                const rot = new THREE.Quaternion();
-                const scl = new THREE.Vector3();
-
-                let placed = 0;
-                let attempts = 0;
-                while (placed < count && attempts < count * 5) {
-                    attempts++;
-                    const angle = Math.random() * Math.PI * 2;
-                    const radius = 30 + Math.random() * 200;
-                    const x = Math.sin(angle) * radius;
-                    const z = Math.cos(angle) * radius;
-
-                    // Keep away from signs
-                    let tooClose = false;
-                    for (const s of this.sections) {
-                        const dx = x - s.position.x, dz = z - s.position.z;
-                        if (dx*dx + dz*dz < 400) { tooClose = true; break; }
-                    }
-                    if (tooClose) continue;
-
-                    const s = 0.8 + Math.random() * 0.6;
-                    rot.setFromAxisAngle(new THREE.Vector3(0,1,0), Math.random() * Math.PI * 2);
-
-                    // Trunk
-                    pos.set(x, 1.75 * s, z); scl.setScalar(s);
-                    mat4.compose(pos, rot, scl);
-                    trunkInst.setMatrixAt(placed, mat4);
-
-                    // Lower cone
-                    pos.set(x, 4.5 * s, z);
-                    mat4.compose(pos, rot, scl);
-                    leaf1Inst.setMatrixAt(placed, mat4);
-
-                    // Upper cone
-                    pos.set(x, 6.2 * s, z);
-                    scl.setScalar(s * 0.8);
-                    mat4.compose(pos, rot, scl);
-                    leaf2Inst.setMatrixAt(placed, mat4);
-
-                    this.collisionSystem.addTree({ x, z });
-                    this.treePositions.push({ x, z });
-                    placed++;
+                // Trees
+                this.createTrees(this.state.quality === 'ultra' ? 40 : this.state.quality === 'high' ? 25 : this.state.quality === 'medium' ? 12 : 6);
+                
+                // Decorative elements
+                this.createDecorations();
+                
+                // Interactive objects (cones, barrels) - skip on low
+                if (this.state.quality !== 'low') {
+                    this.createInteractiveObjects();
                 }
-
-                trunkInst.instanceMatrix.needsUpdate = true;
-                leaf1Inst.instanceMatrix.needsUpdate = true;
-                leaf2Inst.instanceMatrix.needsUpdate = true;
-
-                trunkInst.castShadow = true;
-                leaf1Inst.castShadow = true;
-                leaf2Inst.castShadow = true;
-
-                this.scene.add(trunkInst, leaf1Inst, leaf2Inst);
-                this.decorations.push(trunkInst, leaf1Inst, leaf2Inst);
-            }
-
-            createScatteredProps() {
-                // Bruno Simon style: random rocks, low-poly cactus, small blocks scattered around
-                const rockMat = new THREE.MeshLambertMaterial({ color: 0x9e8c78 });
-                const cactusMat = new THREE.MeshLambertMaterial({ color: 0x5a8a3c });
-
-                const propPositions = [
-                    // Rocks
-                    { x: 20, z: 25 },  { x: -30, z: 15 }, { x: 40, z: 30 },
-                    { x: -50, z: -20 }, { x: 55, z: -35 }, { x: -25, z: -40 },
-                    { x: 15, z: -55 },  { x: -45, z: 35 }, { x: 60, z: 10 },
-                    { x: -60, z: -10 }, { x: 30, z: -70 }, { x: -35, z: 70 },
-                ];
-
-                propPositions.forEach(({ x, z }, i) => {
-                    if (this.state.quality === 'low' && i > 5) return;
-
-                    const isRock = i % 3 !== 2;
-                    if (isRock) {
-                        // Low-poly rock: scaled icosahedron
-                        const s = 0.5 + Math.random() * 1.2;
-                        const geo = new THREE.IcosahedronGeometry(s, 0); // low poly
-                        const mesh = new THREE.Mesh(geo, rockMat);
-                        mesh.position.set(x + Math.random()*4-2, s * 0.5, z + Math.random()*4-2);
-                        mesh.rotation.set(Math.random(), Math.random(), Math.random());
-                        mesh.castShadow = true;
-                        this.scene.add(mesh);
-                        this.decorations.push(mesh);
-                    } else {
-                        // Simple cactus: tall box + two side arms
-                        const h = 2.5 + Math.random();
-                        const body = new THREE.Mesh(
-                            new THREE.BoxGeometry(0.5, h, 0.5), cactusMat
-                        );
-                        body.position.set(x, h/2, z);
-                        body.castShadow = true;
-                        this.scene.add(body);
-
-                        const arm = new THREE.Mesh(
-                            new THREE.BoxGeometry(1.2, 0.4, 0.4), cactusMat
-                        );
-                        arm.position.set(x + 0.5, h * 0.65, z);
-                        this.scene.add(arm);
-                        this.decorations.push(body, arm);
-                    }
-                });
-
-                // Stacked coloured cubes near centre (Bruno Simon playground vibe)
-                const colors = [0xe17055, 0x00b894, 0xfdcb6e, 0x636e72, 0xd63031];
-                colors.forEach((color, i) => {
-                    if (this.state.quality === 'low' && i > 2) return;
-                    const mat = new THREE.MeshLambertMaterial({ color });
-                    const size = 1.2;
-                    const mesh = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), mat);
-                    mesh.position.set(
-                        Math.sin(i / colors.length * Math.PI * 2) * 18,
-                        size / 2,
-                        Math.cos(i / colors.length * Math.PI * 2) * 18 + 30
-                    );
-                    mesh.rotation.y = i * 0.7;
-                    mesh.castShadow = true;
-                    this.scene.add(mesh);
-                    this.decorations.push(mesh);
-                });
+                
+                // Particles (only on high/ultra)
+                if (this.state.quality === 'ultra' || this.state.quality === 'high') {
+                    this.createParticles();
+                }
+                
+                // Freeze matrix updates on all static objects (huge perf win)
+                this.freezeStaticObjects();
             }
             
             freezeStaticObjects() {
@@ -4535,9 +4764,9 @@
                         ambientIntensity: 0.3, fogColor: 0xFFCCB3
                     },
                     day: {
-                        skyTop: 0x5ba3d9, skyBottom: 0xf5deb3,
-                        sunColor: 0xffeecc, sunIntensity: 1.8,
-                        ambientIntensity: 0.9, fogColor: 0xd4b896
+                        skyTop: 0x87CEEB, skyBottom: 0xE8F4F8,
+                        sunColor: 0xFFFFF0, sunIntensity: 2.0,
+                        ambientIntensity: 0.4, fogColor: 0xC8E0F0
                     },
                     sunset: {
                         skyTop: 0xFF6B35, skyBottom: 0x4A1942,
@@ -5353,8 +5582,36 @@
                 this.camera.lookAt(this.camera.position.clone().add(currentDir));
             }
             
-            // No tall buildings to clip through in open world
+            // Prevent camera from clipping through buildings
             preventCameraCollision(carPos, cameraPos) {
+                const buildingPositions = [
+                    { x: 0, z: 0 },       // About Me
+                    { x: 70, z: -50 },    // Tech Stack
+                    { x: 0, z: -100 },    // Projects
+                    { x: -70, z: 50 },    // Experience
+                    { x: 70, z: 50 }      // Contact
+                ];
+                const buildingRadius = 15; // Approximate building radius
+                const minCameraHeight = 3;
+                
+                for (const building of buildingPositions) {
+                    const dx = cameraPos.x - building.x;
+                    const dz = cameraPos.z - building.z;
+                    const dist = Math.sqrt(dx * dx + dz * dz);
+                    
+                    if (dist < buildingRadius && cameraPos.y < 40) {
+                        // Push camera outside building
+                        const pushDir = new THREE.Vector2(dx, dz).normalize();
+                        cameraPos.x = building.x + pushDir.x * buildingRadius;
+                        cameraPos.z = building.z + pushDir.y * buildingRadius;
+                        
+                        // Also raise camera if too close
+                        if (dist < buildingRadius * 0.7) {
+                            cameraPos.y = Math.max(cameraPos.y, minCameraHeight + (buildingRadius - dist));
+                        }
+                    }
+                }
+                
                 return cameraPos;
             }
             
@@ -5642,11 +5899,45 @@
                 // Minimap is ~150px, so scale = 150 / 240 ≈ 0.6
                 const scale = 0.55;
                 
-                // Draw section positions on minimap (no roads in open world)
-                const toMinimap = (worldX, worldZ) => ({
-                    x: cx + (worldX - carX) * scale,
-                    y: cy + (worldZ - carZ) * scale
+                // Draw roads - hub and spoke from center (relative to car for centered view)
+                ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+                ctx.lineWidth = 4;
+                
+                const hub = { x: 0, z: 0 };
+                const startPos = { x: 0, z: 60 };
+                const buildings = [
+                    { x: 70, z: -50 },   // Tech Stack
+                    { x: 0, z: -100 },   // Projects
+                    { x: -70, z: 50 },   // Experience
+                    { x: 70, z: 50 }     // Contact
+                ];
+                
+                // Convert world position to minimap position (car-centered)
+                const toMinimap = (worldX, worldZ) => {
+                    return {
+                        x: cx + (worldX - carX) * scale,
+                        y: cy + (worldZ - carZ) * scale
+                    };
+                };
+                
+                // Draw start road
+                const startMini = toMinimap(startPos.x, startPos.z);
+                const hubMini = toMinimap(hub.x, hub.z);
+                ctx.beginPath();
+                ctx.moveTo(startMini.x, startMini.y);
+                ctx.lineTo(hubMini.x, hubMini.y);
+                ctx.stroke();
+                
+                // Draw spoke roads from hub to each building
+                buildings.forEach(building => {
+                    const buildingMini = toMinimap(building.x, building.z);
+                    ctx.beginPath();
+                    ctx.moveTo(hubMini.x, hubMini.y);
+                    ctx.lineTo(buildingMini.x, buildingMini.y);
+                    ctx.stroke();
                 });
+                
+                // Draw buildings with colors
                 this.sections.forEach(section => {
                     const pos = toMinimap(section.position.x, section.position.z);
                     
@@ -5843,10 +6134,10 @@
                         // Day sky - interpolate based on sun height
                         const t = sunHeight;
                         // Dawn/dusk colors
-                        const dawnTop = new THREE.Color(0x7a4a2a);
-                        const dawnBottom = new THREE.Color(0xff9966);
-                        const dayTop = new THREE.Color(0x5ba3d9);
-                        const dayBottom = new THREE.Color(0xf5deb3);
+                        const dawnTop = new THREE.Color(0x1e3a5f);
+                        const dawnBottom = new THREE.Color(0xff7b4a);
+                        const dayTop = new THREE.Color(0x1e5799);
+                        const dayBottom = new THREE.Color(0x7ec8e3);
                         
                         if (t < 0.3) {
                             // Sunrise/sunset

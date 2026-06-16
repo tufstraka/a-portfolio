@@ -616,6 +616,31 @@
             border-color: rgba(255, 255, 255, 0.3);
         }
         
+        /* Mute Button - top right corner */
+        #muteBtn {
+            position: fixed;
+            top: var(--space-4);
+            right: calc(var(--space-4) + 130px);
+            z-index: 200;
+            background: var(--color-bg-glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: var(--radius-lg);
+            padding: var(--space-2) var(--space-3);
+            font-size: 1.1rem;
+            cursor: pointer;
+            color: rgba(255,255,255,0.85);
+            transition: all var(--transition-fast);
+            line-height: 1;
+        }
+        #muteBtn:hover {
+            background: var(--color-bg-card);
+            transform: scale(1.08);
+        }
+        #muteBtn.muted {
+            opacity: 0.5;
+        }
+
         /* Settings Button - Hidden by default, minimal when shown */
         #settingsBtn {
             display: none;

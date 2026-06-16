@@ -28,7 +28,7 @@
     <!-- Preload critical resources -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preconnect" href="https://unpkg.com">
+
     
     <!-- Fonts - Playful but professional -->
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -212,6 +212,9 @@
     </div>
     <div id="floatingScores"></div>
     
+    <!-- Mute Button -->
+    <button id="muteBtn" title="Toggle Sound">🔊</button>
+
     <!-- Settings Button -->
     <button id="settingsBtn">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -266,16 +269,6 @@
         </div>
     </div>
 
-    <!-- Import Map -->
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-        }
-    }
-    </script>
-
-    <script type="module" src="js/main.js"></script>
+        <script type="module" src="/js/main.js"></script>
 </body>
 </html>

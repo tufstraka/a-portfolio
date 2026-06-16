@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 
 export default defineConfig({
   base: '/a-portfolio/',
+  publicDir: 'textures',
   build: {
     outDir: 'dist',
     assetsInlineLimit: 0,

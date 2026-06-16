@@ -34,6 +34,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="css/styles.css?v=3">
+    <!-- Import Map (used for raw GitHub Pages deploy; Vite ignores this) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/examples/jsm/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -269,6 +278,6 @@
         </div>
     </div>
 
-        <script type="module" src="/js/main.js"></script>
+        <script type="module" src="./js/main.js"></script>
 </body>
 </html>

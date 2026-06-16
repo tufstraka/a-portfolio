@@ -3768,7 +3768,7 @@ class PortfolioEngine {
         // We use 2 InstancedMesh calls (trunks + foliage) = 2 draw calls total!
         
         const textureLoader = new THREE.TextureLoader();
-        const barkTexture = textureLoader.load('/textures/bark.jpg');
+        const barkTexture = textureLoader.load('./textures/bark.jpg');
         barkTexture.wrapS = THREE.RepeatWrapping;
         barkTexture.wrapT = THREE.RepeatWrapping;
         barkTexture.repeat.set(1, 2);

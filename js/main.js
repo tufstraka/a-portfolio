@@ -3566,6 +3566,60 @@ class PortfolioEngine {
         this.createNameSign();
     }
 
+    createSecretArea() {
+        // Hidden area at (200, 0, 200) with spinning cubes and a fun sign
+        const group = new THREE.Group();
+        group.position.set(200, 0, 200);
+
+        // Spinning colorful cubes
+        const cubeColors = [0xff6b6b, 0x4ecdc4, 0xffe66d, 0xa855f7, 0x06b6d4];
+        this.secretCubes = [];
+        cubeColors.forEach((color, i) => {
+            const geo = new THREE.BoxGeometry(1.2, 1.2, 1.2);
+            const mat = new THREE.MeshLambertMaterial({ color });
+            const cube = new THREE.Mesh(geo, mat);
+            const angle = (i / cubeColors.length) * Math.PI * 2;
+            cube.position.set(Math.cos(angle) * 5, 1.5 + i * 0.3, Math.sin(angle) * 5);
+            cube.userData.dynamic = true;
+            group.add(cube);
+            this.secretCubes.push(cube);
+        });
+
+        // Secret sign
+        const canvas = document.createElement('canvas');
+        canvas.width = 512; canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, 512, 256);
+        ctx.fillStyle = '#fbbf24';
+        ctx.font = 'bold 42px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('\u{1F389} You found the secret!', 256, 80);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '28px Arial';
+        ctx.fillText("Here's a cookie: \u{1F36A}", 256, 140);
+        ctx.fillStyle = 'rgba(255,255,255,0.5)';
+        ctx.font = '18px Arial';
+        ctx.fillText('Not many make it this far.', 256, 200);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const signMat = new THREE.MeshBasicMaterial({ map: tex });
+        const signGeo = new THREE.PlaneGeometry(7, 3.5);
+        const sign = new THREE.Mesh(signGeo, signMat);
+        sign.position.set(0, 5, 0);
+        group.add(sign);
+
+        // Post
+        const postGeo = new THREE.CylinderGeometry(0.15, 0.18, 5, 8);
+        const postMat = new THREE.MeshLambertMaterial({ color: 0x8B6914 });
+        const post = new THREE.Mesh(postGeo, postMat);
+        post.position.set(0, 2.5, 0);
+        group.add(post);
+
+        this.scene.add(group);
+        this.buildings.push(group);
+    }
+
     createNameSign() {
         // Large welcome sign near player spawn
         const canvas = document.createElement('canvas');
@@ -5754,6 +5808,15 @@ class PortfolioEngine {
     }
     
     updateAnimations() {
+        // Spin secret cubes
+        if (this.secretCubes) {
+            this.secretCubes.forEach((cube, i) => {
+                cube.rotation.x += 0.02 + i * 0.005;
+                cube.rotation.y += 0.03 + i * 0.005;
+                cube.position.y = 1.5 + i * 0.3 + Math.sin(this.state.time * 2 + i) * 0.3;
+            });
+        }
+
         // 🌈 RAINBOW MODE (Konami code activated)
         if (this.state.rainbowMode && this.car) {
             const hue = (this.state.time * 50) % 360;

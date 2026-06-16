@@ -3621,6 +3621,12 @@
                 leaf1Inst.castShadow = true;
                 leaf2Inst.castShadow = true;
 
+                // Never frustum-cull InstancedMeshes — their position is (0,0,0),
+                // not where the instances actually are, causing all trees to vanish.
+                trunkInst.userData.cullable = false;
+                leaf1Inst.userData.cullable = false;
+                leaf2Inst.userData.cullable = false;
+
                 this.scene.add(trunkInst, leaf1Inst, leaf2Inst);
                 this.decorations.push(trunkInst, leaf1Inst, leaf2Inst);
             }
@@ -3806,9 +3812,9 @@
                 foliageInstances.instanceMatrix.needsUpdate = true;
                 
                 // Store references for culling/LOD
-                trunkInstances.userData.cullable = true;
+                trunkInstances.userData.cullable = false;
                 trunkInstances.userData.isInstancedTrees = true;
-                foliageInstances.userData.cullable = true;
+                foliageInstances.userData.cullable = false;
                 foliageInstances.userData.isInstancedTrees = true;
                 
                 // Add to scene

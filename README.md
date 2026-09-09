@@ -1,4 +1,4 @@
-# Keith Kadima's interactive portfolio
+# My interactive portfolio
 
 A drivable Three.js world with five portfolio destinations. Explore by car, drift, jump, discover projects, and find a few surprises along the way.
 

@@ -1,3 +1,9 @@
+import { PORTFOLIO_DATA } from './portfolio-data.js';
+import { Environment } from './environment.js';
+import { applyQuality as configureQuality } from './quality.js';
+import { Discoveries } from './discoveries.js';
+import { setupTouchInput } from './touch-input.js';
+import { Diagnostics } from './diagnostics.js';
 const safeStorage = { getItem(key) { try { return window.localStorage.getItem(key); } catch { return null; } }, setItem(key, value) { try { window.localStorage.setItem(key, value); } catch {} } };
 
 import * as THREE from 'three';
@@ -68,27 +74,27 @@ const ColorGradingShader = {
         uniform float saturation;
         uniform float gamma;
         varying vec2 vUv;
-        
+
         vec3 adjustSaturation(vec3 color, float sat) {
             float gray = dot(color, vec3(0.2126, 0.7152, 0.0722));
             return mix(vec3(gray), color, sat);
         }
-        
+
         void main() {
             vec4 texel = texture2D(tDiffuse, vUv);
-            
+
             // Brightness
             texel.rgb += brightness;
-            
+
             // Contrast
             texel.rgb = (texel.rgb - 0.5) * contrast + 0.5;
-            
+
             // Saturation
             texel.rgb = adjustSaturation(texel.rgb, saturation);
-            
+
             // Gamma correction
             texel.rgb = pow(texel.rgb, vec3(1.0 / gamma));
-            
+
             gl_FragColor = texel;
         }
     `
@@ -113,11 +119,11 @@ const FilmGrainShader = {
         uniform float time;
         uniform float intensity;
         varying vec2 vUv;
-        
+
         float rand(vec2 co) {
             return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
         }
-        
+
         void main() {
             vec4 texel = texture2D(tDiffuse, vUv);
             float noise = rand(vUv + time) * 2.0 - 1.0;
@@ -146,19 +152,19 @@ const MotionBlurShader = {
         uniform float velocity;
         uniform float maxBlur;
         varying vec2 vUv;
-        
+
         void main() {
             float blur = velocity * maxBlur;
             vec4 color = vec4(0.0);
-            
+
             // Radial blur from center
             vec2 dir = vUv - vec2(0.5);
-            
+
             for(float i = -4.0; i <= 4.0; i += 1.0) {
                 vec2 offset = dir * blur * (i / 4.0);
                 color += texture2D(tDiffuse, vUv + offset);
             }
-            
+
             gl_FragColor = color / 9.0;
         }
     `
@@ -175,7 +181,7 @@ class CameraShake {
         this.maxOffset = 0.3;      // Max position offset
         this.maxAngle = 0.02;      // Max rotation offset
         this.frequency = 15;       // Shake frequency
-        
+
         this.offsetX = 0;
         this.offsetY = 0;
         this.offsetZ = 0;
@@ -183,12 +189,12 @@ class CameraShake {
         this.rotationY = 0;
         this.rotationZ = 0;
     }
-    
+
     // Add trauma (0-1 range, accumulates)
     addTrauma(amount) {
         this.trauma = Math.min(1, this.trauma + amount);
     }
-    
+
     // Update shake values
     update(delta, time) {
         if (this.trauma <= 0) {
@@ -196,31 +202,31 @@ class CameraShake {
             this.rotationX = this.rotationY = this.rotationZ = 0;
             return;
         }
-        
+
         // Trauma squared for more dramatic falloff
         const shake = this.trauma * this.trauma;
-        
+
         // Perlin-like noise using sin waves at different frequencies
         const t = time * this.frequency;
-        
+
         this.offsetX = this.maxOffset * shake * Math.sin(t * 1.1 + 0.3);
         this.offsetY = this.maxOffset * shake * Math.sin(t * 1.3 + 1.7);
         this.offsetZ = this.maxOffset * shake * Math.sin(t * 0.9 + 2.9);
-        
+
         this.rotationX = this.maxAngle * shake * Math.sin(t * 1.4 + 0.5);
         this.rotationY = this.maxAngle * shake * Math.sin(t * 1.2 + 1.2);
         this.rotationZ = this.maxAngle * shake * Math.sin(t * 1.5 + 2.1);
-        
+
         // Decay trauma
         this.trauma = Math.max(0, this.trauma - this.decay * delta);
     }
-    
+
     // Apply shake to camera
     apply(camera, basePosition, baseRotation) {
         camera.position.x = basePosition.x + this.offsetX;
         camera.position.y = basePosition.y + this.offsetY;
         camera.position.z = basePosition.z + this.offsetZ;
-        
+
         camera.rotation.x = baseRotation.x + this.rotationX;
         camera.rotation.y = baseRotation.y + this.rotationY;
         camera.rotation.z = baseRotation.z + this.rotationZ;
@@ -243,29 +249,29 @@ class ComboSystem {
         this.multiplierEl = null;
         this.floatContainer = null;
     }
-    
+
     init() {
         this.scoreEl = document.getElementById('comboScore');
         this.multiplierEl = document.getElementById('comboMultiplier');
         this.floatContainer = document.getElementById('floatingScores');
         this.updateDisplay();
     }
-    
+
     addScore(points, label, x, y) {
         const actual = Math.round(points * this.multiplier);
         this.score += actual;
         this.comboTimer = this.comboDecay;
         this.multiplier = Math.min(this.multiplier + 0.2, 5);
-        
+
         // Save periodically
         if (this.score % 100 < actual) {
             safeStorage.setItem('portfolio_score', this.score.toString());
         }
-        
+
         this.updateDisplay();
         this.showFloatingScore(`+${actual} ${label}`, x, y);
     }
-    
+
     update(delta) {
         if (this.comboTimer > 0) {
             this.comboTimer -= delta;
@@ -275,7 +281,7 @@ class ComboSystem {
             }
         }
     }
-    
+
     updateDisplay() {
         if (this.scoreEl) this.scoreEl.textContent = this.score;
         if (this.multiplierEl) {
@@ -287,7 +293,7 @@ class ComboSystem {
             }
         }
     }
-    
+
     showFloatingScore(text, x, y) {
         if (!this.floatContainer) return;
         const el = document.createElement('div');
@@ -308,35 +314,35 @@ const CONFIG = {
     // Physics - Earth-like (scaled for game units where 1 unit ≈ 1 meter)
     GRAVITY: 9.81,
     CAR_MASS: 1500,              // kg (typical sedan)
-    
+
     // Movement
     MAX_SPEED: 35,               // ~126 km/h top speed
     ACCELERATION: 12,            // m/s² (sporty car ~0-100 in 8s)
     BRAKE_FORCE: 20,             // m/s² (strong braking)
     REVERSE_MAX_SPEED: 8,        // ~29 km/h reverse
-    
+
     // Jump (Bruno Simon style!)
     JUMP_FORCE: 12,              // Initial upward velocity
     JUMP_COOLDOWN: 500,          // ms between jumps
     AIR_CONTROL: 0.3,            // Steering control while airborne
-    
+
     // Friction & Grip
     ROAD_FRICTION: 0.85,         // Asphalt grip
     GRASS_FRICTION: 0.4,         // Much less grip on grass
     ROLLING_RESISTANCE: 0.015,   // Constant drag
     AIR_RESISTANCE: 0.4,         // Drag coefficient
-    
+
     // Steering
     MAX_STEER_ANGLE: 0.6,        // radians (~35 degrees)
     STEER_SPEED: 3.5,            // How fast steering responds
     STEER_RETURN_SPEED: 5,       // How fast wheel centers
-    
+
     // Suspension feel
     BODY_ROLL_FACTOR: 0.08,      // How much car leans in turns
     PITCH_FACTOR: 0.04,          // How much car pitches on accel/brake
     SUSPENSION_STIFFNESS: 15,    // Spring rate
     SUSPENSION_DAMPING: 4,       // Damping rate
-    
+
     // Collision
     CAR_COLLISION_RADIUS: 2.5,   // Bounding sphere for car
     CAR_LENGTH: 4.5,
@@ -345,24 +351,24 @@ const CONFIG = {
     TREE_COLLISION_RADIUS: 1.5,
     WORLD_BOUNDARY: 300,         // Invisible wall distance
     COLLISION_BOUNCE: 0.3,       // How much car bounces back
-    
+
     // Camera
     DEFAULT_CAMERA_DISTANCE: 18,
     DEFAULT_CAMERA_HEIGHT: 8,
     CAMERA_LERP_FACTOR: 0.08,
     CAMERA_SHAKE_DECAY: 0.9,     // How fast shake diminishes
-    
+
     // Gameplay
     SECTION_DETECTION_RADIUS: 25,
     BOOST_MULTIPLIER: 1.8,
-    
+
     // Ramps
     RAMP_BOOST: 1.5,             // Speed multiplier when hitting ramp
-    
+
     // Performance
     TARGET_FPS: 60,
     AUTO_QUALITY_THRESHOLD: 30,
-    
+
     // Frustum Culling & LOD
     CULLING_ENABLED: true,
     LOD_ENABLED: true,
@@ -382,13 +388,13 @@ class SpatialPartition {
         this.chunks = new Map(); // Map<chunkKey, Set<object>>
         this.objectChunks = new Map(); // Map<object, chunkKey>
     }
-    
+
     getChunkKey(x, z) {
         const cx = Math.floor(x / this.chunkSize);
         const cz = Math.floor(z / this.chunkSize);
         return `${cx},${cz}`;
     }
-    
+
     add(object, x, z) {
         const key = this.getChunkKey(x, z);
         if (!this.chunks.has(key)) {
@@ -397,7 +403,7 @@ class SpatialPartition {
         this.chunks.get(key).add(object);
         this.objectChunks.set(object, key);
     }
-    
+
     remove(object) {
         const key = this.objectChunks.get(object);
         if (key && this.chunks.has(key)) {
@@ -405,7 +411,7 @@ class SpatialPartition {
         }
         this.objectChunks.delete(object);
     }
-    
+
     update(object, x, z) {
         const newKey = this.getChunkKey(x, z);
         const oldKey = this.objectChunks.get(object);
@@ -414,14 +420,14 @@ class SpatialPartition {
             this.add(object, x, z);
         }
     }
-    
+
     // Get objects in chunks within radius
     getNearbyChunks(x, z, radius) {
         const results = [];
         const chunkRadius = Math.ceil(radius / this.chunkSize);
         const cx = Math.floor(x / this.chunkSize);
         const cz = Math.floor(z / this.chunkSize);
-        
+
         for (let dx = -chunkRadius; dx <= chunkRadius; dx++) {
             for (let dz = -chunkRadius; dz <= chunkRadius; dz++) {
                 const key = `${cx + dx},${cz + dz}`;
@@ -443,7 +449,7 @@ class FrustumCuller {
         this.tempVector = new THREE.Vector3();
         this.tempSphere = new THREE.Sphere();
     }
-    
+
     update() {
         this.projScreenMatrix.multiplyMatrices(
             this.camera.projectionMatrix,
@@ -452,41 +458,41 @@ class FrustumCuller {
         this.frustum.setFromProjectionMatrix(this.projScreenMatrix);
         this.camera.getWorldDirection(this.cameraDirection);
     }
-    
+
     // Check if object is in frustum
     isVisible(object, boundingRadius = 5) {
         if (!CONFIG.CULLING_ENABLED) return true;
-        
+
         // Get world position
         this.tempVector.setFromMatrixPosition(object.matrixWorld);
-        
+
         // Create bounding sphere
         this.tempSphere.center.copy(this.tempVector);
         this.tempSphere.radius = boundingRadius;
-        
+
         return this.frustum.intersectsSphere(this.tempSphere);
     }
-    
+
     // Check if object is behind camera (more aggressive culling)
     isBehindCamera(objectPosition, cameraPosition, margin = 10) {
         if (!CONFIG.BEHIND_CAMERA_CULL) return false;
-        
+
         this.tempVector.subVectors(objectPosition, cameraPosition);
         const dot = this.tempVector.dot(this.cameraDirection);
-        
+
         // Object is behind camera if dot product is negative (with margin)
         return dot < -margin;
     }
-    
+
     // Get distance from camera
     getDistanceToCamera(objectPosition, cameraPosition) {
         return objectPosition.distanceTo(cameraPosition);
     }
-    
+
     // Get LOD level based on distance
     getLODLevel(distance) {
         if (!CONFIG.LOD_ENABLED) return 0;
-        
+
         if (distance < CONFIG.LOD_DISTANCES[0]) return 0; // High detail
         if (distance < CONFIG.LOD_DISTANCES[1]) return 1; // Medium detail
         if (distance < CONFIG.LOD_DISTANCES[2]) return 2; // Low detail
@@ -502,7 +508,7 @@ class LODManager {
     constructor() {
         this.lodObjects = new Map(); // Map<object, { levels: [], currentLevel: number }>
     }
-    
+
     // Register an object with multiple LOD levels
     register(object, levels) {
         // levels = [{ distance: 0, detail: 'high' }, { distance: 60, detail: 'low' }, ...]
@@ -512,22 +518,22 @@ class LODManager {
             visible: true
         });
     }
-    
+
     // Update visibility and detail level
     update(object, distance, isInFrustum) {
         const lodData = this.lodObjects.get(object);
         if (!lodData) return;
-        
+
         // Determine if should be visible
         const shouldBeVisible = isInFrustum && distance < CONFIG.VIEW_DISTANCE;
-        
+
         if (lodData.visible !== shouldBeVisible) {
             lodData.visible = shouldBeVisible;
             object.visible = shouldBeVisible;
         }
-        
+
         if (!shouldBeVisible) return;
-        
+
         // Determine LOD level
         let newLevel = 0;
         for (let i = 0; i < lodData.levels.length; i++) {
@@ -535,14 +541,14 @@ class LODManager {
                 newLevel = i;
             }
         }
-        
+
         // Apply LOD changes if level changed
         if (newLevel !== lodData.currentLevel) {
             this.applyLOD(object, lodData.levels[newLevel]);
             lodData.currentLevel = newLevel;
         }
     }
-    
+
     applyLOD(object, levelConfig) {
         // Apply LOD-specific settings
         object.traverse(child => {
@@ -552,7 +558,7 @@ class LODManager {
                     child.castShadow = levelConfig.shadows;
                     child.receiveShadow = levelConfig.shadows;
                 }
-                
+
                 // Simplify materials at distance
                 if (levelConfig.simpleMaterial && child.material) {
                     if (!child.userData.originalMaterial) {
@@ -575,13 +581,13 @@ class ObjectPool {
         this.resetFn = resetFn;
         this.pool = [];
         this.active = new Set();
-        
+
         // Pre-populate pool
         for (let i = 0; i < initialSize; i++) {
             this.pool.push(this.createFn());
         }
     }
-    
+
     get() {
         let obj;
         if (this.pool.length > 0) {
@@ -592,7 +598,7 @@ class ObjectPool {
         this.active.add(obj);
         return obj;
     }
-    
+
     release(obj) {
         if (this.active.has(obj)) {
             this.active.delete(obj);
@@ -600,7 +606,7 @@ class ObjectPool {
             this.pool.push(obj);
         }
     }
-    
+
     releaseAll() {
         this.active.forEach(obj => {
             this.resetFn(obj);
@@ -608,7 +614,7 @@ class ObjectPool {
         });
         this.active.clear();
     }
-    
+
     getActiveCount() {
         return this.active.size;
     }
@@ -625,7 +631,7 @@ class AdaptiveQualityManager {
         this.historySize = 60; // Track last 60 FPS readings
         this.lastAdjustTime = 0;
         this.adjustCooldown = 3000; // Wait 3 seconds between adjustments
-        
+
         // Quality levels with their settings
         this.qualityLevels = {
             ultra: {
@@ -666,245 +672,44 @@ class AdaptiveQualityManager {
             }
         };
     }
-    
+
     recordFPS(fps) {
         this.fpsHistory.push(fps);
         if (this.fpsHistory.length > this.historySize) {
             this.fpsHistory.shift();
         }
     }
-    
+
     getAverageFPS() {
         if (this.fpsHistory.length === 0) return 60;
         return this.fpsHistory.reduce((a, b) => a + b, 0) / this.fpsHistory.length;
     }
-    
+
     shouldDowngrade() {
         const avgFPS = this.getAverageFPS();
         const now = performance.now();
-        
+
         // Check cooldown
         if (now - this.lastAdjustTime < this.adjustCooldown) return false;
-        
+
         // Downgrade if average FPS below threshold
         return avgFPS < CONFIG.AUTO_QUALITY_THRESHOLD;
     }
-    
+
     shouldUpgrade() {
         const avgFPS = this.getAverageFPS();
         const now = performance.now();
-        
+
         // Check cooldown (longer for upgrades)
         if (now - this.lastAdjustTime < this.adjustCooldown * 2) return false;
-        
+
         // Upgrade if average FPS consistently high
         return avgFPS > 55 && this.fpsHistory.length >= 30;
     }
-    
-    applyQuality(level) {
-        const settings = this.qualityLevels[level];
-        if (!settings || !this.engine) return;
-        
-        this.lastAdjustTime = performance.now();
-        
-        // Apply pixel ratio
-        if (this.engine.renderer) {
-            this.engine.renderer.setPixelRatio(settings.pixelRatio);
-        }
-        
-        // Apply shadow settings
-        if (this.engine.renderer) {
-            this.engine.renderer.shadowMap.enabled = settings.shadowsEnabled;
-        }
-        
-        if (this.engine.sunLight && this.engine.sunLight.shadow) {
-            this.engine.sunLight.shadow.mapSize.width = settings.shadowMapSize;
-            this.engine.sunLight.shadow.mapSize.height = settings.shadowMapSize;
-        }
-        
-        // Update view distance
-        CONFIG.VIEW_DISTANCE = settings.viewDistance;
-        
-        // Update LOD bias
-        CONFIG.LOD_DISTANCES = CONFIG.LOD_DISTANCES.map((d, i) => 
-            [30, 60, 120][i] - settings.lodBias * 10
-        );
-        
-        console.log(`🎮 Quality adjusted to: ${level} (avg FPS: ${Math.round(this.getAverageFPS())})`);
-    }
+
+    applyQuality(quality) { this.lastAdjustTime = performance.now(); configureQuality(this.engine, quality); }
+
 }
-
-// ============================================
-// PORTFOLIO DATA - Fun & Engaging
-// ============================================
-
-const PORTFOLIO_DATA = {
-    'About Me': {
-        color: 0xE17055,
-        icon: '👋',
-        position: { x: 0, z: 0 },
-        content: {
-            intro: "Software engineer with a founder mindset. I design, scale, and maintain production systems — fintech, AI, logistics. Based in Nairobi 🇰🇪",
-            sections: [
-                {
-                    title: "What I Build",
-                    items: [
-                        "Real-time systems with WebSockets & low latency",
-                        "Scalable microservices handling high concurrency",
-                        "CI/CD pipelines with 95%+ test coverage",
-                        "Production systems at telecom scale (millions of users)"
-                    ]
-                },
-                {
-                    title: "Beyond Code",
-                    items: [
-                        "♟️ Chess player — always thinking moves ahead",
-                        "🎮 Gamer — understanding systems through play",
-                        "🎨 Creating art, even if it isn't perfect"
-                    ]
-                }
-            ]
-        }
-    },
-    'Tech Stack': {
-        color: 0x00B894,
-        icon: '⚡',
-        position: { x: 70, z: -50 },
-        content: {
-            intro: "Backend-heavy, full-stack capable. Always picking the right tool for the job.",
-            sections: [
-                {
-                    title: "Backend & Systems",
-                    items: [
-                        "Node.js, Golang — high-concurrency workloads",
-                        "REST APIs, gRPC, WebSockets — real-time comms",
-                        "Microservices, System Design — scale first",
-                        "Python — automation & AI/ML experiments"
-                    ]
-                },
-                {
-                    title: "Data & Cloud",
-                    items: [
-                        "PostgreSQL — optimized queries, indexing, pooling",
-                        "MongoDB, Redis — flexible data needs",
-                        "AWS (EKS, EC2, S3, CloudWatch) — cloud native",
-                        "Docker, GitHub Actions — CI/CD automation"
-                    ]
-                },
-                {
-                    title: "Frontend & More",
-                    items: [
-                        "React, Next.js — modern web apps",
-                        "Three.js, WebGL — 3D experiences (like this!)",
-                        "Rust — the new love 🦀",
-                        "Prometheus, PagerDuty — observability"
-                    ]
-                }
-            ]
-        }
-    },
-    'Projects': {
-        color: 0xFDCB6E,
-        icon: '🚀',
-        position: { x: 0, z: -100 },
-        content: {
-            intro: "Real projects, real impact. From startups I founded to platforms serving thousands.",
-            sections: [
-                {
-                    title: "Founder Projects",
-                    items: [
-                        "🚗 Locsafe — Asset tracking with real-time WebSockets, blockchain",
-                        "🍽️ SafeBite — AI food safety scanner for allergies",
-                        "💰 FixFlow — Stablecoin payments on MNEE"
-                    ]
-                },
-                {
-                    title: "Web3 & AI",
-                    items: [
-                        "🏛️ Colosseum — AI agents + Polkadot stablecoins",
-                        "🗳️ Jaba — Decentralized voting on ICP",
-                        "🎮 Real-time multiplayer game with security focus",
-                        "🔗 Shadowchain — Polkadot blockchain project"
-                    ]
-                },
-                {
-                    title: "Security & Tools",
-                    items: [
-                        "🔐 Port Scanner & SHA-1 Password Cracker",
-                        "🎬 BFR — Multi-user movie/TV reviews platform",
-                        "📊 Stock Price Checker with real-time data",
-                        "🤖 Polybot — Python automation bot"
-                    ]
-                }
-            ]
-        }
-    },
-    'Experience': {
-        color: 0x636E72,
-        icon: '💼',
-        position: { x: -70, z: 50 },
-        content: {
-            intro: "From telecom scale to startup agility. Hands-on ownership in fast-moving environments.",
-            sections: [
-                {
-                    title: "Niche Traffic Kit — 2025",
-                    items: [
-                        "Full Stack Engineer — Golang microservices",
-                        "50%+ API response time reduction",
-                        "PostgreSQL optimization & connection pooling",
-                        "99.9% uptime on automation features"
-                    ]
-                },
-                {
-                    title: "Locsafe (Founder) — 2024",
-                    items: [
-                        "Lead Backend Engineer — real-time tracking",
-                        "30% latency reduction via WebSocket architecture",
-                        "Led team — architecture, code reviews, CI/CD",
-                        "AWS + Docker production deployments"
-                    ]
-                },
-                {
-                    title: "Previous Roles",
-                    items: [
-                        "PaydHQ — Backend for ~30k users, real-time payments",
-                        "Safaricom — SRE at telecom scale, millions of users"                            ]
-                }
-            ]
-        }
-    },
-    'Contact': {
-        color: 0xD63031,
-        icon: '💬',
-        position: { x: 70, z: 50 },
-        content: {
-            intro: "Let's build something. Open to opportunities, collaborations, or just good conversation.",
-            sections: [
-                {
-                    title: "Reach Out",
-                    items: [
-                        "📧 keithkadima@gmail.com",
-                        "💼 linkedin.com/in/kadimakeith",
-                        "🐙 github.com/tufstraka",
-                        "📱 +254 701 746 774"
-                    ]
-                },
-                {
-                    title: "Location",
-                    items: [
-                        "📍 Nairobi, Kenya",
-                        "🌍 Open to remote work globally",
-                        "⏰ EAT (UTC+3)"
-                    ]
-                }
-            ]
-        }
-    }
-};
-
-// ============================================
-// COLLISION SYSTEM
-// ============================================
 
 class CollisionSystem {
     constructor() {
@@ -912,7 +717,7 @@ class CollisionSystem {
         this.trees = [];
         this.worldBoundary = CONFIG.WORLD_BOUNDARY;
     }
-    
+
     addBuilding(position, width, depth) {
         this.buildings.push({
             x: position.x,
@@ -922,7 +727,7 @@ class CollisionSystem {
             type: 'building'
         });
     }
-    
+
     addTree(position) {
         this.trees.push({
             x: position.x,
@@ -931,44 +736,44 @@ class CollisionSystem {
             type: 'tree'
         });
     }
-    
+
     // Open world - no roads, uniform surface everywhere
     isOnRoad(x, z) { return true; }
-    
+
     pointToSegmentDistance(px, pz, x1, z1, x2, z2) {
         const dx = x2 - x1;
         const dz = z2 - z1;
         const lengthSq = dx * dx + dz * dz;
-        
+
         if (lengthSq === 0) return Math.sqrt((px - x1) ** 2 + (pz - z1) ** 2);
-        
+
         let t = Math.max(0, Math.min(1, ((px - x1) * dx + (pz - z1) * dz) / lengthSq));
         const nearestX = x1 + t * dx;
         const nearestZ = z1 + t * dz;
-        
+
         return Math.sqrt((px - nearestX) ** 2 + (pz - nearestZ) ** 2);
     }
-    
+
     // Check collision and return push-back vector
     checkCollision(x, z, radius) {
         let pushX = 0;
         let pushZ = 0;
         let collided = false;
-        
+
         // World boundary
         if (x < -this.worldBoundary) { pushX = (-this.worldBoundary - x) + 1; collided = true; }
         if (x > this.worldBoundary) { pushX = (this.worldBoundary - x) - 1; collided = true; }
         if (z < -this.worldBoundary) { pushZ = (-this.worldBoundary - z) + 1; collided = true; }
         if (z > this.worldBoundary) { pushZ = (this.worldBoundary - z) - 1; collided = true; }
-        
+
         // Building collisions (AABB)
         for (const building of this.buildings) {
             const dx = x - building.x;
             const dz = z - building.z;
-            
+
             const overlapX = building.halfWidth + radius - Math.abs(dx);
             const overlapZ = building.halfDepth + radius - Math.abs(dz);
-            
+
             if (overlapX > 0 && overlapZ > 0) {
                 collided = true;
                 // Push out along the axis with least overlap
@@ -979,14 +784,14 @@ class CollisionSystem {
                 }
             }
         }
-        
+
         // Tree collisions (circle)
         for (const tree of this.trees) {
             const dx = x - tree.x;
             const dz = z - tree.z;
             const dist = Math.sqrt(dx * dx + dz * dz);
             const minDist = tree.radius + radius;
-            
+
             if (dist < minDist && dist > 0) {
                 collided = true;
                 const overlap = minDist - dist;
@@ -994,7 +799,7 @@ class CollisionSystem {
                 pushZ += (dz / dist) * overlap;
             }
         }
-        
+
         return { collided, pushX, pushZ };
     }
 }
@@ -1007,54 +812,54 @@ class VehiclePhysics {
     constructor() {
         this.reset();
     }
-    
+
     reset() {
         // Position & rotation
         this.x = 0;
         this.z = 60;
         this.rotation = 0;        // Yaw (heading)
         this.y = 0;               // Height (for suspension/jump)
-        
+
         // Velocity
         this.velocityX = 0;
         this.velocityZ = 0;
         this.velocityY = 0;       // Vertical velocity for jump
         this.speed = 0;           // Signed speed (+ forward, - backward)
         this.angularVelocity = 0;
-        
+
         // Drift / slip-angle state
         this.slipAngle = 0;
         this.rearGrip = 1.0;
         this.isDrifting = false;
         this.driftAngle = 0;
         this.velocityHeading = 0; // Direction velocity is actually moving
-        
+
         // Steering
         this.steerAngle = 0;
         this.targetSteerAngle = 0;
-        
+
         // Suspension state
         this.bodyRoll = 0;
         this.bodyPitch = 0;
-        
+
         // Jump state
         this.isGrounded = true;
         this.lastJumpTime = 0;
         this.jumpCount = 0;
-        
+
         // State
         this.isOnRoad = true;
         this.isColliding = false;
         this.landingImpact = 0;
     }
-    
+
     // Get terrain height at position
     getTerrainHeight(x, z) {
         // Flat ground - no height variation
         // Visual variation is handled by the shader only
         return 0;
     }
-    
+
     jump() {
         const now = performance.now();
         if (this.isGrounded && (now - this.lastJumpTime) > CONFIG.JUMP_COOLDOWN) {
@@ -1066,21 +871,21 @@ class VehiclePhysics {
         }
         return false;
     }
-    
+
     update(delta, input, collisionSystem) {
         // Cap delta to prevent physics explosion
         delta = Math.min(delta, 0.05);
-        
+
         // Get surface friction (reduced in air)
         this.isOnRoad = collisionSystem.isOnRoad(this.x, this.z);
         const baseFriction = this.isOnRoad ? CONFIG.ROAD_FRICTION : CONFIG.GRASS_FRICTION;
         const friction = this.isGrounded ? baseFriction : baseFriction * CONFIG.AIR_CONTROL;
-        
+
         // --- SPEED-ADAPTIVE STEERING ---
         const speedNorm = Math.min(Math.abs(this.speed) / CONFIG.MAX_SPEED, 1.0);
         const maxAngle = CONFIG.MAX_STEER_ANGLE * (1.0 - speedNorm * 0.55);
         this.targetSteerAngle = input.steer * maxAngle;
-        
+
         // Instant response at low speed, damped at high speed
         const steerResponse = THREE.MathUtils.lerp(12.0, 3.5, speedNorm);
         this.steerAngle = THREE.MathUtils.lerp(
@@ -1088,22 +893,22 @@ class VehiclePhysics {
             this.targetSteerAngle, 
             steerResponse * delta
         );
-        
+
         // Instant return to center when no input
         if (Math.abs(input.steer) < 0.01) {
             this.steerAngle *= Math.pow(0.001, delta);
         }
-        
+
         const airFactor = this.isGrounded ? 1 : CONFIG.AIR_CONTROL;
         const effectiveSteer = this.steerAngle * airFactor;
-        
+
         // --- NON-LINEAR ACCELERATION & BRAKING ---
         let accelerationForce = 0;
         const isMovingForward = this.speed > 0.1;
         const isMovingBackward = this.speed < -0.1;
-        
+
         const accelMultiplier = this.isGrounded ? 1 : 0.2;
-        
+
         if (input.throttle > 0) {
             const maxSpeed = input.boost ? CONFIG.MAX_SPEED * CONFIG.BOOST_MULTIPLIER : CONFIG.MAX_SPEED;
             // Non-linear power curve: explosive start, tapering at top
@@ -1119,36 +924,36 @@ class VehiclePhysics {
                 accelerationForce = -CONFIG.ACCELERATION * 0.5 * input.brake * friction * accelMultiplier;
             }
         }
-        
+
         // --- RESISTANCE FORCES ---
         const rollingResistance = this.isGrounded 
             ? -Math.sign(this.speed) * CONFIG.ROLLING_RESISTANCE * CONFIG.CAR_MASS * CONFIG.GRAVITY
             : 0;
         const airResistance = -CONFIG.AIR_RESISTANCE * this.speed * Math.abs(this.speed);
-        
+
         const totalAcceleration = accelerationForce + (rollingResistance + airResistance) / CONFIG.CAR_MASS;
         this.speed += totalAcceleration * delta;
-        
+
         // Natural stop at very low speeds
         if (Math.abs(this.speed) < 0.1 && input.throttle === 0 && input.brake === 0 && this.isGrounded) {
             this.speed *= 0.9;
             if (Math.abs(this.speed) < 0.01) this.speed = 0;
         }
-        
+
         // --- TURNING WITH SLIP-ANGLE DRIFT ---
         if (Math.abs(this.speed) > 0.5 && Math.abs(effectiveSteer) > 0.001) {
             const wheelBase = CONFIG.CAR_LENGTH * 0.6;
             const tanSteer = Math.tan(Math.abs(effectiveSteer));
             const turnRadius = tanSteer > 0.001 ? wheelBase / tanSteer : 1000;
             const angularVel = this.speed / turnRadius * Math.sign(effectiveSteer);
-            
+
             const turnMultiplier = this.isGrounded ? 1 : CONFIG.AIR_CONTROL;
             this.angularVelocity = angularVel * turnMultiplier;
             this.rotation += this.angularVelocity * delta;
         } else {
             this.angularVelocity *= 0.9; // Decay
         }
-        
+
         // --- SLIP-ANGLE DRIFT PHYSICS ---
         if (this.isGrounded && Math.abs(this.speed) > 3) {
             // Calculate velocity heading vs car heading
@@ -1158,22 +963,22 @@ class VehiclePhysics {
             while (rawSlip > Math.PI) rawSlip -= Math.PI * 2;
             while (rawSlip < -Math.PI) rawSlip += Math.PI * 2;
             this.slipAngle = rawSlip;
-            
+
             // Rear grip loss: speed × steer = less grip
             const gripLoss = speedNorm * Math.abs(this.steerAngle / CONFIG.MAX_STEER_ANGLE) * 1.8;
             // Grass has much less grip
             const surfaceGrip = this.isOnRoad ? 1.0 : 0.5;
             this.rearGrip = Math.max(0.15, (1.0 - gripLoss) * surfaceGrip);
-            
+
             // Countersteer recovers grip
             if (Math.abs(this.slipAngle) > 0.1 && Math.sign(input.steer) !== Math.sign(this.slipAngle)) {
                 this.rearGrip = Math.min(1.0, this.rearGrip + 0.4);
             }
-            
+
             // Drift threshold
             this.isDrifting = Math.abs(this.slipAngle) > 0.15 && this.rearGrip < 0.7;
             this.driftAngle = this.slipAngle;
-            
+
             // Apply lateral slide when grip is low
             if (this.rearGrip < 0.9) {
                 const slideForce = Math.sin(this.slipAngle) * Math.abs(this.speed) * (1 - this.rearGrip) * 0.4;
@@ -1186,22 +991,22 @@ class VehiclePhysics {
             this.isDrifting = false;
             this.driftAngle = 0;
         }
-        
+
         // --- STRONGER BODY PITCH ON BRAKE ---
         const brakePitchTarget = (input.brake > 0 && isMovingForward) 
             ? -0.1 * Math.min(Math.abs(this.speed) / 15, 1)
             : (input.throttle > 0 ? 0.03 * input.throttle : 0);
-        
+
         // --- GRAVITY & VERTICAL PHYSICS ---
         if (!this.isGrounded) {
             this.velocityY -= CONFIG.GRAVITY * delta;
             this.velocityY = Math.max(this.velocityY, -50);
         }
-        
+
         this.y += this.velocityY * delta;
-        
+
         const terrainHeight = this.getTerrainHeight(this.x, this.z);
-        
+
         if (this.y <= terrainHeight) {
             this.y = terrainHeight;
             if (this.velocityY < -2) {
@@ -1217,29 +1022,29 @@ class VehiclePhysics {
             this.isGrounded = false;
             this.landingImpact = 0;
         }
-        
+
         this.y = Math.max(this.y, Math.max(0, terrainHeight));
-        
+
         // --- UPDATE HORIZONTAL POSITION ---
         const prevX = this.x;
         const prevZ = this.z;
-        
+
         this.velocityX = Math.sin(this.rotation) * this.speed;
         this.velocityZ = Math.cos(this.rotation) * this.speed;
-        
+
         this.x += this.velocityX * delta;
         this.z += this.velocityZ * delta;
-        
+
         // --- COLLISION DETECTION WITH REFLECTION BOUNCE ---
         const collision = collisionSystem.checkCollision(this.x, this.z, CONFIG.CAR_COLLISION_RADIUS);
-        
+
         if (collision.collided) {
             this.isColliding = true;
-            
+
             // Push car out
             this.x += collision.pushX;
             this.z += collision.pushZ;
-            
+
             // Reflection bounce: deflect velocity off collision normal
             const normalLen = Math.sqrt(collision.pushX * collision.pushX + collision.pushZ * collision.pushZ);
             if (normalLen > 0.001) {
@@ -1257,28 +1062,28 @@ class VehiclePhysics {
             } else {
                 this.speed *= (1 - CONFIG.COLLISION_BOUNCE);
             }
-            
+
             // Larger rotation on impact
             this.rotation += (Math.random() - 0.5) * 0.25 * Math.min(Math.abs(this.speed) / CONFIG.MAX_SPEED, 1);
         } else {
             this.isColliding = false;
         }
-        
+
         // --- SUSPENSION / BODY DYNAMICS ---
         const airPitch = this.isGrounded ? 0 : -0.1;
-        
+
         // Body roll (enhanced during drift)
         const lateralG = this.speed * this.angularVelocity;
         const driftRoll = this.isDrifting ? this.slipAngle * 0.15 : 0;
         const targetRoll = -lateralG * CONFIG.BODY_ROLL_FACTOR + driftRoll;
         this.bodyRoll = THREE.MathUtils.lerp(this.bodyRoll, targetRoll, CONFIG.SUSPENSION_DAMPING * delta);
         this.bodyRoll = THREE.MathUtils.clamp(this.bodyRoll, -0.2, 0.2);
-        
+
         // Body pitch (stronger nose-dive on brake)
         const targetPitch = this.isGrounded ? brakePitchTarget : airPitch;
         this.bodyPitch = THREE.MathUtils.lerp(this.bodyPitch, targetPitch, 8 * delta);
         this.bodyPitch = THREE.MathUtils.clamp(this.bodyPitch, -0.15, 0.15);
-        
+
         return {
             x: this.x,
             z: this.z,
@@ -1327,7 +1132,7 @@ const TerrainShader = {
         varying vec3 vNormal;
         varying vec3 vWorldPosition;
         varying float vDistanceFromCenter;
-        
+
         void main() {
             vUv = uv;
             vNormal = normalize(normalMatrix * normal);
@@ -1349,17 +1154,17 @@ const TerrainShader = {
         uniform vec3 sunColor;
         uniform vec3 skyColor;
         uniform vec3 shadowColor;
-        
+
         varying vec2 vUv;
         varying vec3 vNormal;
         varying vec3 vWorldPosition;
         varying float vDistanceFromCenter;
-        
+
         // High quality noise
         vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
         vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
         vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
-        
+
         float snoise(vec2 v) {
             const vec4 C = vec4(0.211324865405187, 0.366025403784439,
                                -0.577350269189626, 0.024390243902439);
@@ -1382,7 +1187,7 @@ const TerrainShader = {
             g.yz = a0.yz * x12.xz + h.yz * x12.yw;
             return 130.0 * dot(m, g);
         }
-        
+
         // Multi-octave noise
         float fbm(vec2 p, int octaves) {
             float value = 0.0;
@@ -1396,7 +1201,7 @@ const TerrainShader = {
             }
             return value;
         }
-        
+
         // Voronoi for grass clumps
         float voronoi(vec2 p) {
             vec2 n = floor(p);
@@ -1413,63 +1218,63 @@ const TerrainShader = {
             }
             return sqrt(md);
         }
-        
+
         void main() {
             vec2 pos = vWorldPosition.xz;
-            
+
             // Multi-scale noise layers
             float largeNoise = fbm(pos / noiseScale, 4) * 0.5 + 0.5;
             float mediumNoise = fbm(pos / (noiseScale * 0.4), 3) * 0.5 + 0.5;
             float smallNoise = snoise(pos / 8.0) * 0.5 + 0.5;
             float microNoise = snoise(pos / 2.0) * 0.5 + 0.5;
-            
+
             // Grass clump pattern using voronoi
             float grassClumps = voronoi(pos / 4.0);
-            
+
             // Three-tone grass blending
             vec3 grass = mix(grassColor1, grassColor2, smallNoise);
             grass = mix(grass, grassColor3, smoothstep(0.3, 0.7, grassClumps) * 0.4);
-            
+
             // Add grass blade micro-detail
             float bladeDetail = microNoise * 0.2;
             grass *= (0.85 + bladeDetail);
-            
+
             // Dirt patches (natural distribution)
             float dirtPattern = smoothstep(0.45, 0.55, largeNoise);
             dirtPattern *= smoothstep(0.4, 0.6, mediumNoise);
             vec3 baseColor = mix(grass, dirtColor, dirtPattern * 0.5);
-            
+
             // Worn paths near center (where car drives)
             float pathDist = smoothstep(15.0, 8.0, vDistanceFromCenter);
             baseColor = mix(baseColor, pathColor, pathDist * 0.3);
-            
+
             // Lighting
             float NdotL = max(dot(vNormal, sunDirection), 0.0);
             float shadow = smoothstep(0.0, 0.3, NdotL);
-            
+
             // Diffuse with soft shadow
             vec3 diffuse = sunColor * NdotL * 0.65;
-            
+
             // Ambient from sky
             vec3 ambient = mix(shadowColor, skyColor, 0.3) * 0.4;
-            
+
             // Subsurface scattering approximation for grass
             float sss = pow(max(0.0, dot(-sunDirection, vNormal) + 0.5), 2.0) * 0.15;
             vec3 subsurface = grassColor2 * sss;
-            
+
             // Final color composition
             vec3 finalColor = baseColor * (ambient + diffuse) + subsurface;
-            
+
             // Distance fade to horizon color
             float dist = length(vWorldPosition.xz);
             float fogFactor = smoothstep(150.0, 400.0, dist);
             vec3 horizonColor = mix(skyColor, vec3(0.85, 0.9, 0.95), 0.5);
             finalColor = mix(finalColor, horizonColor, fogFactor * 0.6);
-            
+
             // Slight vignette for depth
             float vignette = 1.0 - smoothstep(200.0, 600.0, dist) * 0.2;
             finalColor *= vignette;
-            
+
             gl_FragColor = vec4(finalColor, 1.0);
         }
     `
@@ -1486,49 +1291,49 @@ class PortfolioEngine {
         this.renderer = null;
         this.composer = null;
         this.clock = new THREE.Clock();
-        
+
         this.car = null;
         this.character = null;
         this.sections = [];
         this.buildings = [];
         this.decorations = [];
         this.treePositions = []; // Store tree positions for collision
-        
+
         this.sunLight = null;
         this.sky = null;
-        
+
         // Physics & Collision Systems
         this.collisionSystem = new CollisionSystem();
         this.vehiclePhysics = new VehiclePhysics();
-        
+
         // Performance Optimization Systems
         this.frustumCuller = null; // Initialized after camera
         this.spatialPartition = new SpatialPartition();
         this.lodManager = new LODManager();
         this.cullableObjects = []; // Objects that can be culled
         this.adaptiveQuality = null; // Initialized after engine setup
-        
+
         // Camera shake system
         this.cameraShake = new CameraShake();
-        
+
         // Combo scoring system
         this.combo = new ComboSystem();
-        
+
         // Object pools for particles
         this.dustParticlePool = null;
         this.smokeParticlePool = null;
-        
+
         // Skid marks system
         this.skidMarks = [];
         this.maxSkidMarks = this.state ? (this.state.quality === 'low' ? 20 : 50) : 50;
-        
+
         // Day/night cycle
         this.dayTime = 0.35; // Start at mid-morning (0-1, 0.5 = noon)
-        this.daySpeed = 0.01; // Full cycle in ~100 seconds
-        
+        this.daySpeed = 1 / 420; // Full cycle in ~100 seconds
+
         // Ambient sounds
         this.ambientPlaying = false;
-        
+
         this.state = {
             playerMode: 'driving',
             cameraMode: 'follow',
@@ -1557,21 +1362,21 @@ class PortfolioEngine {
             holdingSpaceTime: 0,
             tutorialComplete: safeStorage.getItem('portfolioTutorialComplete') === 'true'
         };
-        
+
         this.frameCount = 0;
         this.lastFpsTime = performance.now();
         this.fps = 60;
-        
+
         this.animate = this.animate.bind(this);
         this.onResize = this.onResize.bind(this);
         this.onKeyDown = this.onKeyDown.bind(this);
         this.onKeyUp = this.onKeyUp.bind(this);
     }
-    
+
     detectMobile() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
-    
+
     detectQuality() {
         if (this.detectMobile()) return 'low';
         // Be aggressive for low-end machines (3GB = reported as 4)
@@ -1595,23 +1400,23 @@ class PortfolioEngine {
         } catch(e) {}
         return 'high';
     }
-    
+
     async init() {
         try {
             this.updateLoadingProgress(5);
-            
+
             await this.initRenderer();
             this.updateLoadingProgress(20);
-            
+
             await this.createScene();
             this.updateLoadingProgress(40);
-            
+
             await this.createVehicle();
             this.updateLoadingProgress(55);
-            
+
             this.createPortfolioSections();
             this.updateLoadingProgress(80);
-            
+
             this.setupEventListeners();
             this.combo.init();
             this.createSidebar();
@@ -1621,25 +1426,30 @@ class PortfolioEngine {
             this.initMuteButton();
             this.initAnalytics();
             this.initCockpit();
+            this.environment = new Environment(this);
+            this.discoveries = new Discoveries(this);
+            this.diagnostics = new Diagnostics();
+            this.applyQuality(this.state.quality);
             this.updateLoadingProgress(90);
-            
+
             // Position car at start
             this.car.position.set(0, 0.5, 60);
             this.camera.position.set(0, 12, 80);
-            
+
             // Initialize physics position
             this.vehiclePhysics.x = 0;
             this.vehiclePhysics.z = 60;
-            this.vehiclePhysics.rotation = 0;
-            
+            this.vehiclePhysics.rotation = Math.PI;
+            this.car.rotation.y = Math.PI;
+
             this.renderer.render(this.scene, this.camera);
             this.updateMinimap();
             this.updateLoadingProgress(100);
-            
+
             // Hide loading screen with style
             setTimeout(() => {
                 document.getElementById('loadingScreen').classList.add('hidden');
-                
+
                 // Show tutorial for first-time visitors
                 if (!this.state.tutorialComplete) {
                     this.showTutorial();
@@ -1648,14 +1458,12 @@ class PortfolioEngine {
                     this.showToast('🚗', 'Welcome Back!', 'Drive to any building to explore');
                 }
             }, 600);
-            
+
             // Load non-critical assets progressively
-            setTimeout(() => this.loadEnvironmentDetails(), 500);
-            
+            requestAnimationFrame(() => this.loadEnvironmentDetails());
+
             // Performance: downgrade materials on low quality
-            if (this.state.quality === 'low') {
-                this.downgradeMaterials();
-            }
+
         } catch (error) {
             console.error('Portfolio initialization failed:', error);
             // Show error message to user
@@ -1670,10 +1478,10 @@ class PortfolioEngine {
             }
         }
     }
-    
+
     updateLoadingProgress(percent) {
         document.getElementById('loadingBar').style.width = `${percent}%`;
-        
+
         // Show random loading tips
         const tips = [
             '💡 Use SHIFT for turbo boost!',
@@ -1685,70 +1493,70 @@ class PortfolioEngine {
             '🗺️ Check the minimap for directions',
             '⏎ Press SPACE near buildings to enter'
         ];
-        
+
         const tipEl = document.querySelector('.loading-subtitle');
         if (tipEl && percent < 100) {
             const tip = tips[Math.floor(Math.random() * tips.length)];
             tipEl.textContent = tip;
         }
     }
-    
+
     // ============================================
     // GAME FEEL & UX METHODS
     // ============================================
-    
+
     showTutorial() {
         const overlay = document.getElementById('tutorialOverlay');
         overlay.classList.add('active');
         document.getElementById('tutorialStartBtn').focus();
-        
+
         document.getElementById('tutorialStartBtn').onclick = () => this.closeTutorial();
-        
+
         document.getElementById('tutorialSkipBtn').onclick = () => this.closeTutorial();
     }
-    
+
     closeTutorial() {
         const overlay = document.getElementById('tutorialOverlay');
         overlay.classList.remove('active');
-        
+
         // Mark tutorial as complete
         this.state.tutorialComplete = true;
         safeStorage.setItem('portfolioTutorialComplete', 'true');
-        
+
         // Start the game
         this.startLoop();
         document.getElementById('gameContainer').focus();
-        
+
         // Welcome message
         setTimeout(() => {
             this.showToast('🎉', 'Let\'s Go!', 'Drive to the glowing buildings to explore');
         }, 500);
     }
-    
+
     showToast(icon, title, subtitle, duration = 3500) {
         const toast = document.getElementById('notificationToast');
         const toastIcon = document.getElementById('toastIcon');
         const toastTitle = document.getElementById('toastTitle');
         const toastSubtitle = document.getElementById('toastSubtitle');
-        
+
         toastIcon.textContent = icon;
         toastTitle.textContent = title;
         toastSubtitle.textContent = subtitle;
-        
+
         toast.classList.add('show');
-        
+
         setTimeout(() => {
             toast.classList.remove('show');
         }, duration);
     }
-    
+
     triggerScreenShake(intensity = 1) {
         if (this.reducedMotion) return;
         if (this.cameraShake) {
             this.cameraShake.addTrauma(intensity * 0.4);
         }
     }
-    
+
     setBoostLines(active) {
         const lines = document.getElementById('boostLines');
         if (active) {
@@ -1757,11 +1565,11 @@ class PortfolioEngine {
             lines.classList.remove('active');
         }
     }
-    
+
     updateProgressBar(progress) {
         const bar = document.getElementById('progressBar');
         const fill = document.getElementById('progressBarFill');
-        
+
         if (progress > 0 && progress < 1) {
             bar.classList.add('active');
             fill.style.width = `${progress * 100}%`;
@@ -1770,13 +1578,13 @@ class PortfolioEngine {
             fill.style.width = '0%';
         }
     }
-    
+
     checkAchievements() {
         // First boost achievement
         if (this.state.isBoosting && !this.state.wasBoostingLastFrame) {
             this.state.boostStartTime = this.state.time;
         }
-        
+
         // Speed demon achievement (boost for 3 seconds)
         if (this.state.isBoosting && 
             this.state.time - this.state.boostStartTime > 3 &&
@@ -1785,7 +1593,7 @@ class PortfolioEngine {
             this.showToast('🔥', 'Speed Demon!', 'Boosted for 3 seconds straight');
             // Achievement unlocked - subtle celebration
         }
-        
+
         // Explorer achievement (visit all sections)
         if (this.state.sectionsVisited.size === 5 && 
             !safeStorage.getItem('achievement_explorer')) {
@@ -1793,13 +1601,13 @@ class PortfolioEngine {
             this.showToast('🏆', 'Explorer!', 'You\'ve visited every section');
             // Achievement unlocked - subtle celebration
         }
-        
+
         // Track distance for road warrior achievement
         if (this.state.lastPosition && this.car) {
             const dx = this.car.position.x - this.state.lastPosition.x;
             const dz = this.car.position.z - this.state.lastPosition.z;
             this.state.totalDistance += Math.sqrt(dx * dx + dz * dz);
-            
+
             // Road warrior achievement (drive 1000 units)
             if (this.state.totalDistance > 1000 &&
                 !safeStorage.getItem('achievement_roadWarrior')) {
@@ -1807,23 +1615,23 @@ class PortfolioEngine {
                 this.showToast('🛣️', 'Road Warrior!', 'Drove over 1000 units');
             }
         }
-        
+
         if (this.car) {
             this.state.lastPosition = { 
                 x: this.car.position.x, 
                 z: this.car.position.z 
             };
         }
-        
+
         this.state.wasBoostingLastFrame = this.state.isBoosting;
     }
-    
+
     async initRenderer() {
         const container = document.getElementById('gameContainer');
-        
+
         // Scene
         this.scene = new THREE.Scene();
-        
+
         // Camera - Increased near plane to reduce z-fighting
         this.camera = new THREE.PerspectiveCamera(
             65,
@@ -1831,13 +1639,13 @@ class PortfolioEngine {
             0.5,  // Increased from 0.1 to reduce z-fighting
             this.state.quality === 'ultra' ? 1500 : this.state.quality === 'high' ? 1000 : 500
         );
-        
+
         // Initialize Frustum Culler after camera is created
         this.frustumCuller = new FrustumCuller(this.camera);
-        
+
         // Initialize Adaptive Quality Manager
         this.adaptiveQuality = new AdaptiveQualityManager(this);
-        
+
         // Renderer with PBR support and logarithmic depth buffer for z-fighting fix
         this.renderer = new THREE.WebGLRenderer({
             antialias: this.state.quality !== 'low',
@@ -1847,27 +1655,27 @@ class PortfolioEngine {
             alpha: false,
             logarithmicDepthBuffer: this.state.quality !== 'low'
         });
-        
+
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        
+
         // Adaptive pixel ratio: aggressive cap for performance
         const maxPixelRatio = this.state.isMobile ? 1.0 : 
             (this.state.quality === 'low' ? 1.0 : 
              this.state.quality === 'medium' ? 1.5 : 2);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPixelRatio));
-        
+
         // Shadow mapping: quality-dependent
         this.renderer.shadowMap.enabled = (this.state.quality === 'high' || this.state.quality === 'ultra');
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         // Don't auto-update shadow map every frame - huge perf save
         this.renderer.shadowMap.autoUpdate = false;
         this.renderer.shadowMap.needsUpdate = true; // Update once on start
-        
+
         // Better color management
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.2;  // Slightly reduced from 1.4
-        
+
         container.appendChild(this.renderer.domElement);
 
         // CSS2D Renderer for crisp HTML sign labels
@@ -1879,72 +1687,21 @@ class PortfolioEngine {
         this.labelRenderer.domElement.style.pointerEvents = 'none';
         this.labelRenderer.domElement.style.zIndex = '5';
         container.appendChild(this.labelRenderer.domElement);
-        
-        // Post-processing - quality-dependent pipeline
+
         this.composer = new EffectComposer(this.renderer);
         this.composer.addPass(new RenderPass(this.scene, this.camera));
-        
-        // SMAA only on high/ultra (expensive full-screen pass)
-        if (this.state.quality === 'high' || this.state.quality === 'ultra') {
-            const smaaPass = new SMAAPass(
-                window.innerWidth * this.renderer.getPixelRatio(),
-                window.innerHeight * this.renderer.getPixelRatio()
-            );
-            this.composer.addPass(smaaPass);
-        }
-        
-        // Bloom on medium+ (half-res for performance)
-        this.bloomPass = new UnrealBloomPass(
-            new THREE.Vector2(window.innerWidth / 2, window.innerHeight / 2),
-            0.2,   // Strength
-            0.4,   // Radius
-            0.88   // Threshold - only bright spots
-        );
-        if (this.state.quality !== 'low') {
-            this.composer.addPass(this.bloomPass);
-        }
-        
-        // Color Grading only on high/ultra
+        this.bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), .15, .3, .95);
+        this.composer.addPass(this.bloomPass);
         this.colorGradingPass = new ShaderPass(ColorGradingShader);
-        this.colorGradingPass.uniforms['brightness'].value = 0.05;
-        this.colorGradingPass.uniforms['contrast'].value = 1.08;
-        this.colorGradingPass.uniforms['saturation'].value = 1.15;
-        this.colorGradingPass.uniforms['gamma'].value = 0.95;
-        if (this.state.quality === 'high' || this.state.quality === 'ultra') {
-            this.composer.addPass(this.colorGradingPass);
-        }
-        
-        // Vignette only on ultra
-        this.vignettePass = new ShaderPass(VignetteShader);
-        this.vignettePass.uniforms['offset'].value = 1.2;
-        this.vignettePass.uniforms['darkness'].value = 1.2;
-        if (this.state.quality === 'ultra') {
-            this.composer.addPass(this.vignettePass);
-        }
-        
-        // Film Grain only on ultra
-        this.filmGrainPass = new ShaderPass(FilmGrainShader);
-        this.filmGrainPass.uniforms['intensity'].value = 0.02;
-        this.filmGrainPass.enabled = this.state.quality === 'ultra';
-        if (this.state.quality === 'ultra') {
-            this.composer.addPass(this.filmGrainPass);
-        }
-        
-        // Motion Blur only on high/ultra
-        this.motionBlurPass = new ShaderPass(MotionBlurShader);
-        this.motionBlurPass.uniforms['velocity'].value = 0;
-        this.motionBlurPass.uniforms['maxBlur'].value = 0.012;
-        if (this.state.quality === 'high' || this.state.quality === 'ultra') {
-            this.composer.addPass(this.motionBlurPass);
-        }
-        
-        // Output pass
+        this.colorGradingPass.uniforms['brightness'].value = 0;
+        this.colorGradingPass.uniforms['contrast'].value = 1.02;
+        this.colorGradingPass.uniforms['saturation'].value = 1.02;
+        this.colorGradingPass.uniforms['gamma'].value = 1;
+        this.composer.addPass(this.colorGradingPass);
         this.composer.addPass(new OutputPass());
-        
-        // Flag: on low quality, bypass composer entirely in animate()
-        this.useComposer = this.state.quality !== 'low';
+        this.renderer.info.autoReset = false;
     }
-    
+
     async createScene() {
         // Bruno Simon style: warm, playful open world
         this.scene.background = new THREE.Color(0x88c3e8);
@@ -1976,6 +1733,8 @@ class PortfolioEngine {
                 void main() {
                     float h = normalize(vWorldPosition + offset).y;
                     gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h,0.0),exponent),0.0)),1.0);
+                    #include <tonemapping_fragment>
+                    #include <colorspace_fragment>
                 }
             `,
             side: THREE.BackSide
@@ -2042,6 +1801,7 @@ class PortfolioEngine {
         }
 
         const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
         tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
         tex.repeat.set(20, 20);
 
@@ -2054,29 +1814,29 @@ class PortfolioEngine {
 
     // stub — terrain replaced by flat ground above
     async createTerrain() {}
-    
+
     createClouds() {
         // Create fluffy clouds using sprites
         const cloudGroup = new THREE.Group();
-        
+
         // Cloud texture (procedural)
         const cloudCanvas = document.createElement('canvas');
         cloudCanvas.width = 256;
         cloudCanvas.height = 256;
         const ctx = cloudCanvas.getContext('2d');
-        
+
         // Create soft cloud shape
         const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
         gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
         gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)');
         gradient.addColorStop(0.6, 'rgba(255, 255, 255, 0.3)');
         gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        
+
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 256, 256);
-        
+
         const cloudTexture = new THREE.CanvasTexture(cloudCanvas);
-        
+
         // Create multiple clouds at different positions
         const cloudPositions = [
             { x: 100, y: 200, z: -200, scale: 80 },
@@ -2090,12 +1850,12 @@ class PortfolioEngine {
             { x: 150, y: 185, z: 200, scale: 75 },
             { x: -50, y: 215, z: -350, scale: 95 },
         ];
-        
+
         cloudPositions.forEach(pos => {
             // Each cloud: fewer sprites on lower quality
             const cloudCluster = new THREE.Group();
             const spriteCount = this.state.quality === 'low' ? 2 : (this.state.quality === 'medium' ? 3 : 5);
-            
+
             for (let i = 0; i < spriteCount; i++) {
                 const spriteMaterial = new THREE.SpriteMaterial({
                     map: cloudTexture,
@@ -2103,7 +1863,7 @@ class PortfolioEngine {
                     opacity: 0.7 + Math.random() * 0.2,
                     depthWrite: false
                 });
-                
+
                 const sprite = new THREE.Sprite(spriteMaterial);
                 sprite.position.set(
                     (Math.random() - 0.5) * pos.scale * 0.5,
@@ -2113,14 +1873,14 @@ class PortfolioEngine {
                 sprite.scale.setScalar(pos.scale * (0.5 + Math.random() * 0.5));
                 cloudCluster.add(sprite);
             }
-            
+
             cloudCluster.position.set(pos.x, pos.y, pos.z);
             cloudGroup.add(cloudCluster);
         });
-        
+
         this.clouds = cloudGroup;
         this.scene.add(cloudGroup);
-        
+
         // Add visible sun
         const sunSegments = this.state.quality === 'low' ? 12 : 24;
         const sunGeo = new THREE.SphereGeometry(30, sunSegments, sunSegments);
@@ -2131,7 +1891,7 @@ class PortfolioEngine {
         this.sunMesh = new THREE.Mesh(sunGeo, sunMat);
         this.sunMesh.position.set(400, 300, -200); // Far away in the sky
         this.scene.add(this.sunMesh);
-        
+
         // Sun glow (larger, transparent)
         const glowGeo = new THREE.SphereGeometry(50, sunSegments, sunSegments);
         const glowMat = new THREE.MeshBasicMaterial({
@@ -2144,14 +1904,14 @@ class PortfolioEngine {
         this.sunGlow.position.copy(this.sunMesh.position);
         this.scene.add(this.sunGlow);
     }
-    
+
     // Generate realistic procedural grass texture
     createGrassTexture() {
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 512;
         const ctx = canvas.getContext('2d');
-        
+
         // Base grass green with variation
         const gradient = ctx.createRadialGradient(256, 256, 0, 256, 256, 400);
         gradient.addColorStop(0, '#4a7c3f');
@@ -2159,7 +1919,7 @@ class PortfolioEngine {
         gradient.addColorStop(1, '#2d5a28');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, 512, 512);
-        
+
         // Add grass blade details
         const grassBladeCount = this.state.quality === 'low' ? 3000 : (this.state.quality === 'medium' ? 8000 : 15000);
         for (let i = 0; i < grassBladeCount; i++) {
@@ -2167,19 +1927,19 @@ class PortfolioEngine {
             const y = Math.random() * 512;
             const length = 3 + Math.random() * 8;
             const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.6;
-            
+
             // Vary grass color
             const brightness = 0.7 + Math.random() * 0.5;
             const hue = 90 + Math.random() * 30; // Green range
             ctx.strokeStyle = `hsl(${hue}, 50%, ${30 * brightness}%)`;
             ctx.lineWidth = 0.5 + Math.random() * 1;
-            
+
             ctx.beginPath();
             ctx.moveTo(x, y);
             ctx.lineTo(x + Math.cos(angle) * length, y + Math.sin(angle) * length);
             ctx.stroke();
         }
-        
+
         // Add some dirt patches
         for (let i = 0; i < 30; i++) {
             const x = Math.random() * 512;
@@ -2193,7 +1953,7 @@ class PortfolioEngine {
             ctx.arc(x, y, radius, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         // Add small flowers/details
         for (let i = 0; i < 100; i++) {
             const x = Math.random() * 512;
@@ -2204,21 +1964,21 @@ class PortfolioEngine {
             ctx.arc(x, y, 1 + Math.random() * 2, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         return canvas;
     }
-    
+
     // Generate realistic asphalt texture
     createAsphaltTexture() {
         const canvas = document.createElement('canvas');
         canvas.width = 512;
         canvas.height = 512;
         const ctx = canvas.getContext('2d');
-        
+
         // Dark asphalt base
         ctx.fillStyle = '#1a1a1f';
         ctx.fillRect(0, 0, 512, 512);
-        
+
         // Add aggregate (small stones)
         const aggregateCount = this.state.quality === 'low' ? 5000 : (this.state.quality === 'medium' ? 10000 : 20000);
         for (let i = 0; i < aggregateCount; i++) {
@@ -2231,7 +1991,7 @@ class PortfolioEngine {
             ctx.arc(x, y, size, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         // Add darker patches (oil stains, wear)
         for (let i = 0; i < 15; i++) {
             const x = Math.random() * 512;
@@ -2246,7 +2006,7 @@ class PortfolioEngine {
             ctx.ellipse(x, y, radiusX, radiusY, Math.random() * Math.PI, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         // Add subtle cracks
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
         ctx.lineWidth = 0.5;
@@ -2262,7 +2022,7 @@ class PortfolioEngine {
             }
             ctx.stroke();
         }
-        
+
         // Add lighter worn areas (tire tracks)
         for (let i = 0; i < 5; i++) {
             const x = Math.random() * 512;
@@ -2275,21 +2035,21 @@ class PortfolioEngine {
             ctx.arc(x, y, 40, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         return canvas;
     }
-    
+
     // Generate concrete/stone texture for buildings
     createConcreteTexture() {
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
-        
+
         // Concrete base color
         ctx.fillStyle = '#8a8a8a';
         ctx.fillRect(0, 0, 256, 256);
-        
+
         // Add noise/grain
         for (let i = 0; i < 10000; i++) {
             const x = Math.random() * 256;
@@ -2298,7 +2058,7 @@ class PortfolioEngine {
             ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
             ctx.fillRect(x, y, 1, 1);
         }
-        
+
         // Add some darker spots
         for (let i = 0; i < 20; i++) {
             const x = Math.random() * 256;
@@ -2312,22 +2072,22 @@ class PortfolioEngine {
             ctx.arc(x, y, radius, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         return canvas;
     }
-    
-    
+
+
     // Simple normal map for grass
     createGrassNormalMap() {
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
-        
+
         // Base normal (pointing up = rgb(128, 128, 255))
         ctx.fillStyle = 'rgb(128, 128, 255)';
         ctx.fillRect(0, 0, 256, 256);
-        
+
         // Add random normal variations for grass texture
         const normalGrassCount = this.state.quality === 'low' ? 500 : 2000;
         for (let i = 0; i < normalGrassCount; i++) {
@@ -2338,21 +2098,21 @@ class PortfolioEngine {
             ctx.fillStyle = `rgb(${nx}, ${ny}, 255)`;
             ctx.fillRect(x, y, 2, 2);
         }
-        
+
         return canvas;
     }
-    
+
     // Normal map for asphalt bumps
     createAsphaltNormalMap() {
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
-        
+
         // Base normal (pointing up)
         ctx.fillStyle = 'rgb(128, 128, 255)';
         ctx.fillRect(0, 0, 256, 256);
-        
+
         // Add aggregate bump variations
         const normalAsphaltCount = this.state.quality === 'low' ? 1000 : 3000;
         for (let i = 0; i < normalAsphaltCount; i++) {
@@ -2366,21 +2126,21 @@ class PortfolioEngine {
             ctx.arc(x, y, size, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         return canvas;
     }
-    
+
     // Modern building facade texture (concrete panels with subtle details)
     createBuildingTexture() {
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
-        
+
         // Concrete panel base
         ctx.fillStyle = '#d4d4d8';
         ctx.fillRect(0, 0, 256, 256);
-        
+
         // Add concrete texture noise
         const concreteCount = this.state.quality === 'low' ? 2000 : 5000;
         for (let i = 0; i < concreteCount; i++) {
@@ -2390,11 +2150,11 @@ class PortfolioEngine {
             ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness + 5})`;
             ctx.fillRect(x, y, 1, 1);
         }
-        
+
         // Panel grid lines (horizontal and vertical)
         ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)';
         ctx.lineWidth = 2;
-        
+
         // Horizontal panel lines
         for (let y = 64; y < 256; y += 64) {
             ctx.beginPath();
@@ -2402,7 +2162,7 @@ class PortfolioEngine {
             ctx.lineTo(256, y);
             ctx.stroke();
         }
-        
+
         // Vertical panel lines
         for (let x = 64; x < 256; x += 64) {
             ctx.beginPath();
@@ -2410,7 +2170,7 @@ class PortfolioEngine {
             ctx.lineTo(x, 256);
             ctx.stroke();
         }
-        
+
         // Add weathering/stains
         for (let i = 0; i < 10; i++) {
             const x = Math.random() * 256;
@@ -2424,42 +2184,42 @@ class PortfolioEngine {
             ctx.arc(x, y, radius, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         return canvas;
     }
-    
+
     // Normal map for building panels depth
     createBuildingNormalMap() {
         const canvas = document.createElement('canvas');
         canvas.width = 256;
         canvas.height = 256;
         const ctx = canvas.getContext('2d');
-        
+
         // Base normal
         ctx.fillStyle = 'rgb(128, 128, 255)';
         ctx.fillRect(0, 0, 256, 256);
-        
+
         // Add panel edge normals (creates inset panel look)
         ctx.fillStyle = 'rgb(100, 128, 255)'; // Left edges
         for (let x = 0; x < 256; x += 64) {
             ctx.fillRect(x, 0, 3, 256);
         }
-        
+
         ctx.fillStyle = 'rgb(156, 128, 255)'; // Right edges
         for (let x = 61; x < 256; x += 64) {
             ctx.fillRect(x, 0, 3, 256);
         }
-        
+
         ctx.fillStyle = 'rgb(128, 100, 255)'; // Top edges
         for (let y = 0; y < 256; y += 64) {
             ctx.fillRect(0, y, 256, 3);
         }
-        
+
         ctx.fillStyle = 'rgb(128, 156, 255)'; // Bottom edges
         for (let y = 61; y < 256; y += 64) {
             ctx.fillRect(0, y, 256, 3);
         }
-        
+
         // Add surface variation
         for (let i = 0; i < 2000; i++) {
             const x = Math.random() * 256;
@@ -2469,72 +2229,72 @@ class PortfolioEngine {
             ctx.fillStyle = `rgb(${nx}, ${ny}, 255)`;
             ctx.fillRect(x, y, 2, 2);
         }
-        
+
         return canvas;
     }
-    
+
     createRoads() {
         // No roads in Bruno Simon style — open sandy world
         // Dirt paths are just visual on the ground texture
     }
-    
+
     createRoadSegment(from, to, width, height, material, texture, fromRadius = 8, toRadius = 8) {
         const dx = to.x - from.x;
         const dz = to.z - from.z;
         const length = Math.sqrt(dx * dx + dz * dz);
         const angle = Math.atan2(dx, dz);
-        
+
         // Direction unit vector
         const dirX = dx / length;
         const dirZ = dz / length;
-        
+
         // Road extends INTO intersections for seamless connection
         // No shortening - let the road go all the way
         const roadLength = length;
-        
+
         // Calculate center
         const centerX = from.x + dx / 2;
         const centerZ = from.z + dz / 2;
-        
+
         // Set texture repeat based on road length
         const textureCopy = texture.clone();
         textureCopy.repeat.set(width / 10, roadLength / 10);
         textureCopy.needsUpdate = true;
-        
+
         const roadMat = material.clone();
         roadMat.map = textureCopy;
-        
+
         // Road is slightly below intersections so they blend on top
         const roadGeom = new THREE.BoxGeometry(width, height, roadLength);
         const road = new THREE.Mesh(roadGeom, roadMat);
-        
+
         road.position.set(centerX, height / 2, centerZ);
         road.rotation.y = -angle;
         road.receiveShadow = true;
         this.scene.add(road);
-        
+
         // Add road markings (skip the parts under intersections)
         this.addRoadMarkings(from, to, length, angle, roadLength, width, fromRadius, toRadius);
     }
-    
+
     addRoadMarkings(from, to, length, angle, roadLength, roadWidth, fromRadius = 8, toRadius = 8) {
         const dx = to.x - from.x;
         const dz = to.z - from.z;
         const dirX = dx / length;
         const dirZ = dz / length;
-        
+
         // Markings only in the middle section (not under intersections)
         const markingStart = fromRadius + 2;
         const markingEnd = length - toRadius - 2;
         const markingLength = markingEnd - markingStart;
-        
+
         if (markingLength <= 0) return; // Too short for markings
-        
+
         // White dashed center line
         const dashLength = 4;
         const gapLength = 4;
         const numDashes = Math.floor(markingLength / (dashLength + gapLength));
-        
+
         const lineMaterial = new THREE.MeshBasicMaterial({ 
             color: 0xFFFFFF,
             transparent: true,
@@ -2543,18 +2303,18 @@ class PortfolioEngine {
             polygonOffsetFactor: -2,
             polygonOffsetUnits: -2
         });
-        
+
         // Start position for markings
         const startX = from.x + dirX * markingStart;
         const startZ = from.z + dirZ * markingStart;
-        
+
         for (let i = 0; i < numDashes; i++) {
             const progress = (i * (dashLength + gapLength) + dashLength / 2) / markingLength;
             if (progress > 1) break;
-            
+
             const dashGeom = new THREE.BoxGeometry(0.2, 0.02, dashLength);
             const dash = new THREE.Mesh(dashGeom, lineMaterial);
-            
+
             dash.position.set(
                 startX + dirX * progress * markingLength,
                 0.08,
@@ -2563,18 +2323,18 @@ class PortfolioEngine {
             dash.rotation.y = -angle;
             this.scene.add(dash);
         }
-        
+
         // Edge lines - also shortened to avoid intersections
         const edgeLength = markingLength;
         const edgeCenterX = from.x + dirX * (markingStart + markingLength / 2);
         const edgeCenterZ = from.z + dirZ * (markingStart + markingLength / 2);
-        
+
         [-1, 1].forEach(side => {
             const edgeGeom = new THREE.BoxGeometry(0.15, 0.02, edgeLength);
             const edge = new THREE.Mesh(edgeGeom, lineMaterial);
-            
+
             const offset = (roadWidth / 2 - 0.3) * side;
-            
+
             edge.position.set(
                 edgeCenterX + Math.cos(angle) * offset,
                 0.08,
@@ -2584,36 +2344,36 @@ class PortfolioEngine {
             this.scene.add(edge);
         });
     }
-    
+
     createIntersection(x, z, radius, material) {
         // Flat circle that sits on top of roads for smooth blending
         const geometry = new THREE.CircleGeometry(radius, 48);
-        
+
         const intersectionMat = material ? material.clone() : new THREE.MeshStandardMaterial({
             color: 0x2a2a2a,
             roughness: 0.9,
             metalness: 0.0
         });
-        
+
         // Intersection sits slightly above roads
         intersectionMat.polygonOffset = true;
         intersectionMat.polygonOffsetFactor = -2;
         intersectionMat.polygonOffsetUnits = -2;
-        
+
         const intersection = new THREE.Mesh(geometry, intersectionMat);
         intersection.rotation.x = -Math.PI / 2; // Lay flat
         intersection.position.set(x, 0.06, z);
         intersection.receiveShadow = true;
         this.scene.add(intersection);
     }
-    
+
     createRoadTexture() {
         const canvas = document.createElement('canvas');
         const texSize = this.state.quality === 'low' ? 512 : (this.state.quality === 'medium' ? 1024 : 2048);
         canvas.width = texSize;
         canvas.height = texSize;
         const ctx = canvas.getContext('2d');
-        
+
         // Dark asphalt base with slight blue tint
         const gradient = ctx.createLinearGradient(0, 0, texSize, 0);
         gradient.addColorStop(0, '#2a2a2f');
@@ -2621,7 +2381,7 @@ class PortfolioEngine {
         gradient.addColorStop(1, '#2a2a2f');
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, texSize, texSize);
-        
+
         // Add realistic asphalt texture - particle count scales with texture size
         const particleCount = Math.round((texSize / 2048) * (texSize / 2048) * 60000);
         for (let i = 0; i < particleCount; i++) {
@@ -2634,7 +2394,7 @@ class PortfolioEngine {
             ctx.arc(x, y, size, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         // Add occasional lighter patches (repaired sections)
         for (let i = 0; i < 12; i++) {
             const x = Math.random() * 1800 + 100;
@@ -2644,7 +2404,7 @@ class PortfolioEngine {
             ctx.fillStyle = `rgba(60, 60, 65, ${Math.random() * 0.3 + 0.2})`;
             ctx.fillRect(x, y, w, h);
         }
-        
+
         // Add tire marks (subtle)
         ctx.strokeStyle = 'rgba(20, 20, 20, 0.15)';
         ctx.lineWidth = 6;
@@ -2659,7 +2419,7 @@ class PortfolioEngine {
             );
             ctx.stroke();
         }
-        
+
         // Center line (dashed yellow/white)
         ctx.strokeStyle = '#E8E8E0';
         ctx.lineWidth = 18;
@@ -2669,24 +2429,24 @@ class PortfolioEngine {
         ctx.moveTo(1024, 0);
         ctx.lineTo(1024, 2048);
         ctx.stroke();
-        
+
         // Edge lines (solid white)
         ctx.setLineDash([]);
         ctx.strokeStyle = '#F0F0E8';
         ctx.lineWidth = 15;
-        
+
         // Left edge
         ctx.beginPath();
         ctx.moveTo(120, 0);
         ctx.lineTo(120, 2048);
         ctx.stroke();
-        
+
         // Right edge
         ctx.beginPath();
         ctx.moveTo(1928, 0);
         ctx.lineTo(1928, 2048);
         ctx.stroke();
-        
+
         // Add subtle wear on lines
         ctx.strokeStyle = 'rgba(42, 42, 42, 0.3)';
         ctx.lineWidth = 3;
@@ -2698,7 +2458,7 @@ class PortfolioEngine {
                 ctx.stroke();
             }
         }
-        
+
         const texture = new THREE.CanvasTexture(canvas);
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
@@ -2706,36 +2466,36 @@ class PortfolioEngine {
         texture.generateMipmaps = true;
         texture.minFilter = THREE.LinearMipmapLinearFilter;
         texture.magFilter = THREE.LinearFilter;
-        
+
         return texture;
     }
-    
+
     async createVehicle() {
         const carGroup = new THREE.Group();
-        
+
         // Realistic sports car with proper proportions
-        const bodyColor = 0xC41E3A; // Deep racing red
+        const bodyColor = 0xf39455;
         const bodyMaterial = new THREE.MeshStandardMaterial({
             color: bodyColor,
-            metalness: 0.85,
-            roughness: 0.15,
+            metalness: 0.12,
+            roughness: 0.38,
             envMapIntensity: 1.5
         });
-        
+
         // Secondary body material (darker accents)
         const accentMaterial = new THREE.MeshStandardMaterial({
             color: 0x1a1a1a,
             metalness: 0.6,
             roughness: 0.4
         });
-        
+
         // Main body - lower chassis with realistic shape
         const lowerBodyGeom = new THREE.BoxGeometry(2.1, 0.5, 4.8);
         const lowerBody = new THREE.Mesh(lowerBodyGeom, bodyMaterial);
         lowerBody.position.set(0, 0.45, 0);
         lowerBody.castShadow = true;
         carGroup.add(lowerBody);
-        
+
         // Front fenders (wheel arches)
         [-1, 1].forEach(side => {
             const fenderGeom = new THREE.BoxGeometry(0.3, 0.35, 1.2);
@@ -2744,7 +2504,7 @@ class PortfolioEngine {
             fender.castShadow = true;
             carGroup.add(fender);
         });
-        
+
         // Rear fenders (wider for sporty look)
         [-1, 1].forEach(side => {
             const rearFenderGeom = new THREE.BoxGeometry(0.35, 0.4, 1.3);
@@ -2753,7 +2513,7 @@ class PortfolioEngine {
             rearFender.castShadow = true;
             carGroup.add(rearFender);
         });
-        
+
         // Hood with slope
         const hoodGeom = new THREE.BoxGeometry(1.9, 0.25, 1.8);
         const hood = new THREE.Mesh(hoodGeom, bodyMaterial);
@@ -2761,21 +2521,21 @@ class PortfolioEngine {
         hood.rotation.x = -0.08;
         hood.castShadow = true;
         carGroup.add(hood);
-        
+
         // Cabin/roof
         const cabinGeom = new THREE.BoxGeometry(1.85, 0.7, 2.2);
         const cabin = new THREE.Mesh(cabinGeom, bodyMaterial);
         cabin.position.set(0, 1.05, -0.3);
         cabin.castShadow = true;
         carGroup.add(cabin);
-        
+
         // Trunk/rear
         const trunkGeom = new THREE.BoxGeometry(1.9, 0.35, 1.0);
         const trunk = new THREE.Mesh(trunkGeom, bodyMaterial);
         trunk.position.set(0, 0.7, -1.9);
         trunk.castShadow = true;
         carGroup.add(trunk);
-        
+
         // Front grille
         const grilleMaterial = new THREE.MeshStandardMaterial({
             color: 0x0a0a0a,
@@ -2786,20 +2546,20 @@ class PortfolioEngine {
         const grille = new THREE.Mesh(grilleGeom, grilleMaterial);
         grille.position.set(0, 0.45, 2.43);
         carGroup.add(grille);
-        
+
         // Front bumper
         const bumperGeom = new THREE.BoxGeometry(2.1, 0.3, 0.3);
         const frontBumper = new THREE.Mesh(bumperGeom, accentMaterial);
         frontBumper.position.set(0, 0.3, 2.4);
         frontBumper.castShadow = true;
         carGroup.add(frontBumper);
-        
+
         // Rear bumper
         const rearBumper = new THREE.Mesh(bumperGeom, accentMaterial);
         rearBumper.position.set(0, 0.3, -2.4);
         rearBumper.castShadow = true;
         carGroup.add(rearBumper);
-        
+
         // Side skirts
         [-1, 1].forEach(side => {
             const skirtGeom = new THREE.BoxGeometry(0.15, 0.2, 3.5);
@@ -2807,7 +2567,7 @@ class PortfolioEngine {
             skirt.position.set(side * 1.05, 0.25, 0);
             carGroup.add(skirt);
         });
-        
+
         // Windshields - quality-dependent material
         let glassMaterial;
         if (this.state.quality === 'low' || this.state.quality === 'medium') {
@@ -2829,21 +2589,21 @@ class PortfolioEngine {
                 opacity: 0.35
             });
         }
-        
+
         // Front windshield (angled)
         const frontGlassGeom = new THREE.PlaneGeometry(1.75, 1.0);
         const frontGlass = new THREE.Mesh(frontGlassGeom, glassMaterial);
         frontGlass.position.set(0, 1.2, 0.95);
         frontGlass.rotation.x = 0.45;
         carGroup.add(frontGlass);
-        
+
         // Rear windshield
         const rearGlassGeom = new THREE.PlaneGeometry(1.6, 0.8);
         const rearGlass = new THREE.Mesh(rearGlassGeom, glassMaterial);
         rearGlass.position.set(0, 1.15, -1.45);
         rearGlass.rotation.x = -0.4;
         carGroup.add(rearGlass);
-        
+
         // Side windows
         [-1, 1].forEach(side => {
             const sideGlass = new THREE.Mesh(
@@ -2854,7 +2614,7 @@ class PortfolioEngine {
             sideGlass.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
             carGroup.add(sideGlass);
         });
-        
+
         // Door handles
         const handleMaterial = new THREE.MeshStandardMaterial({
             color: 0xC0C0C0,
@@ -2867,25 +2627,25 @@ class PortfolioEngine {
             handle.position.set(side * 1.08, 0.85, 0.2);
             carGroup.add(handle);
         });
-        
+
         // Side mirrors
         [-1, 1].forEach(side => {
             const mirrorGroup = new THREE.Group();
-            
+
             const mirrorArm = new THREE.Mesh(
                 new THREE.BoxGeometry(0.25, 0.05, 0.05),
                 accentMaterial
             );
             mirrorArm.position.set(side * 0.12, 0, 0);
             mirrorGroup.add(mirrorArm);
-            
+
             const mirrorHead = new THREE.Mesh(
                 new THREE.BoxGeometry(0.08, 0.12, 0.18),
                 accentMaterial
             );
             mirrorHead.position.set(side * 0.28, 0, 0);
             mirrorGroup.add(mirrorHead);
-            
+
             // Mirror glass
             const mirrorGlass = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.06, 0.1),
@@ -2898,11 +2658,11 @@ class PortfolioEngine {
             mirrorGlass.position.set(side * 0.32, 0, 0);
             mirrorGlass.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
             mirrorGroup.add(mirrorGlass);
-            
+
             mirrorGroup.position.set(side * 0.85, 1.05, 0.8);
             carGroup.add(mirrorGroup);
         });
-        
+
         // Realistic wheels with proper tire sidewalls
         const wheelPositions = [
             { x: -1.0, y: 0.38, z: 1.5 },  // Front left
@@ -2910,35 +2670,35 @@ class PortfolioEngine {
             { x: -1.0, y: 0.38, z: -1.5 }, // Rear left
             { x: 1.0, y: 0.38, z: -1.5 }   // Rear right
         ];
-        
+
         const tireMaterial = new THREE.MeshStandardMaterial({
             color: 0x1a1a1a,
             roughness: 0.9,
             metalness: 0.0
         });
-        
+
         const rimMaterial = new THREE.MeshStandardMaterial({
             color: 0x888888,
             metalness: 0.95,
             roughness: 0.15
         });
-        
+
         this.wheels = [];
         wheelPositions.forEach((pos, index) => {
             const wheelGroup = new THREE.Group();
-            
+
             // Tire (outer rubber)
             const tireGeom = new THREE.TorusGeometry(0.35, 0.12, 16, 32);
             const tire = new THREE.Mesh(tireGeom, tireMaterial);
             tire.rotation.y = Math.PI / 2;
             wheelGroup.add(tire);
-            
+
             // Rim
             const rimGeom = new THREE.CylinderGeometry(0.28, 0.28, 0.22, 24);
             const rim = new THREE.Mesh(rimGeom, rimMaterial);
             rim.rotation.z = Math.PI / 2;
             wheelGroup.add(rim);
-            
+
             // Rim spokes (5-spoke design)
             for (let i = 0; i < 5; i++) {
                 const spokeAngle = (i / 5) * Math.PI * 2;
@@ -2952,13 +2712,13 @@ class PortfolioEngine {
                 spoke.rotation.y = spokeAngle;
                 wheelGroup.add(spoke);
             }
-            
+
             // Center cap with logo indent
             const capGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.24, 16);
             const cap = new THREE.Mesh(capGeom, rimMaterial);
             cap.rotation.z = Math.PI / 2;
             wheelGroup.add(cap);
-            
+
             // Brake caliper (visible through spokes)
             const caliperGeom = new THREE.BoxGeometry(0.12, 0.08, 0.15);
             const caliperMat = new THREE.MeshStandardMaterial({
@@ -2969,22 +2729,22 @@ class PortfolioEngine {
             const caliper = new THREE.Mesh(caliperGeom, caliperMat);
             caliper.position.set(pos.x > 0 ? 0.05 : -0.05, -0.12, 0);
             wheelGroup.add(caliper);
-            
+
             wheelGroup.position.set(pos.x, pos.y, pos.z);
             wheelGroup.userData.steering = index < 2;
             wheelGroup.castShadow = true;
-            
+
             this.wheels.push(wheelGroup);
             carGroup.add(wheelGroup);
         });
-        
+
         // LED Headlights
         const headlightMaterial = new THREE.MeshStandardMaterial({
             color: 0xFFFFFF,
             emissive: 0xFFFFFF,
             emissiveIntensity: 2.0
         });
-        
+
         [-0.6, 0.6].forEach(x => {
             // Main headlight
             const headlight = new THREE.Mesh(
@@ -2993,21 +2753,21 @@ class PortfolioEngine {
             );
             headlight.position.set(x, 0.55, 2.45);
             carGroup.add(headlight);
-            
+
             // DRL strip
             const drlGeom = new THREE.BoxGeometry(0.3, 0.03, 0.02);
             const drl = new THREE.Mesh(drlGeom, headlightMaterial);
             drl.position.set(x, 0.7, 2.45);
             carGroup.add(drl);
         });
-        
+
         // LED Taillights
         const taillightMaterial = new THREE.MeshStandardMaterial({
             color: 0xFF0000,
             emissive: 0xFF0000,
             emissiveIntensity: 1.0
         });
-        
+
         [-0.6, 0.6].forEach(x => {
             // Main taillight
             const taillight = new THREE.Mesh(
@@ -3017,7 +2777,7 @@ class PortfolioEngine {
             taillight.position.set(x, 0.6, -2.45);
             carGroup.add(taillight);
         });
-        
+
         // Exhaust tips
         const exhaustMaterial = new THREE.MeshStandardMaterial({
             color: 0x333333,
@@ -3031,14 +2791,14 @@ class PortfolioEngine {
             exhaust.position.set(x, 0.25, -2.5);
             carGroup.add(exhaust);
         });
-        
+
         // Rear spoiler
         const spoilerMat = new THREE.MeshStandardMaterial({
             color: 0x1a1a1a,
             metalness: 0.5,
             roughness: 0.4
         });
-        
+
         // Spoiler supports
         [-0.5, 0.5].forEach(x => {
             const supportGeom = new THREE.BoxGeometry(0.08, 0.35, 0.08);
@@ -3046,7 +2806,7 @@ class PortfolioEngine {
             support.position.set(x, 1.0, -2.1);
             carGroup.add(support);
         });
-        
+
         // Spoiler wing
         const spoilerWing = new THREE.Mesh(
             new THREE.BoxGeometry(1.6, 0.08, 0.35),
@@ -3055,14 +2815,14 @@ class PortfolioEngine {
         spoilerWing.position.set(0, 1.2, -2.15);
         spoilerWing.rotation.x = -0.15;
         carGroup.add(spoilerWing);
-        
+
         // Exhaust pipes
         const exhaustMat = new THREE.MeshStandardMaterial({
             color: 0x404040,
             metalness: 0.9,
             roughness: 0.3
         });
-        
+
         [-0.4, 0.4].forEach(x => {
             const exhaust = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.08, 0.08, 0.3, 16),
@@ -3072,14 +2832,14 @@ class PortfolioEngine {
             exhaust.position.set(x, 0.3, -2.4);
             carGroup.add(exhaust);
         });
-        
+
         // Mirrors
         const mirrorMat = new THREE.MeshStandardMaterial({
             color: bodyColor,
             metalness: 0.95,
             roughness: 0.2
         });
-        
+
         [-1.1, 1.1].forEach(x => {
             const mirror = new THREE.Mesh(
                 new THREE.BoxGeometry(0.15, 0.15, 0.3),
@@ -3088,71 +2848,74 @@ class PortfolioEngine {
             mirror.position.set(x, 1.0, 0.8);
             carGroup.add(mirror);
         });
-        
+
         carGroup.position.set(0, 0.6, 60);
-        
+
         // Initialize engine sound
         this.initializeSound();
-        
+
         this.car = carGroup;
         this.scene.add(this.car);
-        
+
         // Add headlights to car
         // Headlights only on high/ultra (spotlights are expensive)
         if (this.state.quality === 'high' || this.state.quality === 'ultra') {
             this.createHeadlights();
         }
-        
+
         // Start ambient sounds
         this.startAmbientSounds();
     }
-    
+
     initializeSound() {
         // Create Audio Context (Web Audio API)
         this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        
+        this.masterAudio = this.audioContext.createGain();
+        this.masterAudio.gain.value = Number(safeStorage.getItem('keith_volume') || .45);
+        this.masterAudio.connect(this.audioContext.destination);
+
         // Realistic engine sound using multiple oscillators (harmonics)
         // Real engines have multiple cylinder firings creating complex waveforms
         this.engineOscillators = [];
         this.engineGains = [];
-        
+
         // Create master gain and compressor for overall engine volume
         this.engineMasterGain = this.audioContext.createGain();
         this.engineMasterGain.gain.value = 0;
-        
+
         // Add dynamics compressor to prevent clipping
         this.engineCompressor = this.audioContext.createDynamicsCompressor();
         this.engineCompressor.threshold.value = -20;
         this.engineCompressor.knee.value = 10;
         this.engineCompressor.ratio.value = 4;
-        
+
         // Main engine filter (low-pass to simulate muffler)
         this.engineFilter = this.audioContext.createBiquadFilter();
         this.engineFilter.type = 'lowpass';
         this.engineFilter.frequency.value = 800;
         this.engineFilter.Q.value = 2;
-        
+
         // Create 4 harmonics for a 4-cylinder engine feel
         const harmonicRatios = [1, 2, 3, 4]; // Fundamental + harmonics
         const harmonicVolumes = [0.5, 0.3, 0.15, 0.05]; // Decreasing volume
         const waveTypes = ['sawtooth', 'square', 'triangle', 'sine'];
-        
+
         harmonicRatios.forEach((ratio, i) => {
             const osc = this.audioContext.createOscillator();
             const gain = this.audioContext.createGain();
-            
+
             osc.type = waveTypes[i];
             osc.frequency.value = 40 * ratio; // Base 40Hz (idle)
             gain.gain.value = harmonicVolumes[i];
-            
+
             osc.connect(gain);
             gain.connect(this.engineFilter);
             osc.start();
-            
+
             this.engineOscillators.push(osc);
             this.engineGains.push(gain);
         });
-        
+
         // Add subtle noise for engine rumble texture
         this.engineNoise = this.audioContext.createBufferSource();
         const noiseBuffer = this.audioContext.createBuffer(1, this.audioContext.sampleRate * 2, this.audioContext.sampleRate);
@@ -3162,39 +2925,39 @@ class PortfolioEngine {
         }
         this.engineNoise.buffer = noiseBuffer;
         this.engineNoise.loop = true;
-        
+
         this.noiseGain = this.audioContext.createGain();
         this.noiseGain.gain.value = 0;
         this.noiseFilter = this.audioContext.createBiquadFilter();
         this.noiseFilter.type = 'bandpass';
         this.noiseFilter.frequency.value = 200;
         this.noiseFilter.Q.value = 5;
-        
+
         this.engineNoise.connect(this.noiseFilter);
         this.noiseFilter.connect(this.noiseGain);
         this.noiseGain.connect(this.engineFilter);
         this.engineNoise.start();
-        
+
         // Connect everything
         this.engineFilter.connect(this.engineCompressor);
         this.engineCompressor.connect(this.engineMasterGain);
-        this.engineMasterGain.connect(this.audioContext.destination);
-        
+        this.engineMasterGain.connect(this.masterAudio || this.audioContext.destination);
+
         this.engineStarted = false;
         this.lastCollisionSound = 0;
     }
-    
+
     playCollisionSound(intensity = 1) {
         if (!this.audioContext || this.muted) return;
-        
+
         const now = Date.now();
         if (now - this.lastCollisionSound < 200) return;
         this.lastCollisionSound = now;
-        
+
         if (this.audioContext.state === 'suspended') {
             this.audioContext.resume();
         }
-        
+
         // Create impact sound using white noise burst
         const duration = 0.15;
         const audioBuffer = this.audioContext.createBuffer(
@@ -3203,79 +2966,79 @@ class PortfolioEngine {
             this.audioContext.sampleRate
         );
         const data = audioBuffer.getChannelData(0);
-        
+
         for (let i = 0; i < data.length; i++) {
             const decay = 1 - (i / data.length);
             data[i] = (Math.random() * 2 - 1) * decay * decay;
         }
-        
+
         const source = this.audioContext.createBufferSource();
         source.buffer = audioBuffer;
-        
+
         const impactGain = this.audioContext.createGain();
         const impactFilter = this.audioContext.createBiquadFilter();
-        
+
         impactFilter.type = 'bandpass';
         impactFilter.frequency.value = 400 + intensity * 300;
         impactFilter.Q.value = 2;
-        
+
         impactGain.gain.value = Math.min(intensity * 0.4, 0.6);
-        
+
         source.connect(impactFilter);
         impactFilter.connect(impactGain);
-        impactGain.connect(this.audioContext.destination);
-        
+        impactGain.connect(this.masterAudio || this.audioContext.destination);
+
         source.start();
         source.stop(this.audioContext.currentTime + duration);
     }
-    
+
     playLandingSound(intensity = 1) {
         if (!this.audioContext || this.muted) return;
-        
+
         // Resume audio context if suspended
         if (this.audioContext.state === 'suspended') {
             this.audioContext.resume();
         }
-        
+
         // Low thud for landing
         const osc = this.audioContext.createOscillator();
         const gain = this.audioContext.createGain();
-        
+
         osc.type = 'sine';
         osc.frequency.value = 60;
-        
+
         gain.gain.value = Math.min(intensity * 0.3, 0.5);
         gain.gain.exponentialRampToValueAtTime(
             0.01,
             this.audioContext.currentTime + 0.3
         );
-        
+
         osc.connect(gain);
-        gain.connect(this.audioContext.destination);
-        
+        gain.connect(this.masterAudio || this.audioContext.destination);
+
         osc.start();
         osc.stop(this.audioContext.currentTime + 0.3);
     }
-    
+
     // ⚡ GAME FEEL: Particle system for landing dust/sparks
     spawnLandingParticles(count = 8) {
         if (!this.car || this.state.quality === 'low') return;
-        
+
         // Limit active particles for performance
         if (!this.particlePool) {
             this.particlePool = [];
             this.activeParticles = [];
         }
-        
+
         // Cap max active particles
         if (this.activeParticles.length > 30) return;
-        
+
         const carPos = this.car.position;
         const spawnCount = this.state.quality === 'medium' ? Math.ceil(count / 2) : count;
-        
+
         for (let i = 0; i < spawnCount; i++) {
             let particle;
-            
+
             // Object pooling - reuse particles
             if (this.particlePool.length > 0) {
                 particle = this.particlePool.pop();
@@ -3290,7 +3053,7 @@ class PortfolioEngine {
                 particle = new THREE.Mesh(geometry, material);
                 this.scene.add(particle);
             }
-            
+
             // Position around car wheels
             const angle = Math.random() * Math.PI * 2;
             const radius = 1.5 + Math.random() * 1;
@@ -3299,7 +3062,7 @@ class PortfolioEngine {
                 carPos.y + 0.2,
                 carPos.z + Math.sin(angle) * radius
             );
-            
+
             // Random velocity
             particle.userData.velocity = {
                 x: (Math.random() - 0.5) * 8,
@@ -3308,30 +3071,30 @@ class PortfolioEngine {
             };
             particle.userData.life = 1.0;
             particle.userData.decay = 0.02 + Math.random() * 0.02;
-            
+
             this.activeParticles.push(particle);
         }
     }
-    
+
     updateParticles(delta) {
         if (!this.activeParticles) return;
-        
+
         for (let i = this.activeParticles.length - 1; i >= 0; i--) {
             const p = this.activeParticles[i];
-            
+
             // Update position
             p.position.x += p.userData.velocity.x * delta;
             p.position.y += p.userData.velocity.y * delta;
             p.position.z += p.userData.velocity.z * delta;
-            
+
             // Apply gravity
             p.userData.velocity.y -= 15 * delta;
-            
+
             // Fade out
             p.userData.life -= p.userData.decay;
             p.material.opacity = p.userData.life * 0.8;
             p.scale.setScalar(p.userData.life);
-            
+
             // Remove dead particles (return to pool)
             if (p.userData.life <= 0) {
                 p.visible = false;
@@ -3340,36 +3103,36 @@ class PortfolioEngine {
             }
         }
     }
-    
+
     updateEngineSound() {
         if (!this.audioContext || !this.vehiclePhysics || !this.engineOscillators) return;
-        
+
         const speed = Math.abs(this.vehiclePhysics.speed);
         const speedKmh = speed * 3.6;
         const throttle = this.state.input.throttle;
-        
+
         // Resume audio context if needed (browser autoplay policy)
         if (this.audioContext.state === 'suspended' && throttle > 0 && !this.muted) {
             this.audioContext.resume();
         }
-        
+
         // Simulate realistic RPM based on speed and throttle
         // Idle: 800 RPM, Redline: ~6500 RPM
         // For audio, we map this to frequencies (divide by ~100)
         const idleFreq = 35;  // ~800 RPM
         const maxFreq = 120;  // ~6500 RPM at high speed
-        
+
         // RPM increases with speed but also responds to throttle
         const speedFactor = Math.min(speedKmh / 140, 1); // Max at 140 km/h
         const baseFreq = idleFreq + speedFactor * (maxFreq - idleFreq);
-        
+
         // Throttle adds extra revs (like pressing gas while not fully accelerating)
         const throttleBoost = throttle * 15;
         const targetFreq = baseFreq + throttleBoost;
-        
+
         // Smooth frequency transition (engine doesn't instantly change RPM)
         const freqSmoothing = 0.08;
-        
+
         // Update all harmonics
         const harmonicRatios = [1, 2, 3, 4];
         this.engineOscillators.forEach((osc, i) => {
@@ -3377,10 +3140,10 @@ class PortfolioEngine {
             const targetHarmonicFreq = targetFreq * harmonicRatios[i];
             osc.frequency.value = currentFreq + (targetHarmonicFreq - currentFreq) * freqSmoothing;
         });
-        
+
         // Volume based on throttle, speed, and boost
         let targetVolume = 0.04; // Idle volume (subtle)
-        
+
         if (throttle > 0) {
             // Accelerating: louder
             targetVolume = 0.08 + throttle * 0.1 + speedFactor * 0.05;
@@ -3388,7 +3151,7 @@ class PortfolioEngine {
             // Coasting at speed: medium volume
             targetVolume = 0.05 + speedFactor * 0.04;
         }
-        
+
         // Boost: significantly louder and higher filter cutoff
         if (this.state.input.boost && throttle > 0) {
             targetVolume = 0.18;
@@ -3399,12 +3162,12 @@ class PortfolioEngine {
             this.engineFilter.frequency.value = 600 + speedFactor * 600 + throttle * 200;
             this.noiseGain.gain.value = 0.01 + throttle * 0.015;
         }
-        
+
         // Smooth volume change
         const currentVol = this.engineMasterGain.gain.value;
         this.engineMasterGain.gain.value = currentVol + (targetVolume - currentVol) * 0.12;
     }
-    
+
     createPortfolioSections() {
         // Bruno Simon style: billboard signs on posts, not buildings
         // Each section gets: colored ground zone + billboard post + sign face with content
@@ -3491,6 +3254,7 @@ class PortfolioEngine {
             ctx.fillText('Hold SPACE to explore ▸', 256, 298);
 
             const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
             const faceMat = new THREE.MeshBasicMaterial({ map: tex });
             const faceGeo = new THREE.PlaneGeometry(boardW - 0.3, boardH - 0.3);
             const face = new THREE.Mesh(faceGeo, faceMat);
@@ -3606,6 +3370,7 @@ class PortfolioEngine {
         ctx.fillText('Not many make it this far.', 256, 200);
 
         const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
         const signMat = new THREE.MeshBasicMaterial({ map: tex });
         const signGeo = new THREE.PlaneGeometry(7, 3.5);
         const sign = new THREE.Mesh(signGeo, signMat);
@@ -3637,27 +3402,28 @@ class PortfolioEngine {
         ctx.fillText('KEITH KADIMA', 512, 128);
         ctx.font = '36px Arial, sans-serif';
         ctx.fillStyle = '#c9a96e';
-        ctx.fillText('Software Engineer · Nairobi 🇰🇪 · Drive around to explore', 512, 215);
+        ctx.fillText('ENGINEER / FOUNDER / EXPLORER', 512, 215);
 
         const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
         const mat = new THREE.MeshBasicMaterial({ map: tex });
-        const geo = new THREE.PlaneGeometry(24, 6);
+        const geo = new THREE.PlaneGeometry(18, 4.5);
         const sign = new THREE.Mesh(geo, mat);
-        sign.position.set(0, 5, 42); // just in front of spawn
+        sign.position.set(-24, 5, 42); // just in front of spawn
         this.scene.add(sign);
 
         // Posts for name sign
         const postMat = new THREE.MeshLambertMaterial({ color: 0x2c1810 });
-        [-11, 11].forEach(x => {
+        [-8, 8].forEach(x => {
             const post = new THREE.Mesh(
                 new THREE.CylinderGeometry(0.2, 0.25, 7, 8),
                 postMat
             );
-            post.position.set(x, 3.5, 42);
+            post.position.set(x - 24, 3.5, 42);
             this.scene.add(post);
         });
     }
-    
+
     loadEnvironmentDetails() {
         const treeCount = this.state.quality === 'low' ? 8 : this.state.quality === 'medium' ? 18 : 35;
         this.createStylizedTrees(treeCount);
@@ -3694,6 +3460,8 @@ class PortfolioEngine {
             const x = Math.sin(angle) * radius;
             const z = Math.cos(angle) * radius;
 
+            // Keep driving lanes and the pool clear.
+            if (Math.abs(x)<9 || (Math.abs(z-50)<9 && Math.abs(x)<90) || (Math.abs(z+50)<9 && x>0 && x<80) || Math.hypot(x+58,z+57)<27) continue;
             // Keep away from signs
             let tooClose = false;
             for (const s of this.sections) {
@@ -3726,6 +3494,8 @@ class PortfolioEngine {
             placed++;
         }
 
+        trunkInst.count = leaf1Inst.count = leaf2Inst.count = placed;
+        [trunkInst, leaf1Inst, leaf2Inst].forEach(mesh => mesh.computeBoundingSphere());
         trunkInst.instanceMatrix.needsUpdate = true;
         leaf1Inst.instanceMatrix.needsUpdate = true;
         leaf2Inst.instanceMatrix.needsUpdate = true;
@@ -3808,140 +3578,17 @@ class PortfolioEngine {
             this.decorations.push(mesh);
         });
     }
-    
+
     freezeStaticObjects() {
-        this.scene.traverse(obj => {
-            // Skip dynamic objects (interactive items, car, particles)
-            if (obj.userData.dynamic) return;
-            if (obj === this.car || obj.parent === this.car) return;
-            obj.matrixAutoUpdate = false;
-            obj.updateMatrix();
-        });
-    }
-    
-    createTrees(count) {
-        // 🎯 PERFORMANCE: Use InstancedMesh for massive draw call reduction
-        // Instead of count * meshes per tree = thousands of draw calls
-        // We use 2 InstancedMesh calls (trunks + foliage) = 2 draw calls total!
-        
-        const textureLoader = new THREE.TextureLoader();
-        const barkTexture = textureLoader.load(new URL('../textures/bark.jpg', import.meta.url).href);
-        barkTexture.wrapS = THREE.RepeatWrapping;
-        barkTexture.wrapT = THREE.RepeatWrapping;
-        barkTexture.repeat.set(1, 2);
-        
-        const trunkMaterial = new THREE.MeshStandardMaterial({
-            map: barkTexture,
-            color: 0x3D2817,
-            roughness: 0.95,
-            metalness: 0.0
-        });
-        
-        const leafMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1A4D2E,
-            roughness: 0.9,
-            metalness: 0.0
-        });
-        
-        // Pre-calculate valid tree positions
-        const treePositions = [];
-        const treeScales = [];
-        
-        for (let i = 0; i < count * 2; i++) { // Generate extra to account for rejected positions
-            if (treePositions.length >= count) break;
-            
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 50 + Math.random() * 200;
-            
-            const x = Math.sin(angle) * radius;
-            const z = Math.cos(angle) * radius;
-            
-            let tooClose = false;
-            for (const section of this.sections) {
-                const dx = x - section.position.x;
-                const dz = z - section.position.z;
-                if (Math.sqrt(dx*dx + dz*dz) < 30) {
-                    tooClose = true;
-                    break;
-                }
-            }
-            if (tooClose) continue;
-            
-            const scale = 0.9 + Math.random() * 0.8;
-            const rotationY = Math.random() * Math.PI * 2;
-            
-            treePositions.push({ x, z, rotationY });
-            treeScales.push(scale);
-            
-            // Register for collision
-            this.collisionSystem.addTree({ x, z });
-            this.treePositions.push({ x, z });
+        // Only explicitly static decoration is frozen. Never traverse animated rigs.
+        for (const object of this.decorations) {
+            if (object.userData.dynamic) continue;
+            object.updateMatrix(); object.matrixAutoUpdate = false;
         }
-        
-        const treeCount = treePositions.length;
-        if (treeCount === 0) return;
-        
-        // Create shared geometries
-        const trunkGeometry = new THREE.CylinderGeometry(0.35, 0.45, 5, 8, 1);
-        const foliageGeometry = new THREE.SphereGeometry(2.5, 8, 6);
-        
-        // Create InstancedMesh for trunks (1 draw call for all trunks!)
-        const trunkInstances = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, treeCount);
-        trunkInstances.castShadow = true;
-        trunkInstances.receiveShadow = true;
-        
-        // Create InstancedMesh for foliage (1 draw call for all foliage!)
-        const foliageInstances = new THREE.InstancedMesh(foliageGeometry, leafMaterial, treeCount);
-        foliageInstances.castShadow = true;
-        foliageInstances.receiveShadow = true;
-        
-        // Matrix for positioning each instance
-        const matrix = new THREE.Matrix4();
-        const position = new THREE.Vector3();
-        const rotation = new THREE.Quaternion();
-        const scale = new THREE.Vector3();
-        
-        // Position each tree instance
-        for (let i = 0; i < treeCount; i++) {
-            const treePos = treePositions[i];
-            const treeScale = treeScales[i];
-            
-            // Trunk instance
-            position.set(treePos.x, 2.5 * treeScale, treePos.z);
-            rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), treePos.rotationY);
-            scale.set(treeScale, treeScale, treeScale);
-            matrix.compose(position, rotation, scale);
-            trunkInstances.setMatrixAt(i, matrix);
-            
-            // Foliage instance (positioned above trunk)
-            position.set(treePos.x, 6.5 * treeScale, treePos.z);
-            scale.set(treeScale * 1.2, treeScale * 1.2, treeScale * 1.2);
-            matrix.compose(position, rotation, scale);
-            foliageInstances.setMatrixAt(i, matrix);
-        }
-        
-        // Mark for GPU update
-        trunkInstances.instanceMatrix.needsUpdate = true;
-        foliageInstances.instanceMatrix.needsUpdate = true;
-        
-        // Store references for culling/LOD
-        trunkInstances.userData.cullable = false;
-        trunkInstances.userData.isInstancedTrees = true;
-        foliageInstances.userData.cullable = false;
-        foliageInstances.userData.isInstancedTrees = true;
-        
-        // Add to scene
-        this.scene.add(trunkInstances);
-        this.scene.add(foliageInstances);
-        
-        // Store references
-        this.treeInstances = { trunks: trunkInstances, foliage: foliageInstances };
-        this.decorations.push(trunkInstances);
-        this.decorations.push(foliageInstances);
-        
-        console.log(`🌳 Trees: ${treeCount} trees rendered with only 2 draw calls (was ${treeCount * 8} draw calls)`);
     }
-    
+
+
+
     createDecorations() {
         // Street lamps using InstancedMesh for massive draw call reduction
         const lampMaterial = new THREE.MeshStandardMaterial({
@@ -3954,18 +3601,18 @@ class PortfolioEngine {
             emissive: 0xFFFFAA,
             emissiveIntensity: 0.5
         });
-        
+
         // Collect all lamp positions first
         const lampPositions = [];
         const positions = Object.values(PORTFOLIO_DATA).map(d => d.position);
-        
+
         positions.forEach((pos, i) => {
             const nextPos = positions[(i + 1) % positions.length];
             const dx = nextPos.x - pos.x;
             const dz = nextPos.z - pos.z;
             const length = Math.sqrt(dx * dx + dz * dz);
             const steps = Math.floor(length / 30);
-            
+
             for (let j = 1; j < steps; j++) {
                 const t = j / steps;
                 const x = pos.x + dx * t;
@@ -3973,7 +3620,7 @@ class PortfolioEngine {
                 const perpX = -dz / length * 8;
                 const perpZ = dx / length * 8;
                 const angle = Math.atan2(dx, dz);
-                
+
                 [-1, 1].forEach(side => {
                     lampPositions.push({
                         x: x + perpX * side,
@@ -3983,21 +3630,21 @@ class PortfolioEngine {
                 });
             }
         });
-        
+
         const count = lampPositions.length;
         if (count === 0) return;
-        
+
         // Instanced pole (1 draw call for all poles)
         const poleGeom = new THREE.CylinderGeometry(0.15, 0.2, 8, 6, 1);
         const poleInstances = new THREE.InstancedMesh(poleGeom, lampMaterial, count);
         poleInstances.castShadow = this.state.quality !== 'low';
-        
+
         // Instanced light fixtures
         const lightGeom = new THREE.SphereGeometry(0.4, 8, 6);
         const lightInstances = new THREE.InstancedMesh(lightGeom, lightMat, count);
-        
+
         const matrix = new THREE.Matrix4();
-        
+
         for (let i = 0; i < count; i++) {
             const p = lampPositions[i];
             // Pole
@@ -4007,31 +3654,31 @@ class PortfolioEngine {
             matrix.makeTranslation(p.x, 7.8, p.z);
             lightInstances.setMatrixAt(i, matrix);
         }
-        
+
         poleInstances.instanceMatrix.needsUpdate = true;
         lightInstances.instanceMatrix.needsUpdate = true;
-        
+
         this.scene.add(poleInstances);
         this.scene.add(lightInstances);
     }
-    
+
     createParticles() {
         // Floating particles - reduced count for performance
         const count = this.state.quality === 'low' ? 50 : (this.state.quality === 'medium' ? 150 : 300);
         const positions = new Float32Array(count * 3);
-        
+
         for (let i = 0; i < count; i++) {
             const angle = Math.random() * Math.PI * 2;
             const radius = Math.random() * 200;
-            
+
             positions[i * 3] = Math.sin(angle) * radius;
             positions[i * 3 + 1] = 2 + Math.random() * 30;
             positions[i * 3 + 2] = Math.cos(angle) * radius;
         }
-        
+
         const geometry = new THREE.BufferGeometry();
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-        
+
         const material = new THREE.PointsMaterial({
             color: 0xFFFFFF,
             size: 0.15,
@@ -4039,31 +3686,31 @@ class PortfolioEngine {
             opacity: 0.4,
             sizeAttenuation: true
         });
-        
+
         this.particles = new THREE.Points(geometry, material);
         this.scene.add(this.particles);
-        
+
         // Dust particle system for car (landing/drifting)
         this.createDustParticles();
     }
-    
+
     createDustParticles() {
         // Pool of dust particles for landing/drifting effects
         const dustCount = 100;
         const dustPositions = new Float32Array(dustCount * 3);
         const dustVelocities = new Float32Array(dustCount * 3);
         const dustLifetimes = new Float32Array(dustCount);
-        
+
         for (let i = 0; i < dustCount; i++) {
             dustPositions[i * 3] = 0;
             dustPositions[i * 3 + 1] = -100; // Hidden below ground
             dustPositions[i * 3 + 2] = 0;
             dustLifetimes[i] = 0;
         }
-        
+
         const dustGeometry = new THREE.BufferGeometry();
         dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
-        
+
         const dustMaterial = new THREE.PointsMaterial({
             color: 0xC4A76C, // Sandy/dusty color
             size: 0.8,
@@ -4071,70 +3718,70 @@ class PortfolioEngine {
             opacity: 0.6,
             sizeAttenuation: true
         });
-        
+
         this.dustParticles = new THREE.Points(dustGeometry, dustMaterial);
         this.dustVelocities = dustVelocities;
         this.dustLifetimes = dustLifetimes;
         this.dustIndex = 0;
         this.scene.add(this.dustParticles);
     }
-    
+
     spawnDustBurst(x, y, z, intensity = 1) {
         if (!this.dustParticles) return;
-        
+
         const positions = this.dustParticles.geometry.attributes.position.array;
         const count = Math.floor(10 * intensity);
-        
+
         for (let i = 0; i < count; i++) {
             const idx = (this.dustIndex % 100) * 3;
-            
+
             // Random position around spawn point
             positions[idx] = x + (Math.random() - 0.5) * 3;
             positions[idx + 1] = y + Math.random() * 0.5;
             positions[idx + 2] = z + (Math.random() - 0.5) * 3;
-            
+
             // Random velocity (outward and up)
             this.dustVelocities[idx] = (Math.random() - 0.5) * 8;
             this.dustVelocities[idx + 1] = Math.random() * 5 + 2;
             this.dustVelocities[idx + 2] = (Math.random() - 0.5) * 8;
-            
+
             this.dustLifetimes[this.dustIndex % 100] = 1.0;
             this.dustIndex++;
         }
-        
+
         this.dustParticles.geometry.attributes.position.needsUpdate = true;
     }
-    
+
     updateDustParticles(delta) {
         if (!this.dustParticles) return;
-        
+
         const positions = this.dustParticles.geometry.attributes.position.array;
-        
+
         for (let i = 0; i < 100; i++) {
             if (this.dustLifetimes[i] > 0) {
                 const idx = i * 3;
-                
+
                 // Update position
                 positions[idx] += this.dustVelocities[idx] * delta;
                 positions[idx + 1] += this.dustVelocities[idx + 1] * delta;
                 positions[idx + 2] += this.dustVelocities[idx + 2] * delta;
-                
+
                 // Apply gravity
                 this.dustVelocities[idx + 1] -= 15 * delta;
-                
+
                 // Fade lifetime
                 this.dustLifetimes[i] -= delta * 2;
-                
+
                 // Hide when dead
                 if (this.dustLifetimes[i] <= 0) {
                     positions[idx + 1] = -100;
                 }
             }
         }
-        
+
         this.dustParticles.geometry.attributes.position.needsUpdate = true;
     }
-    
+
     createInteractiveObjects() {
         this.interactiveObjects = [];
 
@@ -4190,6 +3837,7 @@ class PortfolioEngine {
             ctx.beginPath(); ctx.moveTo(0,y0); ctx.lineTo(128,y0+Math.random()*8-4); ctx.stroke();
         }
         const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
         const mat = new THREE.MeshLambertMaterial({ map: tex });
 
         const body = new THREE.Mesh(new THREE.BoxGeometry(size,size,size), mat);
@@ -4246,6 +3894,7 @@ class PortfolioEngine {
             ctx.beginPath(); ctx.arc(rx,ry,3,0,Math.PI*2); ctx.fill();
         });
         const tex = new THREE.CanvasTexture(canvas);
+        tex.colorSpace = THREE.SRGBColorSpace;
 
         const bodyMat = new THREE.MeshLambertMaterial({ map: tex });
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,1.4,16), bodyMat);
@@ -4254,7 +3903,7 @@ class PortfolioEngine {
         group.add(body);
 
         // Metal rings
-        const ringMat = new THREE.MeshLambertMaterial({ color: 0x909090, metalness: 0.8 });
+        const ringMat = new THREE.MeshLambertMaterial({ color: 0x909090 });
         [0.25, 0.7, 1.15].forEach(y => {
             const ring = new THREE.Mesh(
                 new THREE.TorusGeometry(0.57, 0.05, 8, 20), ringMat
@@ -4460,39 +4109,40 @@ class PortfolioEngine {
             }
         }
     }
-    
+
     setupEventListeners() {
         window.addEventListener('keydown', this.onKeyDown);
         window.addEventListener('keyup', this.onKeyUp);
         window.addEventListener('resize', this.onResize);
-        
+
         window.addEventListener('wheel', (e) => {
             if (this.isInterfaceOpen() || e.target !== this.renderer.domElement) return;
             this.state.cameraDistance += e.deltaY * 0.02;
             this.state.cameraDistance = Math.max(8, Math.min(40, this.state.cameraDistance));
         }, { passive: true });
-        
+
         // UI Controls
         document.getElementById('controlsToggle').addEventListener('click', () => {
             const collapsed = document.getElementById('controlsPanel').classList.toggle('collapsed');
             document.getElementById('controlsToggle').setAttribute('aria-expanded', String(!collapsed));
             document.getElementById('gameContainer').focus();
         });
-        
+
         document.getElementById('settingsBtn').addEventListener('click', () => {
             const open = document.getElementById('settingsPanel').classList.toggle('active');
             document.getElementById('settingsBtn').setAttribute('aria-expanded', String(open));
             this.resetInput();
         });
-        
+
         document.getElementById('qualitySelect').addEventListener('change', (e) => {
+            this.manualQuality = true;
             this.applyQuality(e.target.value);
         });
-        
+
         document.getElementById('effectsSelect').addEventListener('change', (e) => {
             this.applyEffects(e.target.value);
         });
-        
+
         document.getElementById('modalClose').addEventListener('click', () => this.closeModal());
         document.getElementById('modalCloseBtn').addEventListener('click', () => this.closeModal());
         document.getElementById('modalOverlay').addEventListener('click', (e) => {
@@ -4500,137 +4150,22 @@ class PortfolioEngine {
                 this.closeModal();
             }
         });
-        
+
         document.getElementById('qualitySelect').value = this.state.quality;
-        
+
         // Mobile touch controls
         if (this.state.isMobile) {
             this.setupMobileControls();
         }
-        
+
         // Mouse camera control (desktop)
         if (!this.state.isMobile) {
             this.setupMouseCameraControl();
         }
     }
-    
-    setupMobileControls() {
-        const joystick = document.getElementById('joystick');
-        const joystickInner = document.getElementById('joystickInner');
-        const boostBtn = document.getElementById('mobileBoost');
-        const jumpBtn = document.getElementById('mobileJump');
-        const actionBtn = document.getElementById('mobileAction');
-        
-        if (!joystick) return;
-        
-        let joystickActive = false;
-        
-        const handleJoystickMove = (clientX, clientY) => {
-            if (!joystickActive) return;
-            
-            const rect = joystick.getBoundingClientRect();
-            const centerX = rect.left + rect.width / 2;
-            const centerY = rect.top + rect.height / 2;
-            
-            let dx = clientX - centerX;
-            let dy = clientY - centerY;
-            
-            const maxDist = rect.width / 2 - 30;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if (dist > maxDist) {
-                dx = (dx / dist) * maxDist;
-                dy = (dy / dist) * maxDist;
-            }
-            
-            joystickInner.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-            
-            // Map to analog-style controls
-            const normalizedX = dx / maxDist;
-            const normalizedY = -dy / maxDist;
-            
-            // Throttle/brake based on Y axis
-            this.state.input.throttle = Math.max(0, normalizedY);
-            this.state.input.brake = Math.max(0, -normalizedY);
-            
-            // Steering based on X axis
-            this.state.input.steer = normalizedX;
-            
-            // Also set key states for compatibility
-            this.state.keys['KeyW'] = normalizedY > 0.2;
-            this.state.keys['KeyS'] = normalizedY < -0.2;
-            this.state.keys['KeyA'] = normalizedX < -0.2;
-            this.state.keys['KeyD'] = normalizedX > 0.2;
-        };
-        
-        joystick.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            joystickActive = true;
-            handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: false });
-        
-        joystick.addEventListener('touchmove', (e) => {
-            e.preventDefault();
-            handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY);
-        }, { passive: false });
-        
-        joystick.addEventListener('touchend', () => {
-            joystickActive = false;
-            joystickInner.style.transform = 'translate(-50%, -50%)';
-            this.state.input.throttle = 0;
-            this.state.input.brake = 0;
-            this.state.input.steer = 0;
-            this.state.keys['KeyW'] = false;
-            this.state.keys['KeyS'] = false;
-            this.state.keys['KeyA'] = false;
-            this.state.keys['KeyD'] = false;
-        });
-        
-        // Boost button
-        if (boostBtn) {
-            boostBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.state.keys['ShiftLeft'] = true;
-                this.state.input.boost = true;
-            }, { passive: false });
-            boostBtn.addEventListener('touchend', () => {
-                this.state.keys['ShiftLeft'] = false;
-                this.state.input.boost = false;
-            });
-        }
-        
-        // Jump button
-        if (jumpBtn) {
-            jumpBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.state.keys['KeyJ'] = true;
-                // Trigger jump
-                if (this.vehiclePhysics && this.vehiclePhysics.isGrounded) {
-                    this.vehiclePhysics.velocityY = CONFIG.JUMP_FORCE;
-                    this.vehiclePhysics.isGrounded = false;
-                }
-            }, { passive: false });
-            jumpBtn.addEventListener('touchend', () => {
-                this.state.keys['KeyJ'] = false;
-            });
-        }
-        
-        // Action button (enter building)
-        if (actionBtn) {
-            actionBtn.addEventListener('touchstart', (e) => {
-                e.preventDefault();
-                this.state.keys['Space'] = true;
-                if (this.state.currentSection) {
-                    this.openModal(this.state.currentSection.userData);
-                }
-            }, { passive: false });
-            actionBtn.addEventListener('touchend', () => {
-                this.state.keys['Space'] = false;
-            });
-        }
-    }
-    
-    // 🖱️ MOUSE CAMERA CONTROL
+
+    setupMobileControls() { setupTouchInput(this); }
+
     setupMouseCameraControl() {
         this.mouseCamera = {
             enabled: false,
@@ -4640,9 +4175,9 @@ class PortfolioEngine {
             maxPitch: Math.PI / 3,
             minPitch: -Math.PI / 6
         };
-        
+
         const canvas = this.renderer.domElement;
-        
+
         // Right-click drag to rotate camera
         canvas.addEventListener('mousedown', (e) => {
             if (e.button === 2 || e.button === 0) { // Right or left click
@@ -4650,38 +4185,38 @@ class PortfolioEngine {
                 canvas.style.cursor = 'grabbing';
             }
         });
-        
+
         window.addEventListener('mouseup', () => {
             this.mouseCamera.enabled = false;
             canvas.style.cursor = 'grab';
         });
-        
+
         window.addEventListener('mousemove', (e) => {
             if (!this.mouseCamera.enabled) return;
-            
+
             this.mouseCamera.yaw -= e.movementX * this.mouseCamera.sensitivity;
             this.mouseCamera.pitch -= e.movementY * this.mouseCamera.sensitivity;
-            
+
             // Clamp pitch
             this.mouseCamera.pitch = Math.max(
                 this.mouseCamera.minPitch,
                 Math.min(this.mouseCamera.maxPitch, this.mouseCamera.pitch)
             );
         });
-        
+
         // Scroll to zoom
         canvas.addEventListener('wheel', (e) => {
             this.state.cameraDistance += e.deltaY * 0.02;
             this.state.cameraDistance = Math.max(5, Math.min(50, this.state.cameraDistance));
         }, { passive: true });
-        
+
         // Set initial cursor
         canvas.style.cursor = 'grab';
-        
+
         // Prevent context menu on right-click
         canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     }
-    
+
     onKeyDown(e) {
         if (e.code === 'Escape') {
             this.closeModal();
@@ -4691,16 +4226,17 @@ class PortfolioEngine {
         }
         if (this.isInterfaceOpen() || e.target.closest('button, a, input, select, textarea, [contenteditable]')) return;
         this.state.keys[e.code] = true;
+        if (e.code === 'KeyF') { this.discoveries?.open(this.discoveries.near); return; }
         if (e.repeat) return;
-        
+
         // 🥚 KONAMI CODE EASTER EGG
         this.checkKonamiCode(e.code);
-        
+
         // Space is now handled by hold-to-enter in checkSectionProximity
         if (e.code === 'Space') {
             e.preventDefault();
         }
-        
+
         if (e.code === 'KeyC') this.toggleCamera();
         if (e.code === 'KeyH') this.honk();
         if (e.code === 'KeyM') this.toggleMinimap();
@@ -4708,18 +4244,18 @@ class PortfolioEngine {
         if (e.code === 'KeyN') this.toggleNightMode(); // 🌙 Night mode
         if (e.code === 'KeyR') this.cycleRadio(); // 📻 Radio
         if (e.code === 'KeyV') this.toggleMute(); // 🔊 Mute
-        
+
         if (e.code === 'Escape') {
             this.closeModal();
             document.getElementById('settingsPanel').classList.remove('active');
         }
-        
+
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space', 
              'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight'].includes(e.code)) {
             e.preventDefault();
         }
     }
-    
+
     // 🥚 KONAMI CODE: ↑↑↓↓←→←→BA
     checkKonamiCode(code) {
         const konamiSequence = [
@@ -4727,9 +4263,9 @@ class PortfolioEngine {
             'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight',
             'KeyB', 'KeyA'
         ];
-        
+
         if (!this.konamiIndex) this.konamiIndex = 0;
-        
+
         if (code === konamiSequence[this.konamiIndex]) {
             this.konamiIndex++;
             if (this.konamiIndex === konamiSequence.length) {
@@ -4740,11 +4276,11 @@ class PortfolioEngine {
             this.konamiIndex = 0;
         }
     }
-    
+
     activateKonamiMode() {
         // 🎮 SECRET UNLOCKED!
         this.state.konamiActive = true;
-        
+
         // Rainbow car!
         if (this.car) {
             this.car.traverse(child => {
@@ -4754,14 +4290,14 @@ class PortfolioEngine {
             });
             this.state.rainbowMode = true;
         }
-        
+
         // Boost multiplier
         CONFIG.BOOST_MULTIPLIER = 3.0;
         CONFIG.JUMP_FORCE = 20;
-        
+
         // Epic notification
         this.showToast('🎮', 'KONAMI CODE!', 'Rainbow mode + Super boost activated!');
-        
+
         // Play victory sound
         if (this.audioContext) {
             const now = this.audioContext.currentTime;
@@ -4773,102 +4309,56 @@ class PortfolioEngine {
                 gain.gain.setValueAtTime(0.1, now + i * 0.1);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + i * 0.1 + 0.15);
                 osc.connect(gain);
-                gain.connect(this.audioContext.destination);
+                gain.connect(this.masterAudio || this.audioContext.destination);
                 osc.start(now + i * 0.1);
                 osc.stop(now + i * 0.1 + 0.2);
             });
         }
     }
-    
+
     // 🌅 DYNAMIC TIME OF DAY
     cycleTimeOfDay() {
         const times = ['dawn', 'day', 'sunset', 'night'];
-        if (!this.currentTimeIndex) this.currentTimeIndex = 1; // Start at day
+        if (this.currentTimeIndex === undefined) this.currentTimeIndex = 1; // Start at day
         this.currentTimeIndex = (this.currentTimeIndex + 1) % times.length;
         this.setTimeOfDay(times[this.currentTimeIndex]);
     }
-    
+
     toggleNightMode() {
         const isNight = this.currentTimeIndex === 3;
         this.setTimeOfDay(isNight ? 'day' : 'night');
         this.currentTimeIndex = isNight ? 1 : 3;
     }
-    
+
     setTimeOfDay(time) {
-        const settings = {
-            dawn: {
-                skyTop: 0xFF9966, skyBottom: 0x3D5C8A,
-                sunColor: 0xFFAA77, sunIntensity: 1.5,
-                ambientIntensity: 0.3, fogColor: 0xFFCCB3
-            },
-            day: {
-                skyTop: 0x5ba3d9, skyBottom: 0xf5deb3,
-                sunColor: 0xffeecc, sunIntensity: 1.8,
-                ambientIntensity: 0.9, fogColor: 0xd4b896
-            },
-            sunset: {
-                skyTop: 0xFF6B35, skyBottom: 0x4A1942,
-                sunColor: 0xFF8844, sunIntensity: 1.2,
-                ambientIntensity: 0.25, fogColor: 0xFF9966
-            },
-            night: {
-                skyTop: 0x0A0A20, skyBottom: 0x1A1A3A,
-                sunColor: 0x8888FF, sunIntensity: 0.3,
-                ambientIntensity: 0.15, fogColor: 0x151530
-            }
-        };
-        
-        const s = settings[time];
-        if (!s) return;
-        
-        // Animate sky colors
-        if (this.skyMaterial) {
-            this.skyMaterial.uniforms.topColor.value.setHex(s.skyTop);
-            this.skyMaterial.uniforms.bottomColor.value.setHex(s.skyBottom);
-        }
-        
-        // Update lights
-        if (this.sunLight) {
-            this.sunLight.color.setHex(s.sunColor);
-            this.sunLight.intensity = s.sunIntensity;
-        }
-        if (this.ambientLight) {
-            this.ambientLight.intensity = s.ambientIntensity;
-        }
-        
-        // Update fog
-        if (this.scene.fog) {
-            this.scene.fog.color.setHex(s.fogColor);
-        }
-        
-        const timeNames = { dawn: '🌅 Dawn', day: '☀️ Day', sunset: '🌆 Sunset', night: '🌙 Night' };
-        this.showToast('🕐', timeNames[time], 'Press T to cycle time');
+        this.environment?.setTime(time);
+        this.showToast('◷', time[0].toUpperCase() + time.slice(1), 'The world is changing around you.');
     }
-    
+
     honk() {
         // Play realistic car horn sound using dual-tone synthesis
-        if (this.audioContext) {
+        if (this.audioContext && !this.muted) {
             if (this.audioContext.state === 'suspended') {
                 this.audioContext.resume();
             }
-            
+
             const now = this.audioContext.currentTime;
             const duration = 0.5;
-            
+
             // Real car horns use two simultaneous frequencies
             // Common pairs: F# + A# (370Hz + 466Hz) or A + D (440Hz + 587Hz)
             const frequencies = [370, 466]; // F# and A# - classic car horn
-            
+
             frequencies.forEach((freq, i) => {
                 // Main tone oscillator
                 const osc = this.audioContext.createOscillator();
                 const gain = this.audioContext.createGain();
                 const filter = this.audioContext.createBiquadFilter();
-                
+
                 // Sawtooth wave gives that brassy horn quality
                 osc.type = 'sawtooth';
                 osc.frequency.value = freq;
-                
+
                 // Add slight vibrato for realism
                 const vibrato = this.audioContext.createOscillator();
                 const vibratoGain = this.audioContext.createGain();
@@ -4878,26 +4368,26 @@ class PortfolioEngine {
                 vibratoGain.connect(osc.frequency);
                 vibrato.start(now);
                 vibrato.stop(now + duration);
-                
+
                 // Low-pass filter for that muffled car horn sound
                 filter.type = 'lowpass';
                 filter.frequency.value = 2000;
                 filter.Q.value = 1;
-                
+
                 // Envelope: quick attack, sustain, quick release
                 gain.gain.setValueAtTime(0, now);
                 gain.gain.linearRampToValueAtTime(0.15, now + 0.02); // Fast attack
                 gain.gain.setValueAtTime(0.15, now + duration - 0.05); // Sustain
                 gain.gain.exponentialRampToValueAtTime(0.001, now + duration); // Release
-                
+
                 osc.connect(filter);
                 filter.connect(gain);
-                gain.connect(this.audioContext.destination);
-                
+                gain.connect(this.masterAudio || this.audioContext.destination);
+
                 osc.start(now);
                 osc.stop(now + duration);
             });
-            
+
             // Add a subtle sub-bass for body
             const subOsc = this.audioContext.createOscillator();
             const subGain = this.audioContext.createGain();
@@ -4908,11 +4398,11 @@ class PortfolioEngine {
             subGain.gain.setValueAtTime(0.08, now + duration - 0.05);
             subGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
             subOsc.connect(subGain);
-            subGain.connect(this.audioContext.destination);
+            subGain.connect(this.masterAudio || this.audioContext.destination);
             subOsc.start(now);
             subOsc.stop(now + duration);
         }
-        
+
         // Visual honk wave - more subtle
         if (this.car) {
             const honkGeom = new THREE.RingGeometry(1, 1.5, 32);
@@ -4927,7 +4417,7 @@ class PortfolioEngine {
             honkRing.position.y += 1.5;
             honkRing.rotation.x = -Math.PI / 2;
             this.scene.add(honkRing);
-            
+
             const startTime = performance.now();
             const animateHonk = () => {
                 const elapsed = (performance.now() - startTime) / 1000;
@@ -4944,16 +4434,16 @@ class PortfolioEngine {
             animateHonk();
         }
     }
-    
+
     toggleMinimap() {
         const minimap = document.getElementById('miniMap');
         minimap.classList.toggle('hidden');
     }
-    
+
     onKeyUp(e) {
         this.state.keys[e.code] = false;
     }
-    
+
     onResize() {
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
@@ -4963,24 +4453,24 @@ class PortfolioEngine {
             this.labelRenderer.setSize(window.innerWidth, window.innerHeight);
         }
     }
-    
+
     toggleCamera() {
         const modes = ['follow', 'orbit', 'first-person'];
         const current = modes.indexOf(this.state.cameraMode);
         this.state.cameraMode = modes[(current + 1) % modes.length];
-        
+
         const icons = { 'follow': '📹', 'orbit': '🎬', 'first-person': '👁️' };
         this.showNotification(`Camera: ${this.state.cameraMode} ${icons[this.state.cameraMode]}`);
     }
-    
+
     showNotification(text, subtext = null, color = null) {
         const indicator = document.getElementById('sectionIndicator');
         const dot = document.getElementById('indicatorDot');
         const title = document.getElementById('indicatorTitle');
-        
+
         dot.style.backgroundColor = color || 'var(--color-primary)';
         title.textContent = text;
-        
+
         const hint = indicator.querySelector('.section-indicator-hint');
         if (subtext) {
             hint.textContent = subtext;
@@ -4988,27 +4478,27 @@ class PortfolioEngine {
         } else {
             hint.style.display = 'none';
         }
-        
+
         indicator.style.display = 'block';
-        
+
         setTimeout(() => {
             if (!this.state.currentSection) {
                 indicator.style.display = 'none';
             }
         }, 3000);
     }
-    
+
     openModal(data) {
         this.previousFocus = document.activeElement;
         this.resetInput();
         const { title, content, color, icon } = data;
-        
+
         // Track visited section
         if (!this.state.sectionsVisited.has(title)) {
             this.state.sectionsVisited.add(title);
             this.recordSectionVisit(title);
             if (this.combo) this.combo.addScore(200, '🏢 EXPLORE');
-            
+
             // Check if this was the first section
             if (this.state.sectionsVisited.size === 1 && 
                 !safeStorage.getItem('achievement_firstExplore')) {
@@ -5018,12 +4508,12 @@ class PortfolioEngine {
                 }, 500);
             }
         }
-        
+
         document.getElementById('modalTitle').textContent = title;
         document.getElementById('modalIcon').textContent = icon;
-        
+
         let html = `<p class="modal-intro">${content.intro}</p>`;
-        
+
         content.sections.forEach(section => {
             html += `
                 <div class="modal-section">
@@ -5034,19 +4524,24 @@ class PortfolioEngine {
                 </div>
             `;
         });
-        
+
         document.getElementById('modalContent').innerHTML = html;
+        if (title === 'Projects') {
+            const link = document.createElement('a'); link.href = 'https://github.com/tufstraka'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Explore my public repositories ↗'; link.className = 'project-link'; document.getElementById('modalContent').appendChild(link);
+        }
+        this.diagnostics?.record('open_' + title);
+        this.playUiTone?.();
         document.getElementById('modalOverlay').classList.add('active');
         this.linkContactDetails();
         document.getElementById('modalClose').focus();
-        
+
         // Hide sidebar while modal is open
         this.hideSidebar();
-        
+
         // Subtle feedback on modal open
         this.triggerScreenShake(0.1);
     }
-    
+
     closeModal() {
         const overlay = document.getElementById('modalOverlay');
         if (!overlay.classList.contains('active')) return;
@@ -5260,6 +4755,8 @@ class PortfolioEngine {
         if (this.vehiclePhysics) {
             this.resetInput();
             this.vehiclePhysics.reset();
+            this.vehiclePhysics.rotation = Math.PI;
+            this.car.rotation.y = Math.PI;
             this.vehiclePhysics.x = pos.x;
             this.vehiclePhysics.z = pos.z + offset;
             this.state.carSpeed = 0;
@@ -5284,92 +4781,33 @@ class PortfolioEngine {
             window.history.replaceState(null, '', window.location.pathname + window.location.search);
         }
     }
-    
-    applyQuality(quality) {
-        this.state.quality = quality;
-        
-        this.renderer.shadowMap.enabled = quality !== 'low';
-        this.camera.far = quality === 'ultra' ? 1500 : quality === 'high' ? 800 : quality === 'medium' ? 400 : 200;
-        this.camera.updateProjectionMatrix();
-        
-        // Shadow map size based on quality
-        if (this.sunLight && this.sunLight.shadow) {
-            const shadowSize = quality === 'ultra' ? 2048 : quality === 'high' ? 1024 : 512;
-            this.sunLight.shadow.mapSize.width = shadowSize;
-            this.sunLight.shadow.mapSize.height = shadowSize;
-        }
-        
-        // Pixel ratio
-        const maxPR = quality === 'low' ? 1.0 : quality === 'medium' ? 1.5 : 2;
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, maxPR));
-        
-        // On low, bypass composer entirely
-        this.useComposer = quality !== 'low';
-        
-        // Post-processing toggles
-        if (this.colorGradingPass) this.colorGradingPass.enabled = (quality === 'high' || quality === 'ultra');
-        if (this.vignettePass) this.vignettePass.enabled = quality === 'ultra';
-        if (this.filmGrainPass) this.filmGrainPass.enabled = quality === 'ultra';
-        if (this.bloomPass) this.bloomPass.enabled = quality !== 'low';
-        if (this.motionBlurPass) {
-            this.motionBlurPass.enabled = (quality === 'high' || quality === 'ultra');
-            this.motionBlurPass.uniforms['maxBlur'].value = quality === 'ultra' ? 0.015 : 0.01;
-        }
-    }
-    
-    // Downgrade all MeshStandardMaterial to MeshLambertMaterial for massive perf gain
-    downgradeMaterials() {
-        this.scene.traverse(obj => {
-            if (!obj.isMesh) return;
-            const mat = obj.material;
-            if (!mat) return;
-            
-            // Skip special materials (custom shaders, basic materials)
-            if (mat.isShaderMaterial || mat.isMeshBasicMaterial || mat.isMeshLambertMaterial) return;
-            
-            // Convert Standard/Physical to Lambert (per-vertex lighting = much cheaper)
-            const newMat = new THREE.MeshLambertMaterial({
-                color: mat.color ? mat.color.clone() : new THREE.Color(0x888888),
-                emissive: mat.emissive ? mat.emissive.clone() : new THREE.Color(0x000000),
-                emissiveIntensity: mat.emissiveIntensity || 0,
-                map: mat.map || null,
-                transparent: mat.transparent || false,
-                opacity: mat.opacity !== undefined ? mat.opacity : 1,
-                side: mat.side || THREE.FrontSide,
-                depthWrite: mat.depthWrite !== undefined ? mat.depthWrite : true
-            });
-            
-            obj.material = newMat;
-            obj.castShadow = false;
-            obj.receiveShadow = false;
-            
-            // Dispose old material
-            if (mat.normalMap) mat.normalMap.dispose();
-            if (mat.roughnessMap) mat.roughnessMap.dispose();
-            if (mat.metalnessMap) mat.metalnessMap.dispose();
-            mat.dispose();
-        });
-    }
+
+    applyQuality(quality) { configureQuality(this, quality); }
+
+
 
     applyEffects(level) {
         if (!this.bloomPass) return;
-        
+
         const settings = {
             minimal: { strength: 0.1, radius: 0.3, threshold: 0.95 },
             balanced: { strength: 0.2, radius: 0.4, threshold: 0.85 },
             ultra: { strength: 0.35, radius: 0.5, threshold: 0.75 }
         };
-        
+
         const s = settings[level];
+        this.effectsLevel = level;
+        this.bloomPass.enabled = this.useComposer && level !== 'minimal';
         this.bloomPass.strength = s.strength;
         this.bloomPass.radius = s.radius;
         this.bloomPass.threshold = s.threshold;
     }
-    
+
     animate() {
         this.animationFrame = requestAnimationFrame(this.animate);
         if (document.hidden || this.isInterfaceOpen()) {
             this.clock.getDelta();
+            this.lastFpsTime = performance.now();
             if (this.audioContext?.state === 'running') {
                 this.audioContext.suspend();
                 this.audioPaused = true;
@@ -5380,11 +4818,16 @@ class PortfolioEngine {
             if (!this.muted) this.audioContext?.resume();
             this.audioPaused = false;
         }
-        const delta = Math.min(this.clock.getDelta(), 0.05);
+        const elapsed = this.clock.getDelta();
+        const delta = Math.min(elapsed, 0.05);
         this.frameDelta = delta;
         this.state.time += delta;
-        
-        this.updateMovement(delta);
+
+        this.physicsAccumulator = Math.min((this.physicsAccumulator || 0) + delta, .1);
+        while (this.physicsAccumulator >= 1/60) {
+            this.updateMovement(1/60);
+            this.physicsAccumulator -= 1/60;
+        }
         this.updateCamera();
         this.updateWheels();
         this.checkSectionProximity();
@@ -5392,24 +4835,24 @@ class PortfolioEngine {
         if (this.state.quality !== 'low') {
             this.updateAnimations();
         }
-        
+
         // Frustum culling on medium+ only (low has fewer objects + short view)
         if (this.state.quality !== 'low') {
             this.updateFrustumCulling();
         }
-        
+
         // Update dust particles (skip on low)
         if (this.state.quality !== 'low') {
             this.updateDustParticles(delta);
             this.updateParticles(delta);
         }
-        
+
         // 🚗 DRIFT: Check for drifting and update smoke
         this.checkDrift();
         if (this.state.quality !== 'low') {
             this.updateDriftSmoke(delta);
         }
-        
+
         // 🎯 COMBO: Update scoring
         if (this.combo) {
             this.combo.update(delta);
@@ -5424,7 +4867,7 @@ class PortfolioEngine {
                 this.combo.driftAccum = 0;
             }
         }
-        
+
         // Update interactive objects (cones, barrels)
         if (this.car && this.interactiveObjects) {
             this.updateInteractiveObjects(
@@ -5435,64 +4878,65 @@ class PortfolioEngine {
                 this.car.rotation.y
             );
         }
-        
+
         // Game Feel: Check achievements every 10 frames
         if (this.frameCount % 10 === 0) {
             this.checkAchievements();
         }
-        
+
         if (this.frameCount % 15 === 0) {
             this.updateMinimap();
         }
-        
+
         if (this.frameCount % 30 === 0) {
             this.updateFPS();
         }
-        
-        // Update day/night cycle (skip on low for perf)
-        if (this.state.quality !== 'low') {
-            this.updateDayNightCycle(delta);
-            this.updateHeadlights();
-            if (this.frameCount % 10 === 0) this.renderer.shadowMap.needsUpdate = true;
-        }
-        
+
+        this.updateDayNightCycle(delta);
+        this.updateHeadlights();
+        this.discoveries?.update();
+        if (this.frameCount % 6 === 0) this.renderer.shadowMap.needsUpdate = true;
+
         // Update skid marks (fade out)
         if (this.frameCount % 10 === 0) {
             this.updateSkidMarks();
         }
-        
+
         // 🎨 Update film grain time for animated noise
         if (this.filmGrainPass && this.filmGrainPass.enabled) {
             this.filmGrainPass.uniforms['time'].value = this.state.time;
         }
-        
+
         // 🎥 Update camera shake
         if (this.cameraShake) {
             this.cameraShake.update(delta, this.state.time);
         }
-        
+
         // 🎥 Update motion blur based on speed
         if (this.motionBlurPass && this.motionBlurPass.enabled) {
             const normalizedSpeed = Math.abs(this.state.carSpeed) / CONFIG.MAX_SPEED;
             this.motionBlurPass.uniforms['velocity'].value = normalizedSpeed * 0.8;
         }
-        
+
         this.frameCount++;
-        
+
         // Update speedometer HUD
         this.updateSpeedometer();
-        
+
         // Update analytics tracking
         this.updateAnalytics(delta);
-        
+
+        this.renderer.info.reset();
         // Render: bypass composer on low quality for massive FPS gain
         if (this.useComposer) {
             this.composer.render();
         } else {
             this.renderer.render(this.scene, this.camera);
         }
+        this.labelRenderer?.render(this.scene, this.camera);
+        this.diagnostics?.frame(elapsed * 1000, this.renderer);
     }
-    
+
     // 🎯 PERFORMANCE: Frustum Culling - Only render what the camera sees
     updateFrustumCulling() {
         if (!this.frustumCuller || !this.camera || !CONFIG.CULLING_ENABLED) return;
@@ -5509,7 +4953,7 @@ class PortfolioEngine {
             const dx = camPos.x - p.x;
             const dz = camPos.z - p.z;
             const distSq = dx*dx + dz*dz;
-            const vd = CONFIG.VIEW_DISTANCE;
+            const vd = this.viewDistance || CONFIG.VIEW_DISTANCE;
 
             if (distSq > vd * vd) {
                 obj.visible = false;
@@ -5521,20 +4965,20 @@ class PortfolioEngine {
         });
 
         // Buildings/signs: never cull — they're landmarks
-        this.buildings.forEach(b => { b.visible = true; });
+        this.buildings.forEach(b => { b.visible = true; this.applyBuildingLOD(b, camPos.distanceTo(b.position)); });
 
         // Interactive objects: never cull — physics needs them visible
         if (this.interactiveObjects) {
             this.interactiveObjects.forEach(o => { o.visible = true; });
         }
     }
-    
+
     // Apply LOD settings to an object
     applyLODToObject(obj, lodLevel, distance) {
         // Skip if already at this LOD level
         if (obj.userData.currentLOD === lodLevel) return;
         obj.userData.currentLOD = lodLevel;
-        
+
         obj.traverse(child => {
             if (child.isMesh) {
                 switch(lodLevel) {
@@ -5558,14 +5002,14 @@ class PortfolioEngine {
             }
         });
     }
-    
+
     // Apply LOD to buildings (windows, details, shadows)
     applyBuildingLOD(building, distance) {
         const lodLevel = this.frustumCuller.getLODLevel(distance);
-        
+
         if (building.userData.currentLOD === lodLevel) return;
         building.userData.currentLOD = lodLevel;
-        
+
         building.traverse(child => {
             if (child.isMesh) {
                 // Disable shadows on distant buildings
@@ -5579,7 +5023,7 @@ class PortfolioEngine {
                 } else {
                     child.castShadow = true;
                 }
-                
+
                 // Hide small details at distance (window frames, etc.)
                 if (child.geometry && child.geometry.parameters) {
                     const size = Math.max(
@@ -5597,40 +5041,41 @@ class PortfolioEngine {
             }
         });
     }
-    
+
     updateMovement(delta) {
         this.updateCar(delta);
     }
-    
+
     updateCar(delta) {
         const keys = this.state.keys;
-        
+
         // Build input state
-        this.state.input.throttle = (keys['KeyW'] || keys['ArrowUp']) ? 1 : 0;
-        this.state.input.brake = (keys['KeyS'] || keys['ArrowDown']) ? 1 : 0;
+        this.state.input.throttle = Math.max(this.touchInput?.throttle || 0, (keys['KeyW'] || keys['ArrowUp']) ? 1 : 0);
+        this.state.input.brake = Math.max(this.touchInput?.brake || 0, (keys['KeyS'] || keys['ArrowDown']) ? 1 : 0);
         this.state.input.boost = keys['ShiftLeft'] || keys['ShiftRight'];
-        
+
         // Update engine sound
         this.updateEngineSound();
-        
+
         // Jump! (J key)
         if (keys['KeyJ'] && this.state.playerMode === 'driving') {
+            this.state.keys['KeyJ'] = false;
             const jumped = this.vehiclePhysics.jump();
             if (jumped) {
                 this.showToast('🦘', 'Jump!', '');
                 if (this.combo) this.combo.addScore(50, '⬆️ JUMP');
             }
         }
-        
+
         // Steering (-1 to 1)
-        let steer = 0;
+        let steer = this.touchInput?.steer || 0;
         if (keys['KeyA'] || keys['ArrowLeft']) steer = 1;
         if (keys['KeyD'] || keys['ArrowRight']) steer = -1;
         this.state.input.steer = steer;
-        
+
         // Update physics
         const physicsState = this.vehiclePhysics.update(delta, this.state.input, this.collisionSystem);
-        
+
         // Apply physics to car mesh
         this.car.position.x = physicsState.x;
         this.car.position.z = physicsState.z;
@@ -5638,18 +5083,18 @@ class PortfolioEngine {
         this.car.rotation.y = physicsState.rotation;
         this.car.rotation.z = physicsState.bodyRoll;
         this.car.rotation.x = physicsState.bodyPitch;
-        
+
         // Store for other systems
         this.state.carSpeed = physicsState.speed;
         this.state.isBoosting = this.state.input.boost && this.state.input.throttle > 0;
         this.state.isAirborne = physicsState.isAirborne;
-        
+
         // Update UI
         const speedKmh = Math.round(physicsState.speedKmh);
         const speedEl = document.getElementById('speedValue');
         const boostEl = document.getElementById('speedBoost');
         const airborneEl = document.getElementById('speedAirborne');
-        
+
         if (speedEl) {
             speedEl.textContent = speedKmh;
             // ⚡ GAME FEEL: Dynamic speed coloring
@@ -5662,10 +5107,10 @@ class PortfolioEngine {
         }
         if (boostEl) boostEl.style.display = this.state.isBoosting ? 'inline-flex' : 'none';
         if (airborneEl) airborneEl.style.display = physicsState.isAirborne ? 'inline-flex' : 'none';
-        
+
         // Visual feedback
         this.setBoostLines(this.state.isBoosting && physicsState.speedKmh > 60);
-        
+
         // Collision feedback - reflection bounce + sparks
         if (physicsState.isColliding && Math.abs(physicsState.speed) > 5) {
             const intensity = Math.min(Math.abs(physicsState.speed) / 20, 1);
@@ -5673,7 +5118,7 @@ class PortfolioEngine {
             this.spawnDustBurst(this.car.position.x, 0.2, this.car.position.z, 0.5);
             this.playCollisionSound(intensity);
         }
-        
+
         // Landing impact with dust burst
         if (this.state.wasAirborne && physicsState.isGrounded && physicsState.landingImpact > 2) {
             const intensity = Math.min(physicsState.landingImpact / 8, 1);
@@ -5689,11 +5134,11 @@ class PortfolioEngine {
             }
         }
         this.state.wasAirborne = physicsState.isAirborne;
-        
+
         // Spawn dust and skid marks when drifting/skidding
         if (physicsState.isGrounded && Math.abs(physicsState.speed) > 10) {
             const isDrifting = Math.abs(physicsState.angularVelocity) > 0.5 || !physicsState.isOnRoad;
-            
+
             if (isDrifting) {
                 // Skid marks on road
                 if (physicsState.isOnRoad && Math.random() < 0.3) {
@@ -5704,7 +5149,7 @@ class PortfolioEngine {
                         Math.min(Math.abs(physicsState.speed) / 20, 1)
                     );
                 }
-                
+
                 // Dust on grass
                 if (!physicsState.isOnRoad && Math.random() < 0.1) {
                     this.spawnDustBurst(
@@ -5717,24 +5162,24 @@ class PortfolioEngine {
             }
         }
     }
-    
+
     updateWheels() {
         if (!this.wheels || !this.car) return;
-        
+
         // Calculate wheel rotation based on speed (distance traveled per frame)
         const wheelRadius = 0.4;
         const speed = this.vehiclePhysics.speed;
-        const rotationAmount = (speed * 0.016) / wheelRadius; // Assuming ~60fps
-        
+        const rotationAmount = (speed * (this.frameDelta || 0)) / wheelRadius; // Assuming ~60fps
+
         // Get steering angle from physics
         const steeringAngle = this.vehiclePhysics.steerAngle;
-        
+
         this.wheels.forEach((wheel, index) => {
             // Apply steering to front wheels (rotate the entire group around Y)
             if (wheel.userData.steering) {
                 wheel.rotation.y = steeringAngle;
             }
-            
+
             // Rolling rotation: cylinders are rotated 90° on Z to point along X axis
             // So they roll around the X axis as the car moves forward/backward
             wheel.children.forEach(mesh => {
@@ -5744,43 +5189,43 @@ class PortfolioEngine {
             });
         });
     }
-    
+
     updateCamera() {
         const target = this.car;
         if (!target) return;
-        
+
         let targetPos = new THREE.Vector3();
         let lookPos = new THREE.Vector3();
-        
+
         const mouseYaw = this.mouseCamera ? this.mouseCamera.yaw : 0;
         const mousePitch = this.mouseCamera ? this.mouseCamera.pitch : 0;
-        
+
         // Dynamic speed factor for camera effects
         const speedNorm = this.vehiclePhysics ? Math.min(Math.abs(this.vehiclePhysics.speed) / CONFIG.MAX_SPEED, 1.0) : 0;
         const isBoosting = this.state.isBoosting && this.state.input.throttle > 0;
-        
+
         // Dynamic FOV: 65° at rest → 80° at max, +5° during boost
-        const targetFOV = 65 + (speedNorm * 15) + (isBoosting ? 5 : 0);
-        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, 0.04);
+        const targetFOV = this.reducedMotion ? 65 : 65 + speedNorm * 6 + (isBoosting ? 2 : 0);
+        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, targetFOV, 1 - Math.exp(-3 * (this.frameDelta || .016)));
         this.camera.updateProjectionMatrix();
-        
+
         // Adaptive lerp: tighter at speed
-        const adaptiveLerp = THREE.MathUtils.lerp(0.04, 0.13, speedNorm);
-        
+        const adaptiveLerp = 1 - Math.exp(-(this.reducedMotion ? 6 : 4 + speedNorm * 4) * (this.frameDelta || .016));
+
         switch (this.state.cameraMode) {
             case 'follow':
                 // Look-ahead: camera leads turns
                 const steerLead = this.state.input ? (this.state.input.steer || 0) * speedNorm * 0.3 : 0;
                 const baseAngle = target.rotation.y + mouseYaw + steerLead;
-                
+
                 // Camera pulls back during boost, drops at speed
-                const boostPullback = isBoosting ? 4.0 : 0;
+                const boostPullback = isBoosting && !this.reducedMotion ? 1.5 : 0;
                 const dynamicDist = this.state.cameraDistance + boostPullback - speedNorm * 2;
                 const dynamicHeight = this.state.cameraHeight - speedNorm * 1.5;
-                
+
                 const heightOffset = dynamicHeight + Math.sin(mousePitch) * dynamicDist * 0.5;
                 const distanceOffset = dynamicDist * Math.cos(mousePitch * 0.5);
-                
+
                 targetPos.set(
                     target.position.x - Math.sin(baseAngle) * distanceOffset,
                     target.position.y + heightOffset,
@@ -5788,9 +5233,9 @@ class PortfolioEngine {
                 );
                 lookPos.copy(target.position).add(new THREE.Vector3(0, 2, 0));
                 break;
-                
+
             case 'orbit':
-                const orbitAngle = this.state.time * 0.3 + mouseYaw;
+                const orbitAngle = (this.reducedMotion ? 0 : this.state.time * 0.15) + mouseYaw;
                 targetPos.set(
                     target.position.x + Math.sin(orbitAngle) * this.state.cameraDistance,
                     target.position.y + this.state.cameraHeight + mousePitch * 10,
@@ -5798,7 +5243,7 @@ class PortfolioEngine {
                 );
                 lookPos.copy(target.position);
                 break;
-                
+
             case 'first-person':
                 if (this.state.playerMode === 'driving') {
                     targetPos.copy(this.car.position).add(
@@ -5827,24 +5272,24 @@ class PortfolioEngine {
                 }
                 break;
         }
-        
+
         // Camera collision prevention
         targetPos = this.preventCameraCollision(target.position, targetPos);
-        
+
         this.camera.position.lerp(targetPos, adaptiveLerp);
-        
+
         const currentDir = new THREE.Vector3();
         this.camera.getWorldDirection(currentDir);
         const targetDir = new THREE.Vector3().subVectors(lookPos, this.camera.position).normalize();
         currentDir.lerp(targetDir, adaptiveLerp);
         this.camera.lookAt(this.camera.position.clone().add(currentDir));
     }
-    
+
     // No tall buildings to clip through in open world
     preventCameraCollision(carPos, cameraPos) {
         return cameraPos;
     }
-    
+
     updateAnimations() {
         // Spin secret cubes
         if (this.secretCubes) {
@@ -5864,7 +5309,7 @@ class PortfolioEngine {
                 }
             });
         }
-        
+
         // Animate building signs (gentle float)
         this.sections.forEach((section, i) => {
             const sign = section.children.find(c => c.type === 'Group' && c.children && c.children.length > 1);
@@ -5875,7 +5320,7 @@ class PortfolioEngine {
                 sign.rotation.y = Math.sin(this.state.time * 0.5 + i) * 0.1;
             }
         });
-        
+
         // Animate particles
         if (this.particles && this.particles.geometry && this.particles.geometry.attributes.position) {
             const positions = this.particles.geometry.attributes.position.array;
@@ -5887,35 +5332,35 @@ class PortfolioEngine {
             this.particles.geometry.attributes.position.needsUpdate = true;
         }
     }
-    
+
     // 🚗 DRIFT DETECTION - now uses physics slip-angle data
     checkDrift() {
         if (!this.vehiclePhysics || !this.car) return;
-        
+
         const speed = Math.abs(this.vehiclePhysics.speed);
         const speedKmh = speed * 3.6;
-        
+
         // Use real drift state from physics
         const isDrifting = this.vehiclePhysics.isDrifting;
-        
+
         if (isDrifting && !this.state.wasDrifting) {
             // Start drift
             this.playTireScreech();
             this.state.driftStartTime = this.state.time;
         }
-        
+
         if (isDrifting) {
             // Spawn tire smoke
             if (this.frameCount % 3 === 0) {
                 this.spawnDriftSmoke();
             }
-            
+
             // Continuous tire audio (modulate existing screech)
             if (this.tireScreechGain) {
                 const driftIntensity = Math.min(Math.abs(this.vehiclePhysics.slipAngle) / 0.8, 1);
                 this.tireScreechGain.gain.value = 0.05 + driftIntensity * 0.1;
             }
-            
+
             // Check for drift achievement
             const driftDuration = this.state.time - (this.state.driftStartTime || 0);
             if (driftDuration > 2 && !safeStorage.getItem('achievement_driftKing')) {
@@ -5928,49 +5373,49 @@ class PortfolioEngine {
                 this.tireScreechGain.gain.value *= 0.85;
             }
         }
-        
+
         this.state.wasDrifting = isDrifting;
     }
-    
+
     playTireScreech() {
         if (!this.audioContext || this.state.quality === 'low') return;
-        
+
         if (this.audioContext.state === 'suspended') {
             this.audioContext.resume();
         }
-        
+
         // Continuous tire screech with gain control for drift
         const duration = 1.5;
         const bufferSize = this.audioContext.sampleRate * duration;
         const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
         const data = buffer.getChannelData(0);
-        
+
         for (let i = 0; i < bufferSize; i++) {
             data[i] = (Math.random() * 2 - 1);
         }
-        
+
         const source = this.audioContext.createBufferSource();
         source.buffer = buffer;
         source.loop = false;
-        
+
         const filter = this.audioContext.createBiquadFilter();
         filter.type = 'bandpass';
         filter.frequency.value = 2500;
         filter.Q.value = 4;
-        
+
         const gain = this.audioContext.createGain();
         gain.gain.value = 0.06;
-        
+
         // Store reference for continuous modulation
         this.tireScreechGain = gain;
-        
+
         source.connect(filter);
         filter.connect(gain);
-        gain.connect(this.audioContext.destination);
-        
+        gain.connect(this.masterAudio || this.audioContext.destination);
+
         source.start();
         source.stop(this.audioContext.currentTime + duration);
-        
+
         // Clear reference after sound ends
         setTimeout(() => {
             if (this.tireScreechGain === gain) {
@@ -5978,16 +5423,16 @@ class PortfolioEngine {
             }
         }, duration * 1000);
     }
-    
+
     spawnDriftSmoke() {
         if (!this.car || this.state.quality === 'low') return;
         if (!this.driftSmokePool) {
             this.driftSmokePool = [];
             this.activeDriftSmoke = [];
         }
-        
+
         if (this.activeDriftSmoke.length > 20) return;
-        
+
         // Spawn at rear wheels
         [-1.1, 1.1].forEach(xOffset => {
             let smoke;
@@ -6004,27 +5449,27 @@ class PortfolioEngine {
                 smoke = new THREE.Mesh(geom, mat);
                 this.scene.add(smoke);
             }
-            
+
             const worldPos = new THREE.Vector3(xOffset, 0.3, -2);
             worldPos.applyMatrix4(this.car.matrixWorld);
             smoke.position.copy(worldPos);
             smoke.scale.setScalar(1);
             smoke.userData.life = 1.0;
-            
+
             this.activeDriftSmoke.push(smoke);
         });
     }
-    
+
     updateDriftSmoke(delta) {
         if (!this.activeDriftSmoke) return;
-        
+
         for (let i = this.activeDriftSmoke.length - 1; i >= 0; i--) {
             const smoke = this.activeDriftSmoke[i];
             smoke.userData.life -= delta * 1.5;
             smoke.position.y += delta * 2;
             smoke.scale.addScalar(delta * 3);
             smoke.material.opacity = smoke.userData.life * 0.4;
-            
+
             if (smoke.userData.life <= 0) {
                 smoke.visible = false;
                 this.driftSmokePool.push(smoke);
@@ -6032,15 +5477,15 @@ class PortfolioEngine {
             }
         }
     }
-    
+
     checkSectionProximity() {
         if (document.getElementById('modalOverlay').classList.contains('active')) return;
-        
+
         const pos = this.state.playerMode === 'driving' ? this.car.position : this.character.position;
-        
+
         let closest = null;
         let closestDist = CONFIG.SECTION_DETECTION_RADIUS;
-        
+
         this.sections.forEach(section => {
             const dist = pos.distanceTo(section.position);
             if (dist < closestDist) {
@@ -6048,25 +5493,25 @@ class PortfolioEngine {
                 closestDist = dist;
             }
         });
-        
+
         if (closest !== this.state.currentSection) {
             this.state.currentSection = closest;
             this.state.holdingSpaceTime = 0; // Reset hold timer
-            
+
             const indicator = document.getElementById('sectionIndicator');
             const dot = document.getElementById('indicatorDot');
             const title = document.getElementById('indicatorTitle');
             const hint = indicator.querySelector('.section-indicator-hint');
-            
+
             if (closest) {
                 const color = '#' + new THREE.Color(closest.userData.color).getHexString();
                 dot.style.backgroundColor = color;
                 dot.style.color = color;
                 title.textContent = `${closest.userData.icon} ${closest.userData.title}`;
-                hint.textContent = 'Hold SPACE to enter';
+                hint.textContent = matchMedia('(pointer: coarse), (max-width: 700px)').matches ? 'Tap ↵ to enter' : 'Hold SPACE to enter';
                 hint.style.display = 'inline';
                 indicator.style.display = 'block';
-                
+
                 // Show toast for first approach to this section
                 if (!this.state.sectionsVisited.has(closest.userData.title)) {
                     this.showToast(closest.userData.icon, `Discovered: ${closest.userData.title}`, 'Hold SPACE to explore', 2500);
@@ -6088,15 +5533,15 @@ class PortfolioEngine {
                 this.clearHash();
             }
         }
-        
+
         // Handle hold-to-enter mechanic
         if (this.state.currentSection && this.state.keys['Space']) {
             this.state.holdingSpaceTime += this.frameDelta || 0.016;
             const holdRequired = 0.5; // Half second to enter
             const progress = Math.min(this.state.holdingSpaceTime / holdRequired, 1);
-            
+
             this.updateProgressBar(progress);
-            
+
             if (progress >= 1) {
                 this.openModal(this.state.currentSection.userData);
                 this.state.holdingSpaceTime = 0;
@@ -6109,18 +5554,18 @@ class PortfolioEngine {
             }
         }
     }
-    
+
     updateMinimap() {
         const canvas = document.getElementById('miniMapCanvas');
         if (!canvas || !this.car) return;
-        
+
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        
+
         // Clear with semi-transparent background
         ctx.fillStyle = 'rgba(248, 250, 252, 0.95)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         // Stylized grid
         ctx.strokeStyle = 'rgba(99, 102, 241, 0.1)';
         ctx.lineWidth = 1;
@@ -6136,20 +5581,20 @@ class PortfolioEngine {
             ctx.lineTo(canvas.width, i);
             ctx.stroke();
         }
-        
+
         const cx = canvas.width / 2;
         const cy = canvas.height / 2;
-        
+
         // Use actual car position for tracking
         const carX = this.car.position.x;
         const carZ = this.car.position.z;
         const carAngle = this.car.rotation.y;
-        
+
         // Scale: map world units to minimap pixels
         // World is roughly -120 to +120 in x, -120 to +120 in z
         // Minimap is ~150px, so scale = 150 / 240 ≈ 0.6
         const scale = 0.55;
-        
+
         // Draw section positions on minimap (no roads in open world)
         const toMinimap = (worldX, worldZ) => ({
             x: cx + (worldX - carX) * scale,
@@ -6157,36 +5602,36 @@ class PortfolioEngine {
         });
         this.sections.forEach(section => {
             const pos = toMinimap(section.position.x, section.position.z);
-            
+
             // Skip if off-screen
             if (pos.x < -10 || pos.x > canvas.width + 10 || pos.y < -10 || pos.y > canvas.height + 10) return;
-            
+
             const color = '#' + new THREE.Color(section.userData.color).getHexString();
             const icon = section.userData.icon || '📍';
-            
+
             // Glow effect
             ctx.shadowColor = color;
             ctx.shadowBlur = 10;
-            
+
             ctx.fillStyle = color;
             ctx.beginPath();
             ctx.arc(pos.x, pos.y, 10, 0, Math.PI * 2);
             ctx.fill();
-            
+
             ctx.shadowBlur = 0;
-            
+
             // White border
             ctx.strokeStyle = 'white';
             ctx.lineWidth = 2;
             ctx.stroke();
-            
+
             // Icon in center
             ctx.font = '10px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(icon, pos.x, pos.y);
         });
-        
+
         // Draw player (always at center)
         ctx.save();
         ctx.translate(cx, cy);
@@ -6194,16 +5639,16 @@ class PortfolioEngine {
         // Three.js: +Z is forward, rotation.y is yaw counter-clockwise
         // Canvas: -Y is up, need to add PI/2 to point up when facing +Z
         ctx.rotate(-carAngle + Math.PI);
-        
+
         // Player indicator with glow
         ctx.shadowColor = '#6366F1';
         ctx.shadowBlur = 15;
-        
+
         const gradient = ctx.createLinearGradient(-6, -6, 6, 6);
         gradient.addColorStop(0, '#6366F1');
         gradient.addColorStop(1, '#EC4899');
         ctx.fillStyle = gradient;
-        
+
         // Draw arrow pointing in direction of travel
         ctx.beginPath();
         ctx.moveTo(0, -10);   // Front point
@@ -6212,27 +5657,28 @@ class PortfolioEngine {
         ctx.lineTo(6, 8);    // Back right
         ctx.closePath();
         ctx.fill();
-        
+
         ctx.shadowBlur = 0;
-        
+
         ctx.restore();
     }
-    
+
     updateFPS() {
         const now = performance.now();
         const delta = now - this.lastFpsTime;
         // Proper FPS calculation: we update every 30 frames, so multiply by 30
         this.fps = Math.round(30000 / delta);
+        if (this.diagnostics) { const d=this.diagnostics.snapshot(); document.getElementById('performanceReadout').textContent = `${this.state.quality} · ${this.fps} fps · p95 ${Math.round(d.p95)}ms · ${d.drawCalls || 0} draws`; }
         this.lastFpsTime = now;
-        
+
         // Clamp FPS display to reasonable range
         const displayFps = Math.min(Math.max(this.fps, 0), 999);
         document.getElementById('fpsCounter').textContent = `${displayFps} FPS`;
-        
+
         // 🎯 PERFORMANCE: Record FPS for adaptive quality
-        if (this.adaptiveQuality) {
+        if (this.adaptiveQuality && !this.manualQuality) {
             this.adaptiveQuality.recordFPS(this.fps);
-            
+
             // Check if we should adjust quality
             if (this.adaptiveQuality.shouldDowngrade() && this.state.quality !== 'low') {
                 const levels = ['ultra', 'high', 'medium', 'low'];
@@ -6241,27 +5687,17 @@ class PortfolioEngine {
                     const newLevel = levels[currentIndex + 1];
                     document.getElementById('qualitySelect').value = newLevel;
                     this.applyQuality(newLevel);
-                    this.adaptiveQuality.applyQuality(newLevel);
+
                     this.showToast('⚙️', 'Quality Adjusted', `Lowered to ${newLevel} for better performance`);
-                }
-            } else if (this.adaptiveQuality.shouldUpgrade() && this.state.quality !== 'ultra') {
-                const levels = ['ultra', 'high', 'medium', 'low'];
-                const currentIndex = levels.indexOf(this.state.quality);
-                if (currentIndex > 0) {
-                    const newLevel = levels[currentIndex - 1];
-                    document.getElementById('qualitySelect').value = newLevel;
-                    this.applyQuality(newLevel);
-                    this.adaptiveQuality.applyQuality(newLevel);
-                    this.showToast('⚙️', 'Quality Adjusted', `Raised to ${newLevel}`);
                 }
             }
         }
     }
-    
+
     // ============================================
     // SKID MARKS SYSTEM
     // ============================================
-    
+
     createSkidMark(x, z, rotation, intensity = 1) {
         if (this.skidMarks.length >= this.maxSkidMarks) {
             // Remove oldest skid mark
@@ -6270,7 +5706,7 @@ class PortfolioEngine {
             oldest.geometry.dispose();
             oldest.material.dispose();
         }
-        
+
         const skidGeom = new THREE.PlaneGeometry(0.3, 2);
         const skidMat = new THREE.MeshBasicMaterial({
             color: 0x1a1a1a,
@@ -6279,26 +5715,26 @@ class PortfolioEngine {
             side: THREE.DoubleSide,
             depthWrite: false
         });
-        
+
         const skid = new THREE.Mesh(skidGeom, skidMat);
         skid.rotation.x = -Math.PI / 2;
         skid.rotation.z = rotation;
         skid.position.set(x, 0.02, z);
         skid.userData.createdAt = performance.now();
         skid.userData.fadeTime = 10000; // Fade over 10 seconds
-        
+
         this.scene.add(skid);
         this.skidMarks.push(skid);
     }
-    
+
     updateSkidMarks() {
         const now = performance.now();
-        
+
         for (let i = this.skidMarks.length - 1; i >= 0; i--) {
             const skid = this.skidMarks[i];
             const age = now - skid.userData.createdAt;
             const fadeProgress = age / skid.userData.fadeTime;
-            
+
             if (fadeProgress >= 1) {
                 this.scene.remove(skid);
                 skid.geometry.dispose();
@@ -6309,161 +5745,93 @@ class PortfolioEngine {
             }
         }
     }
-    
+
     // ============================================
     // DAY/NIGHT CYCLE
     // ============================================
-    
-    updateDayNightCycle(delta) {
-        this.dayTime += delta * this.daySpeed;
-        if (this.dayTime > 1) this.dayTime -= 1;
-        
-        // Calculate sun position (arc across sky)
-        const sunAngle = this.dayTime * Math.PI * 2 - Math.PI / 2;
-        const sunHeight = Math.sin(sunAngle);
-        const sunX = Math.cos(sunAngle) * 150;
-        const sunY = Math.max(sunHeight * 150, -50);
-        
-        if (this.sunLight) {
-            this.sunLight.position.set(sunX, sunY, 100);
-            
-            // Adjust sun intensity based on height
-            const dayIntensity = Math.max(0, sunHeight);
-            this.sunLight.intensity = 1.5 + dayIntensity * 1.5;
-            
-            // Sun color: warm at sunrise/sunset, white at noon
-            const warmth = 1 - Math.abs(sunHeight);
-            const r = 1;
-            const g = 0.95 - warmth * 0.3;
-            const b = 0.9 - warmth * 0.5;
-            this.sunLight.color.setRGB(r, g, b);
-        }
-        
-        // Update sky colors
-        if (this.skyMaterial) {
-            const isNight = sunHeight < 0;
-            
-            if (isNight) {
-                // Night sky
-                this.skyMaterial.uniforms.topColor.value.setHex(0x0a0a20);
-                this.skyMaterial.uniforms.bottomColor.value.setHex(0x1a1a3a);
-            } else {
-                // Day sky - interpolate based on sun height
-                const t = sunHeight;
-                // Dawn/dusk colors
-                const dawnTop = new THREE.Color(0x7a4a2a);
-                const dawnBottom = new THREE.Color(0xff9966);
-                const dayTop = new THREE.Color(0x5ba3d9);
-                const dayBottom = new THREE.Color(0xf5deb3);
-                
-                if (t < 0.3) {
-                    // Sunrise/sunset
-                    const blend = t / 0.3;
-                    this.skyMaterial.uniforms.topColor.value.lerpColors(dawnTop, dayTop, blend);
-                    this.skyMaterial.uniforms.bottomColor.value.lerpColors(dawnBottom, dayBottom, blend);
-                } else {
-                    this.skyMaterial.uniforms.topColor.value.copy(dayTop);
-                    this.skyMaterial.uniforms.bottomColor.value.copy(dayBottom);
-                }
-            }
-        }
-        
-        // Update ambient light
-        if (this.ambientLight) {
-            const intensity = 0.3 + Math.max(0, sunHeight) * 0.5;
-            this.ambientLight.intensity = intensity;
-        }
-        
-        // Update fog color to match sky
-        if (this.scene.fog && this.skyMaterial) {
-            this.scene.fog.color.copy(this.skyMaterial.uniforms.bottomColor.value);
-        }
-    }
-    
-    // ============================================
-    // AMBIENT SOUNDS
-    // ============================================
-    
+
+    updateDayNightCycle(delta) { this.environment?.update(delta); }
+
     startAmbientSounds() {
         if (this.ambientPlaying || !this.audioContext) return;
-        
+
         // Birds chirping (random high-pitched tones)
         this.birdInterval = setInterval(() => {
             if (Math.random() > 0.7) {
                 this.playBirdSound();
             }
         }, 3000);
-        
+
         // Wind (filtered noise)
         this.createWindSound();
-        
+
         this.ambientPlaying = true;
     }
-    
+
     playBirdSound() {
-        if (!this.audioContext || this.audioContext.state === 'suspended') return;
-        
+        if (!this.audioContext || this.audioContext.state === 'suspended' || this.muted || this.dayTime < .25 || this.dayTime > .8) return;
+
         const osc = this.audioContext.createOscillator();
         const gain = this.audioContext.createGain();
-        
+
         osc.type = 'sine';
         osc.frequency.setValueAtTime(2000 + Math.random() * 1000, this.audioContext.currentTime);
         osc.frequency.exponentialRampToValueAtTime(1500 + Math.random() * 500, this.audioContext.currentTime + 0.1);
-        
+
         gain.gain.setValueAtTime(0.02, this.audioContext.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, this.audioContext.currentTime + 0.3);
-        
+
         osc.connect(gain);
-        gain.connect(this.audioContext.destination);
-        
+        gain.connect(this.masterAudio || this.audioContext.destination);
+
         osc.start();
         osc.stop(this.audioContext.currentTime + 0.3);
     }
-    
+
     createWindSound() {
         if (!this.audioContext || this.muted) return;
-        
+
         // Create noise buffer for wind
         const bufferSize = this.audioContext.sampleRate * 2;
         const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
         const data = buffer.getChannelData(0);
-        
+
         for (let i = 0; i < bufferSize; i++) {
             data[i] = Math.random() * 2 - 1;
         }
-        
+
         this.windNoise = this.audioContext.createBufferSource();
         this.windNoise.buffer = buffer;
         this.windNoise.loop = true;
-        
+
         const windFilter = this.audioContext.createBiquadFilter();
         windFilter.type = 'lowpass';
         windFilter.frequency.value = 400;
-        
+
         const windGain = this.audioContext.createGain();
         windGain.gain.value = 0.03;
-        
+
         this.windNoise.connect(windFilter);
         windFilter.connect(windGain);
-        windGain.connect(this.audioContext.destination);
-        
+        windGain.connect(this.masterAudio || this.audioContext.destination);
+
         this.windNoise.start();
     }
-    
+
     // ============================================
     // CAR HEADLIGHTS
     // ============================================
-    
+
     createHeadlights() {
         if (!this.car) return;
-        
+
         // Left headlight
         this.leftHeadlight = new THREE.SpotLight(0xffffcc, 0, 50, Math.PI / 6, 0.5);
         this.leftHeadlight.position.set(-0.6, 0.5, 2.5);
         this.car.add(this.leftHeadlight);
         this.leftHeadlight.target.position.set(-0.6, 0, 10);
         this.car.add(this.leftHeadlight.target);
-        
+
         // Right headlight
         this.rightHeadlight = new THREE.SpotLight(0xffffcc, 0, 50, Math.PI / 6, 0.5);
         this.rightHeadlight.position.set(0.6, 0.5, 2.5);
@@ -6471,62 +5839,62 @@ class PortfolioEngine {
         this.rightHeadlight.target.position.set(0.6, 0, 10);
         this.car.add(this.rightHeadlight.target);
     }
-    
+
     updateHeadlights() {
         if (!this.leftHeadlight || !this.rightHeadlight) return;
-        
+
         // Turn on headlights at night
         const isNight = this.dayTime < 0.25 || this.dayTime > 0.75;
         const intensity = isNight ? 2 : 0;
-        
+
         this.leftHeadlight.intensity = intensity;
         this.rightHeadlight.intensity = intensity;
     }
-    
+
     // ============================================
     // BUILDING PREVIEWS (on hover/approach)
     // ============================================
-    
+
     updateBuildingPreviews() {
         const indicator = document.getElementById('sectionIndicator');
         if (!indicator || !this.car) return;
-        
+
         // Find nearest building
         let nearest = null;
         let nearestDist = Infinity;
-        
+
         this.sections.forEach(section => {
             const dx = this.car.position.x - section.position.x;
             const dz = this.car.position.z - section.position.z;
             const dist = Math.sqrt(dx * dx + dz * dz);
-            
+
             if (dist < nearestDist && dist < 30) {
                 nearestDist = dist;
                 nearest = section;
             }
         });
-        
+
         if (nearest && nearest.userData) {
             indicator.style.display = 'block';
             const titleEl = indicator.querySelector('.section-indicator-title');
             const hintEl = indicator.querySelector('.section-indicator-hint');
             const dotEl = indicator.querySelector('.section-indicator-dot');
-            
+
             if (titleEl) titleEl.textContent = nearest.userData.icon + ' ' + nearest.userData.title;
             if (hintEl) hintEl.textContent = nearestDist < 15 ? 'Press SPACE to enter' : `${Math.round(nearestDist)}m away`;
             if (dotEl) dotEl.style.color = '#' + new THREE.Color(nearest.userData.color).getHexString();
-            
+
             this.state.currentSection = nearest;
         } else {
             indicator.style.display = 'none';
             this.state.currentSection = null;
         }
     }
-    
+
     // 🎯 PERFORMANCE: Get renderer stats for debugging
     getPerformanceStats() {
         if (!this.renderer) return {};
-        
+
         const info = this.renderer.info;
         return {
             drawCalls: info.render.calls,
@@ -6587,21 +5955,22 @@ class PortfolioEngine {
     cycleRadio() {
         if (!this.audioContext || this.muted) return;
         this.radioStation = (this.radioStation + 1) % 3;
-        
+
         // Stop current
         if (this.radioOsc) { try { this.radioOsc.stop(); } catch(e){} this.radioOsc = null; }
         if (this.radioInterval) { clearInterval(this.radioInterval); this.radioInterval = null; }
         if (this.radioGain) { this.radioGain.disconnect(); this.radioGain = null; }
-        
-        const names = ['Off', '🎵 Lo-fi Chill', '🎹 Retro Synth'];
+
+        const names = ['Off', 'Lo-fi Circuit', 'Retro Relay'];
+        document.getElementById('radioControl').textContent = this.radioStation ? `♫ ${names[this.radioStation]}` : 'Radio · off';
         this.showToast('📻', `Radio: ${names[this.radioStation]}`, 'Press R to change', 2000);
-        
+
         if (this.radioStation === 0) return;
-        
+
         this.radioGain = this.audioContext.createGain();
         this.radioGain.gain.value = 0.08;
-        this.radioGain.connect(this.audioContext.destination);
-        
+        this.radioGain.connect(this.masterAudio || this.audioContext.destination);
+
         if (this.radioStation === 1) {
             // Lo-fi: slow sine melody
             const notes = [261, 293, 329, 349, 392, 349, 329, 293];
@@ -6675,11 +6044,13 @@ class PortfolioEngine {
         return document.getElementById('modalOverlay').classList.contains('active') ||
             document.getElementById('tutorialOverlay').classList.contains('active') ||
             document.getElementById('settingsPanel').classList.contains('active') ||
-            document.getElementById('destinationsDialog').open;
+            document.getElementById('destinationsDialog').open || document.getElementById('experimentDialog').open;
     }
 
     resetInput() {
         this.state.keys = {};
+        this.touchInput = {throttle:0,brake:0,steer:0};
+        this.physicsAccumulator = 0;
         Object.assign(this.state.input, { throttle: 0, brake: 0, steer: 0, boost: false });
         this.state.holdingSpaceTime = 0;
         if (this.mouseCamera) this.mouseCamera.enabled = false;
@@ -6701,6 +6072,7 @@ class PortfolioEngine {
             document.getElementById(target).focus();
         });
         dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+        this.initWorldControls();
         document.getElementById('helpBtn').onclick = () => { this.resetInput(); this.showTutorial(); };
         document.querySelectorAll('[data-destination]').forEach(button => {
             button.onclick = () => {
@@ -6748,13 +6120,56 @@ class PortfolioEngine {
         });
     }
 
+    initWorldControls() {
+        const comfort = document.getElementById('comfortMode');
+        comfort.checked = this.reducedMotion;
+        comfort.onchange = () => {
+            this.reducedMotion = comfort.checked;
+            if (this.reducedMotion) this.state.cameraMode = 'follow';
+            document.body.classList.toggle('comfort-mode', this.reducedMotion);
+            safeStorage.setItem('keith_comfort', String(this.reducedMotion));
+        };
+        if (safeStorage.getItem('keith_comfort') === 'true') { comfort.checked = true; comfort.onchange(); }
+        document.getElementById('timeSelect').onchange = e => this.setTimeOfDay(e.target.value);
+        document.getElementById('volumeControl').oninput = e => {
+            const value = Number(e.target.value) / 100;
+            if (this.masterAudio) this.masterAudio.gain.setTargetAtTime(value, this.audioContext.currentTime, .05);
+            safeStorage.setItem('keith_volume', String(value));
+        };
+        document.getElementById('resetCar').onclick = () => {
+            this.resetInput(); this.vehiclePhysics.reset(); this.car.position.set(0,.5,60);
+            this.car.rotation.set(0,Math.PI,0); this.vehiclePhysics.rotation = Math.PI; this.state.carSpeed = 0; this.state.lastPosition = null;
+            this.camera.position.set(0,12,80); this.camera.lookAt(0,0,60);
+            document.getElementById('settingsPanel').classList.remove('active');
+            document.getElementById('settingsBtn').setAttribute('aria-expanded','false');
+            document.getElementById('gameContainer').focus();
+            this.showToast('↻','Back on the road','Your discoveries are safe.');
+        };
+        document.getElementById('radioControl').onclick = () => {
+            if (this.muted) this.toggleMute();
+            this.audioContext?.resume(); this.cycleRadio();
+            document.getElementById('radioControl').textContent = ['Radio · off','♫ Lo-fi Circuit','♫ Retro Relay'][this.radioStation];
+            document.getElementById('gameContainer').focus();
+        };
+        document.querySelector('.pilot-brand').onclick = e => { e.preventDefault(); document.getElementById('resetCar').click(); };
+    }
+
+    playUiTone() {
+        if (!this.audioContext || this.muted) return;
+        const ctx=this.audioContext,osc=ctx.createOscillator(),gain=ctx.createGain();
+        osc.frequency.setValueAtTime(520,ctx.currentTime);osc.frequency.exponentialRampToValueAtTime(780,ctx.currentTime+.12);
+        gain.gain.setValueAtTime(.035,ctx.currentTime);gain.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.22);
+        osc.connect(gain);gain.connect(this.masterAudio || ctx.destination);osc.start();osc.stop(ctx.currentTime+.23);
+        osc.onended=()=>{osc.disconnect();gain.disconnect();};
+    }
+
     initAnalytics() {
         this.analytics = {
             startTime: Date.now(),
             sectionTimes: {},
             totalVisits: 0
         };
-        
+
         // Progress badge
         const badge = document.createElement('div');
         badge.id = 'analyticsBadge';
@@ -6767,13 +6182,13 @@ class PortfolioEngine {
         `;
         badge.textContent = '0 / 5 DISCOVERED';
         document.body.appendChild(badge);
-        
+
         // Save/restore from sessionStorage
         try {
             const saved = sessionStorage.getItem('portfolio_analytics');
             if (saved) this.analytics = { ...this.analytics, ...JSON.parse(saved) };
         } catch(e) {}
-        
+
         window.addEventListener('beforeunload', () => this.saveAnalytics());
     }
 

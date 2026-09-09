@@ -6,8 +6,8 @@
     <title>Keith Kadima | Software Engineer & Creative Developer</title>
     
     <!-- SEO Meta Tags -->
-    <meta name="description" content="Keith Kadima - Software Engineer specializing in full-stack development, 3D web experiences, and creative coding. Based in Nairobi, Kenya.">
-    <meta name="keywords" content="Keith Kadima, Software Engineer, Web Developer, Three.js, React, Full Stack, Nairobi, Kenya">
+    <meta name="description" content="Keith Kadima - Software Engineer specializing in full-stack development, 3D web experiences, and creative coding. Working from anywhere.">
+    <meta name="keywords" content="Keith Kadima, Software Engineer, Web Developer, Three.js, React, Full Stack">
     <meta name="author" content="Keith Kadima">
     
     <!-- Open Graph / Social Media -->
@@ -43,14 +43,14 @@
         }
     }
     </script>
-    <link rel="stylesheet" href="css/cockpit.css">
+    <link rel="stylesheet" href="css/cockpit.css"><link rel="stylesheet" href="css/world.css">
 </head>
 <body>
     <header class="world-header">
-        <a class="pilot-brand" href="#" aria-label="Keith Kadima, home base"><span class="brand-mark">K<span>·</span></span><span>KEITH KADIMA<small>SOFTWARE ENGINEER / NAIROBI</small></span></a>
+        <a class="pilot-brand" href="#" aria-label="Keith Kadima, home base"><span class="brand-mark">K<span>·</span></span><span>KEITH KADIMA<small>ENGINEERING / SECURITY / ANYWHERE</small></span></a>
         <div class="world-actions"><button id="destinationsBtn" aria-haspopup="dialog">Destinations <span>↗</span></button><button id="helpBtn" aria-label="Show driving instructions">?</button></div>
     </header>
-    <div class="mission-strip"><span class="mission-label">YOUR MISSION</span><span id="missionText">Explore five stops. Discover what I build.</span></div>
+    <div class="mission-strip"><span class="mission-label">YOUR MISSION · <span id="worldTime">GOLDEN HOUR</span></span><span id="missionText">Explore five stops. Discover what I build.</span></div>
     <dialog id="destinationsDialog" aria-labelledby="destinationsTitle">
       <div class="destination-heading"><div><span class="eyebrow">THE FIELD GUIDE</span><h2 id="destinationsTitle">Pick your next stop.</h2></div><button id="closeDestinations" aria-label="Close destinations">×</button></div>
       <p>Take the scenic route, or jump straight to a destination.</p>
@@ -59,11 +59,15 @@
         <button data-destination="projects"><span>02</span><strong>Projects<small>Ideas turned into working systems</small></strong><span>↗</span></button>
         <button data-destination="tech-stack"><span>03</span><strong>Tech stack<small>The tools in my garage</small></strong><span>↗</span></button>
         <button data-destination="experience"><span>04</span><strong>Experience<small>Where I've made an impact</small></strong><span>↗</span></button>
-        <button data-destination="contact"><span>05</span><strong>Contact<small>Let's build something together</small></strong><span>↗</span></button>
+        <button data-destination="contact"><span>05</span><strong>Contact<small>Let’s build something together</small></strong><span>↗</span></button>
       </nav>
+      <a class="resume-download" href="./resume.html" target="_blank" rel="noopener">View résumé ↗</a>
       <a class="direct-contact" href="mailto:keithkadima@gmail.com">keithkadima@gmail.com ↗</a>
     </dialog>
-    <noscript><div class="no-script">This world needs JavaScript to run. I'm Keith Kadima, a software engineer based in Nairobi. <a href="mailto:keithkadima@gmail.com">Email me</a> or <a href="https://github.com/tufstraka">explore my GitHub</a>.</div></noscript>
+    <noscript><div class="no-script">This world needs JavaScript to run. I'm Keith Kadima, a software engineer working from anywhere. <a href="mailto:keithkadima@gmail.com">Email me</a> or <a href="https://github.com/tufstraka">explore my GitHub</a>.</div></noscript>
+    <div class="field-notes"><span id="discoveryCount">0 / 3 FIELD NOTES</span><button id="radioControl">Radio · off</button></div>
+    <button id="discoveryAction" hidden>Discover</button>
+    <dialog id="experimentDialog" aria-labelledby="experimentTitle"><button id="closeExperiment" aria-label="Close experiment">×</button><span class="eyebrow" id="experimentTitle"></span><h2 id="experimentLabel"></h2><p id="experimentDescription"></p><div id="experimentChoices"></div><p id="experimentResult" role="status"></p></dialog>
     <!-- Loading Screen -->
     <div id="loadingScreen">
         <div class="loading-content">
@@ -97,9 +101,9 @@
     <div id="tutorialOverlay" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
         <div class="tutorial-content">
             <span class="eyebrow">WELCOME TO MY CORNER OF THE INTERNET</span><h1 class="tutorial-title" id="tutorialTitle">Good code.<br><em>Great adventures.</em></h1>
-            <p class="tutorial-subtitle">I'm Keith, a software engineer in Nairobi. Hop in, follow your curiosity, and explore the things I build.</p>
+            <p class="tutorial-subtitle">I'm Keith, a software engineer and security researcher working from anywhere. Hop in, follow your curiosity, and explore the things I build.</p>
             
-            <div class="tutorial-keys">
+            <p class="touch-instructions">Drag the left joystick to drive. Use the right buttons to boost, jump, and explore.</p><div class="tutorial-keys">
                 <div class="tutorial-key-group">
                     <div class="tutorial-key">
                         <kbd>W</kbd>
@@ -254,7 +258,7 @@
     
     <!-- Settings Panel -->
     <div id="settingsPanel">
-        <h3 class="settings-title">Display</h3>
+        <h3 class="settings-title">Your experience</h3><div class="settings-group"><label class="settings-label" for="comfortMode">Comfort mode</label><input type="checkbox" id="comfortMode"><span class="settings-help">Steady camera, no extra motion</span></div><div class="settings-group"><label class="settings-label" for="timeSelect">Time of day</label><select class="settings-select" id="timeSelect"><option value="sunset">Golden hour</option><option value="day">Day</option><option value="night">Night</option><option value="dawn">Dawn</option></select></div><div class="settings-group"><label class="settings-label" for="volumeControl">Master volume</label><input id="volumeControl" type="range" min="0" max="100" value="45"></div><button id="resetCar" class="btn btn-primary">Reset car</button><details class="performance-details"><summary>Performance</summary><output id="performanceReadout">Measuring while you drive…</output><p>Local measurements only. No data is sent.</p></details>
         <div class="settings-group">
             <label class="settings-label" for="qualitySelect">Graphics Quality</label>
             <select class="settings-select" id="qualitySelect">

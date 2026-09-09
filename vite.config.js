@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/a-portfolio/',
-  publicDir: 'textures',
+  base: './',
+
   build: {
     outDir: 'dist',
     assetsInlineLimit: 0,
@@ -17,6 +17,6 @@ export default defineConfig({
     }
   },
   server: {
-    open: true
+    open: false
   }
 });

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Keith Kadima | Software Engineer & Creative Developer</title>
     
     <!-- SEO Meta Tags -->
@@ -31,9 +31,9 @@
 
     
     <!-- Fonts - Playful but professional -->
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     
-    <link rel="stylesheet" href="css/styles.css?v=3">
+    <link rel="stylesheet" href="css/styles.css">
     <!-- Import Map (used for raw GitHub Pages deploy; Vite ignores this) -->
     <script type="importmap">
     {
@@ -43,12 +43,31 @@
         }
     }
     </script>
+    <link rel="stylesheet" href="css/cockpit.css">
 </head>
 <body>
+    <header class="world-header">
+        <a class="pilot-brand" href="#" aria-label="Keith Kadima, home base"><span class="brand-mark">K<span>·</span></span><span>KEITH KADIMA<small>SOFTWARE ENGINEER / NAIROBI</small></span></a>
+        <div class="world-actions"><button id="destinationsBtn" aria-haspopup="dialog">Destinations <span>↗</span></button><button id="helpBtn" aria-label="Show driving instructions">?</button></div>
+    </header>
+    <div class="mission-strip"><span class="mission-label">YOUR MISSION</span><span id="missionText">Explore five stops. Discover what I build.</span></div>
+    <dialog id="destinationsDialog" aria-labelledby="destinationsTitle">
+      <div class="destination-heading"><div><span class="eyebrow">THE FIELD GUIDE</span><h2 id="destinationsTitle">Pick your next stop.</h2></div><button id="closeDestinations" aria-label="Close destinations">×</button></div>
+      <p>Take the scenic route, or jump straight to a destination.</p>
+      <nav class="destination-list" aria-label="Portfolio destinations">
+        <button data-destination="about"><span>01</span><strong>About me<small>The person behind the wheel</small></strong><span>↗</span></button>
+        <button data-destination="projects"><span>02</span><strong>Projects<small>Ideas turned into working systems</small></strong><span>↗</span></button>
+        <button data-destination="tech-stack"><span>03</span><strong>Tech stack<small>The tools in my garage</small></strong><span>↗</span></button>
+        <button data-destination="experience"><span>04</span><strong>Experience<small>Where I've made an impact</small></strong><span>↗</span></button>
+        <button data-destination="contact"><span>05</span><strong>Contact<small>Let's build something together</small></strong><span>↗</span></button>
+      </nav>
+      <a class="direct-contact" href="mailto:keithkadima@gmail.com">keithkadima@gmail.com ↗</a>
+    </dialog>
+    <noscript><div class="no-script">This world needs JavaScript to run. I'm Keith Kadima, a software engineer based in Nairobi. <a href="mailto:keithkadima@gmail.com">Email me</a> or <a href="https://github.com/tufstraka">explore my GitHub</a>.</div></noscript>
     <!-- Loading Screen -->
     <div id="loadingScreen">
         <div class="loading-content">
-            <div class="loading-logo">✦</div>
+            <div class="loading-logo">K<span style="color:#dcf572">·</span></div><p class="eyebrow">KEITH KADIMA / INTERACTIVE PORTFOLIO</p><h1 class="loading-heading">A little world.<br>A lot to discover.</h1><p class="loading-status" role="status">Warming up the engine…</p>
             <div class="loading-bar-container">
                 <div class="loading-bar" id="loadingBar"></div>
             </div>
@@ -56,7 +75,7 @@
     </div>
     
     <!-- Game Container -->
-    <div id="gameContainer"></div>
+    <main id="gameContainer" tabindex="-1" aria-label="Interactive driving world. Use WASD or arrow keys to drive; open Destinations to navigate directly."></main>
     
     <!-- Screen Effects Layer -->
     <div id="screenEffects"></div>
@@ -68,17 +87,17 @@
             <div class="mobile-joystick-inner" id="joystickInner"></div>
         </div>
         <div class="mobile-buttons">
-            <button class="mobile-btn mobile-boost" id="mobileBoost">🚀</button>
-            <button class="mobile-btn mobile-jump" id="mobileJump">⬆️</button>
-            <button class="mobile-btn mobile-action" id="mobileAction">⏎</button>
+            <button class="mobile-btn mobile-boost" id="mobileBoost" aria-label="Turbo boost">🚀</button>
+            <button class="mobile-btn mobile-jump" id="mobileJump" aria-label="Jump">⬆️</button>
+            <button class="mobile-btn mobile-action" id="mobileAction" aria-label="Enter destination">⏎</button>
         </div>
     </div>
     
     <!-- Tutorial Overlay -->
-    <div id="tutorialOverlay">
+    <div id="tutorialOverlay" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
         <div class="tutorial-content">
-            <h1 class="tutorial-title">Welcome to My Portfolio! 🎮</h1>
-            <p class="tutorial-subtitle">Explore my work by driving around this 3D world</p>
+            <span class="eyebrow">WELCOME TO MY CORNER OF THE INTERNET</span><h1 class="tutorial-title" id="tutorialTitle">Good code.<br><em>Great adventures.</em></h1>
+            <p class="tutorial-subtitle">I'm Keith, a software engineer in Nairobi. Hop in, follow your curiosity, and explore the things I build.</p>
             
             <div class="tutorial-keys">
                 <div class="tutorial-key-group">
@@ -107,16 +126,16 @@
             </div>
             
             <button class="tutorial-start-btn" id="tutorialStartBtn">
-                Let's Go! 🚗
+                Start your engine <span aria-hidden="true">↗</span>
             </button>
             <button class="tutorial-skip" id="tutorialSkipBtn">
-                I've been here before, skip tutorial
+                Skip instructions & drive
             </button>
         </div>
     </div>
     
     <!-- Notification Toast -->
-    <div id="notificationToast">
+    <div id="notificationToast" role="status" aria-live="polite">
         <span class="toast-icon" id="toastIcon">🎯</span>
         <div class="toast-content">
             <span class="toast-title" id="toastTitle">Achievement</span>
@@ -130,10 +149,10 @@
     </div>
     
     <!-- Controls Panel -->
-    <div id="controlsPanel">
+    <div id="controlsPanel" class="collapsed">
         <div class="controls-header">
             <span class="controls-title">Controls</span>
-            <button class="controls-toggle" id="controlsToggle" aria-label="Toggle controls">
+            <button class="controls-toggle" id="controlsToggle" aria-label="Toggle controls" aria-expanded="false">
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                     <path d="M3 5L7 9L11 5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
@@ -157,8 +176,8 @@
                 <span>Turbo boost! 🚀</span>
             </div>
             <div class="control-item">
-                <span class="control-key">E</span>
-                <span>Exit vehicle</span>
+                <span class="control-key">R / V</span>
+                <span>Radio / sound</span>
             </div>
             <div class="control-item">
                 <span class="control-key">C</span>
@@ -206,7 +225,7 @@
         <div class="section-indicator-content">
             <span class="section-indicator-dot" id="indicatorDot"></span>
             <span class="section-indicator-title" id="indicatorTitle"></span>
-            <span class="section-indicator-hint">SPACE to enter</span>
+            <span class="section-indicator-hint">Hold SPACE to enter</span>
         </div>
     </div>
     
@@ -222,10 +241,10 @@
     <div id="floatingScores"></div>
     
     <!-- Mute Button -->
-    <button id="muteBtn" title="Toggle Sound">🔊</button>
+    <button id="muteBtn" title="Toggle sound" aria-label="Toggle sound" aria-pressed="false">🔊</button>
 
     <!-- Settings Button -->
-    <button id="settingsBtn">
+    <button id="settingsBtn" aria-expanded="false" aria-controls="settingsPanel">
         <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path d="M9 11.25C10.2426 11.25 11.25 10.2426 11.25 9C11.25 7.75736 10.2426 6.75 9 6.75C7.75736 6.75 6.75 7.75736 6.75 9C6.75 10.2426 7.75736 11.25 9 11.25Z" stroke="currentColor" stroke-width="1.5"/>
             <path d="M14.625 9C14.625 8.66 14.5725 8.3325 14.4825 8.0175L16.125 6.7575L14.625 4.2425L12.7125 4.9575C12.2025 4.5575 11.6325 4.2325 11.0175 4.0075L10.67 2H7.33L6.9825 4.0075C6.3675 4.2325 5.7975 4.5575 5.2875 4.9575L3.375 4.2425L1.875 6.7575L3.5175 8.0175C3.4275 8.3325 3.375 8.66 3.375 9C3.375 9.34 3.4275 9.6675 3.5175 9.9825L1.875 11.2425L3.375 13.7575L5.2875 13.0425C5.7975 13.4425 6.3675 13.7675 6.9825 13.9925L7.33 16H10.67L11.0175 13.9925C11.6325 13.7675 12.2025 13.4425 12.7125 13.0425L14.625 13.7575L16.125 11.2425L14.4825 9.9825C14.5725 9.6675 14.625 9.34 14.625 9Z" stroke="currentColor" stroke-width="1.5"/>
@@ -237,7 +256,7 @@
     <div id="settingsPanel">
         <h3 class="settings-title">Display</h3>
         <div class="settings-group">
-            <label class="settings-label">Graphics Quality</label>
+            <label class="settings-label" for="qualitySelect">Graphics Quality</label>
             <select class="settings-select" id="qualitySelect">
                 <option value="low">Low (Potato Mode 🥔)</option>
                 <option value="medium" selected>Medium (Balanced ⚖️)</option>
@@ -246,7 +265,7 @@
             </select>
         </div>
         <div class="settings-group">
-            <label class="settings-label">Visual Effects</label>
+            <label class="settings-label" for="effectsSelect">Visual Effects</label>
             <select class="settings-select" id="effectsSelect">
                 <option value="minimal">Minimal</option>
                 <option value="balanced" selected>Balanced</option>
@@ -273,7 +292,7 @@
                 <div class="modal-content" id="modalContent"></div>
             </div>
             <div class="modal-footer">
-                <button class="btn btn-primary" id="modalCloseBtn">Got it! 👍</button>
+                <button class="btn btn-primary" id="modalCloseBtn">Back to exploring ↗</button>
             </div>
         </div>
     </div>

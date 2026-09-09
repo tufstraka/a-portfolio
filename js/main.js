@@ -1,3 +1,4 @@
+const safeStorage = { getItem(key) { try { return window.localStorage.getItem(key); } catch { return null; } }, setItem(key, value) { try { window.localStorage.setItem(key, value); } catch {} } };
 
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
@@ -232,7 +233,7 @@ class CameraShake {
 
 class ComboSystem {
     constructor() {
-        this.score = parseInt(localStorage.getItem('portfolio_score') || '0');
+        this.score = parseInt(safeStorage.getItem('portfolio_score') || '0');
         this.multiplier = 1;
         this.comboTimer = 0;
         this.comboDecay = 3.0; // seconds before combo resets
@@ -258,7 +259,7 @@ class ComboSystem {
         
         // Save periodically
         if (this.score % 100 < actual) {
-            localStorage.setItem('portfolio_score', this.score.toString());
+            safeStorage.setItem('portfolio_score', this.score.toString());
         }
         
         this.updateDisplay();
@@ -1554,7 +1555,7 @@ class PortfolioEngine {
             lastPosition: null,
             boostStartTime: 0,
             holdingSpaceTime: 0,
-            tutorialComplete: localStorage.getItem('portfolioTutorialComplete') === 'true'
+            tutorialComplete: safeStorage.getItem('portfolioTutorialComplete') === 'true'
         };
         
         this.frameCount = 0;
@@ -1615,10 +1616,11 @@ class PortfolioEngine {
             this.combo.init();
             this.createSidebar();
             this.initDeepLinks();
-            this.initSpeedometer();
+
             this.initRadio();
             this.initMuteButton();
             this.initAnalytics();
+            this.initCockpit();
             this.updateLoadingProgress(90);
             
             // Position car at start
@@ -1630,6 +1632,8 @@ class PortfolioEngine {
             this.vehiclePhysics.z = 60;
             this.vehiclePhysics.rotation = 0;
             
+            this.renderer.render(this.scene, this.camera);
+            this.updateMinimap();
             this.updateLoadingProgress(100);
             
             // Hide loading screen with style
@@ -1640,7 +1644,7 @@ class PortfolioEngine {
                 if (!this.state.tutorialComplete) {
                     this.showTutorial();
                 } else {
-                    this.animate();
+                    this.startLoop();
                     this.showToast('🚗', 'Welcome Back!', 'Drive to any building to explore');
                 }
             }, 600);
@@ -1660,8 +1664,8 @@ class PortfolioEngine {
                 loadingContent.innerHTML = `
                     <div class="loading-logo">⚠️</div>
                     <h1 class="loading-title">Oops!</h1>
-                    <p class="loading-subtitle">Something went wrong. Please refresh the page.</p>
-                    <p style="color: #64748B; font-size: 0.75rem; margin-top: 1rem;">${error.message}</p>
+                    <p class="loading-subtitle">This world could not start on your device.</p><a href="mailto:keithkadima@gmail.com">Email Keith</a><br><a href="https://github.com/tufstraka">Explore my projects on GitHub</a><br><button onclick="location.reload()">Try again</button>
+
                 `;
             }
         }
@@ -1696,14 +1700,11 @@ class PortfolioEngine {
     showTutorial() {
         const overlay = document.getElementById('tutorialOverlay');
         overlay.classList.add('active');
+        document.getElementById('tutorialStartBtn').focus();
         
-        document.getElementById('tutorialStartBtn').addEventListener('click', () => {
-            this.closeTutorial();
-        });
+        document.getElementById('tutorialStartBtn').onclick = () => this.closeTutorial();
         
-        document.getElementById('tutorialSkipBtn').addEventListener('click', () => {
-            this.closeTutorial();
-        });
+        document.getElementById('tutorialSkipBtn').onclick = () => this.closeTutorial();
     }
     
     closeTutorial() {
@@ -1712,10 +1713,11 @@ class PortfolioEngine {
         
         // Mark tutorial as complete
         this.state.tutorialComplete = true;
-        localStorage.setItem('portfolioTutorialComplete', 'true');
+        safeStorage.setItem('portfolioTutorialComplete', 'true');
         
         // Start the game
-        this.animate();
+        this.startLoop();
+        document.getElementById('gameContainer').focus();
         
         // Welcome message
         setTimeout(() => {
@@ -1741,6 +1743,7 @@ class PortfolioEngine {
     }
     
     triggerScreenShake(intensity = 1) {
+        if (this.reducedMotion) return;
         if (this.cameraShake) {
             this.cameraShake.addTrauma(intensity * 0.4);
         }
@@ -1777,16 +1780,16 @@ class PortfolioEngine {
         // Speed demon achievement (boost for 3 seconds)
         if (this.state.isBoosting && 
             this.state.time - this.state.boostStartTime > 3 &&
-            !localStorage.getItem('achievement_speedDemon')) {
-            localStorage.setItem('achievement_speedDemon', 'true');
+            !safeStorage.getItem('achievement_speedDemon')) {
+            safeStorage.setItem('achievement_speedDemon', 'true');
             this.showToast('🔥', 'Speed Demon!', 'Boosted for 3 seconds straight');
             // Achievement unlocked - subtle celebration
         }
         
         // Explorer achievement (visit all sections)
         if (this.state.sectionsVisited.size === 5 && 
-            !localStorage.getItem('achievement_explorer')) {
-            localStorage.setItem('achievement_explorer', 'true');
+            !safeStorage.getItem('achievement_explorer')) {
+            safeStorage.setItem('achievement_explorer', 'true');
             this.showToast('🏆', 'Explorer!', 'You\'ve visited every section');
             // Achievement unlocked - subtle celebration
         }
@@ -1799,8 +1802,8 @@ class PortfolioEngine {
             
             // Road warrior achievement (drive 1000 units)
             if (this.state.totalDistance > 1000 &&
-                !localStorage.getItem('achievement_roadWarrior')) {
-                localStorage.setItem('achievement_roadWarrior', 'true');
+                !safeStorage.getItem('achievement_roadWarrior')) {
+                safeStorage.setItem('achievement_roadWarrior', 'true');
                 this.showToast('🛣️', 'Road Warrior!', 'Drove over 1000 units');
             }
         }
@@ -3182,7 +3185,7 @@ class PortfolioEngine {
     }
     
     playCollisionSound(intensity = 1) {
-        if (!this.audioContext) return;
+        if (!this.audioContext || this.muted) return;
         
         const now = Date.now();
         if (now - this.lastCollisionSound < 200) return;
@@ -3227,7 +3230,7 @@ class PortfolioEngine {
     }
     
     playLandingSound(intensity = 1) {
-        if (!this.audioContext) return;
+        if (!this.audioContext || this.muted) return;
         
         // Resume audio context if suspended
         if (this.audioContext.state === 'suspended') {
@@ -3346,7 +3349,7 @@ class PortfolioEngine {
         const throttle = this.state.input.throttle;
         
         // Resume audio context if needed (browser autoplay policy)
-        if (this.audioContext.state === 'suspended' && throttle > 0) {
+        if (this.audioContext.state === 'suspended' && throttle > 0 && !this.muted) {
             this.audioContext.resume();
         }
         
@@ -3822,7 +3825,7 @@ class PortfolioEngine {
         // We use 2 InstancedMesh calls (trunks + foliage) = 2 draw calls total!
         
         const textureLoader = new THREE.TextureLoader();
-        const barkTexture = textureLoader.load('./textures/bark.jpg');
+        const barkTexture = textureLoader.load(new URL('../textures/bark.jpg', import.meta.url).href);
         barkTexture.wrapS = THREE.RepeatWrapping;
         barkTexture.wrapT = THREE.RepeatWrapping;
         barkTexture.repeat.set(1, 2);
@@ -4464,17 +4467,22 @@ class PortfolioEngine {
         window.addEventListener('resize', this.onResize);
         
         window.addEventListener('wheel', (e) => {
+            if (this.isInterfaceOpen() || e.target !== this.renderer.domElement) return;
             this.state.cameraDistance += e.deltaY * 0.02;
             this.state.cameraDistance = Math.max(8, Math.min(40, this.state.cameraDistance));
         }, { passive: true });
         
         // UI Controls
         document.getElementById('controlsToggle').addEventListener('click', () => {
-            document.getElementById('controlsPanel').classList.toggle('collapsed');
+            const collapsed = document.getElementById('controlsPanel').classList.toggle('collapsed');
+            document.getElementById('controlsToggle').setAttribute('aria-expanded', String(!collapsed));
+            document.getElementById('gameContainer').focus();
         });
         
         document.getElementById('settingsBtn').addEventListener('click', () => {
-            document.getElementById('settingsPanel').classList.toggle('active');
+            const open = document.getElementById('settingsPanel').classList.toggle('active');
+            document.getElementById('settingsBtn').setAttribute('aria-expanded', String(open));
+            this.resetInput();
         });
         
         document.getElementById('qualitySelect').addEventListener('change', (e) => {
@@ -4675,7 +4683,15 @@ class PortfolioEngine {
     }
     
     onKeyDown(e) {
+        if (e.code === 'Escape') {
+            this.closeModal();
+            document.getElementById('settingsPanel').classList.remove('active');
+            document.getElementById('settingsBtn').setAttribute('aria-expanded', 'false');
+            return;
+        }
+        if (this.isInterfaceOpen() || e.target.closest('button, a, input, select, textarea, [contenteditable]')) return;
         this.state.keys[e.code] = true;
+        if (e.repeat) return;
         
         // 🥚 KONAMI CODE EASTER EGG
         this.checkKonamiCode(e.code);
@@ -4983,6 +4999,8 @@ class PortfolioEngine {
     }
     
     openModal(data) {
+        this.previousFocus = document.activeElement;
+        this.resetInput();
         const { title, content, color, icon } = data;
         
         // Track visited section
@@ -4993,8 +5011,8 @@ class PortfolioEngine {
             
             // Check if this was the first section
             if (this.state.sectionsVisited.size === 1 && 
-                !localStorage.getItem('achievement_firstExplore')) {
-                localStorage.setItem('achievement_firstExplore', 'true');
+                !safeStorage.getItem('achievement_firstExplore')) {
+                safeStorage.setItem('achievement_firstExplore', 'true');
                 setTimeout(() => {
                     this.showToast('🎯', 'First Discovery!', 'Keep exploring to find more');
                 }, 500);
@@ -5019,6 +5037,8 @@ class PortfolioEngine {
         
         document.getElementById('modalContent').innerHTML = html;
         document.getElementById('modalOverlay').classList.add('active');
+        this.linkContactDetails();
+        document.getElementById('modalClose').focus();
         
         // Hide sidebar while modal is open
         this.hideSidebar();
@@ -5028,7 +5048,10 @@ class PortfolioEngine {
     }
     
     closeModal() {
-        document.getElementById('modalOverlay').classList.remove('active');
+        const overlay = document.getElementById('modalOverlay');
+        if (!overlay.classList.contains('active')) return;
+        overlay.classList.remove('active');
+        document.getElementById('gameContainer').focus();
         // Re-show sidebar if still near a section
         if (this.state.currentSection) {
             this.showSidebar(this.state.currentSection.userData);
@@ -5217,6 +5240,7 @@ class PortfolioEngine {
 
         // Check initial hash after a short delay (sections may still be loading)
         setTimeout(() => this.handleInitialHash(), 800);
+        window.addEventListener('hashchange', () => this.handleInitialHash());
     }
 
     handleInitialHash() {
@@ -5234,10 +5258,12 @@ class PortfolioEngine {
         const offset = 20; // Stand a bit in front
         this.car.position.set(pos.x, 0.5, pos.z + offset);
         if (this.vehiclePhysics) {
+            this.resetInput();
+            this.vehiclePhysics.reset();
             this.vehiclePhysics.x = pos.x;
             this.vehiclePhysics.z = pos.z + offset;
-            this.vehiclePhysics.vx = 0;
-            this.vehiclePhysics.vz = 0;
+            this.state.carSpeed = 0;
+            this.state.lastPosition = null;
         }
         // Point camera toward section
         this.camera.position.set(pos.x, 12, pos.z + offset + 20);
@@ -5341,9 +5367,21 @@ class PortfolioEngine {
     }
     
     animate() {
-        requestAnimationFrame(this.animate);
-        
-        const delta = this.clock.getDelta();
+        this.animationFrame = requestAnimationFrame(this.animate);
+        if (document.hidden || this.isInterfaceOpen()) {
+            this.clock.getDelta();
+            if (this.audioContext?.state === 'running') {
+                this.audioContext.suspend();
+                this.audioPaused = true;
+            }
+            return;
+        }
+        if (this.audioPaused) {
+            if (!this.muted) this.audioContext?.resume();
+            this.audioPaused = false;
+        }
+        const delta = Math.min(this.clock.getDelta(), 0.05);
+        this.frameDelta = delta;
         this.state.time += delta;
         
         this.updateMovement(delta);
@@ -5405,7 +5443,6 @@ class PortfolioEngine {
         
         if (this.frameCount % 15 === 0) {
             this.updateMinimap();
-            this.updateBuildingPreviews();
         }
         
         if (this.frameCount % 30 === 0) {
@@ -5416,6 +5453,7 @@ class PortfolioEngine {
         if (this.state.quality !== 'low') {
             this.updateDayNightCycle(delta);
             this.updateHeadlights();
+            if (this.frameCount % 10 === 0) this.renderer.shadowMap.needsUpdate = true;
         }
         
         // Update skid marks (fade out)
@@ -5880,8 +5918,8 @@ class PortfolioEngine {
             
             // Check for drift achievement
             const driftDuration = this.state.time - (this.state.driftStartTime || 0);
-            if (driftDuration > 2 && !localStorage.getItem('achievement_driftKing')) {
-                localStorage.setItem('achievement_driftKing', 'true');
+            if (driftDuration > 2 && !safeStorage.getItem('achievement_driftKing')) {
+                safeStorage.setItem('achievement_driftKing', 'true');
                 this.showToast('💨', 'Drift King!', 'Held a drift for 2+ seconds');
             }
         } else {
@@ -6053,7 +6091,7 @@ class PortfolioEngine {
         
         // Handle hold-to-enter mechanic
         if (this.state.currentSection && this.state.keys['Space']) {
-            this.state.holdingSpaceTime += 0.016; // Approximate 60fps
+            this.state.holdingSpaceTime += this.frameDelta || 0.016;
             const holdRequired = 0.5; // Half second to enter
             const progress = Math.min(this.state.holdingSpaceTime / holdRequired, 1);
             
@@ -6383,7 +6421,7 @@ class PortfolioEngine {
     }
     
     createWindSound() {
-        if (!this.audioContext) return;
+        if (!this.audioContext || this.muted) return;
         
         // Create noise buffer for wind
         const bufferSize = this.audioContext.sampleRate * 2;
@@ -6547,7 +6585,7 @@ class PortfolioEngine {
     }
 
     cycleRadio() {
-        if (!this.audioContext) return;
+        if (!this.audioContext || this.muted) return;
         this.radioStation = (this.radioStation + 1) % 3;
         
         // Stop current
@@ -6605,38 +6643,111 @@ class PortfolioEngine {
     // MUTE TOGGLE (Item 5 - supplement)
     // ============================================
     initMuteButton() {
-        const btn = document.createElement('button');
-        btn.id = 'muteBtn';
-        btn.textContent = '🔊';
-        btn.style.cssText = `
-            position: fixed; top: 20px; right: 20px; z-index: 200;
-            background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.2);
-            color: white; font-size: 20px; width: 40px; height: 40px;
-            border-radius: 50%; cursor: pointer; backdrop-filter: blur(8px);
-            display: flex; align-items: center; justify-content: center;
-            transition: transform 0.2s;
-        `;
-        btn.addEventListener('click', () => this.toggleMute());
-        btn.addEventListener('mouseenter', () => btn.style.transform = 'scale(1.1)');
-        btn.addEventListener('mouseleave', () => btn.style.transform = 'scale(1)');
-        document.body.appendChild(btn);
+        const btn = document.getElementById('muteBtn');
+        btn.addEventListener('click', () => { this.toggleMute(); document.getElementById('gameContainer').focus(); });
     }
 
     toggleMute() {
         if (!this.audioContext) return;
         const btn = document.getElementById('muteBtn');
-        if (this.audioContext.state === 'running') {
+        if (!this.muted) {
             this.audioContext.suspend();
-            if (btn) btn.textContent = '🔇';
+            this.muted = true;
+            if (btn) { btn.textContent = '🔇'; btn.setAttribute('aria-pressed', 'true'); }
         } else {
             this.audioContext.resume();
-            if (btn) btn.textContent = '🔊';
+            this.muted = false;
+            if (btn) { btn.textContent = '🔊'; btn.setAttribute('aria-pressed', 'false'); }
         }
     }
 
     // ============================================
     // ANALYTICS (Item 15)
     // ============================================
+
+    startLoop() {
+        if (this.animationFrame) return;
+        this.clock.getDelta();
+        this.animate();
+    }
+
+    isInterfaceOpen() {
+        return document.getElementById('modalOverlay').classList.contains('active') ||
+            document.getElementById('tutorialOverlay').classList.contains('active') ||
+            document.getElementById('settingsPanel').classList.contains('active') ||
+            document.getElementById('destinationsDialog').open;
+    }
+
+    resetInput() {
+        this.state.keys = {};
+        Object.assign(this.state.input, { throttle: 0, brake: 0, steer: 0, boost: false });
+        this.state.holdingSpaceTime = 0;
+        if (this.mouseCamera) this.mouseCamera.enabled = false;
+        document.getElementById('joystickInner').style.transform = '';
+    }
+
+    initCockpit() {
+        this.reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (this.reducedMotion) {
+            this.applyEffects('minimal');
+            document.getElementById('effectsSelect').value = 'minimal';
+            if (this.motionBlurPass) this.motionBlurPass.enabled = false;
+        }
+        const dialog = document.getElementById('destinationsDialog');
+        document.getElementById('destinationsBtn').onclick = () => { this.resetInput(); dialog.showModal(); };
+        document.getElementById('closeDestinations').onclick = () => dialog.close();
+        dialog.addEventListener('close', () => {
+            const target = document.getElementById('modalOverlay').classList.contains('active') ? 'modalClose' : 'gameContainer';
+            document.getElementById(target).focus();
+        });
+        dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
+        document.getElementById('helpBtn').onclick = () => { this.resetInput(); this.showTutorial(); };
+        document.querySelectorAll('[data-destination]').forEach(button => {
+            button.onclick = () => {
+                dialog.close();
+                const title = this._hashMap[button.dataset.destination];
+                history.replaceState(null, '', '#' + button.dataset.destination);
+                this.handleInitialHash();
+                this.openModal({ title, ...PORTFOLIO_DATA[title] });
+            };
+        });
+        window.addEventListener('blur', () => this.resetInput());
+        document.addEventListener('visibilitychange', () => this.resetInput());
+        document.getElementById('mobileControls').addEventListener('touchcancel', () => this.resetInput());
+        document.addEventListener('keydown', e => {
+            const panel = document.getElementById('modalOverlay').classList.contains('active') ? document.getElementById('modal') : document.getElementById('tutorialOverlay').classList.contains('active') ? document.getElementById('tutorialOverlay') : null;
+            if (!panel || e.key !== 'Tab') return;
+            const elements = [...panel.querySelectorAll('button, a[href], select, input, [tabindex="0"]')];
+            const first = elements[0], last = elements.at(-1);
+            if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+            if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        });
+        this.renderer.domElement.addEventListener('webglcontextlost', e => {
+            e.preventDefault(); this.resetInput();
+            this.showToast('↻', 'Graphics connection lost', 'Reload to restart. You can still use Destinations.', 15000);
+        });
+        this.renderer.domElement.addEventListener('pointerdown', () => {
+            if (!this.isInterfaceOpen()) document.getElementById('gameContainer').focus();
+        });
+    }
+
+    linkContactDetails() {
+        const links = {
+            'keithkadima@gmail.com': 'mailto:keithkadima@gmail.com',
+            'linkedin.com/in/kadimakeith': 'https://linkedin.com/in/kadimakeith',
+            'github.com/tufstraka': 'https://github.com/tufstraka',
+            '+254 701 746 774': 'tel:+254701746774'
+        };
+        document.querySelectorAll('#modalContent li').forEach(item => {
+            for (const [label, href] of Object.entries(links)) {
+                if (!item.textContent.includes(label)) continue;
+                const a = document.createElement('a'); a.href = href; a.textContent = label;
+                if (href.startsWith('https:')) { a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+                item.replaceChildren(a);
+            }
+        });
+    }
+
     initAnalytics() {
         this.analytics = {
             startTime: Date.now(),
@@ -6654,7 +6765,7 @@ class PortfolioEngine {
             padding: 8px 12px; border-radius: 8px; backdrop-filter: blur(8px);
             cursor: default; user-select: none;
         `;
-        badge.textContent = '📍 0/5 explored';
+        badge.textContent = '0 / 5 DISCOVERED';
         document.body.appendChild(badge);
         
         // Save/restore from sessionStorage
@@ -6679,7 +6790,8 @@ class PortfolioEngine {
         const badge = document.getElementById('analyticsBadge');
         if (badge) {
             const count = this.state.sectionsVisited.size;
-            badge.textContent = `📍 ${count}/5 explored`;
+            badge.textContent = `${count} / 5 DISCOVERED`;
+            document.getElementById('missionText').textContent = count === 5 ? 'World explored. Let’s build the next one together.' : `${5 - count} stops left. Keep following your curiosity.`;
             if (count === 5) badge.textContent = '✨ All explored!';
         }
         this.saveAnalytics();

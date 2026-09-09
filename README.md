@@ -51,3 +51,13 @@ The stylized art uses lightweight geometry and procedural materials. The unused 
 Targets for physical-device profiling: 16.7 ms median / 25 ms p95 frame time, fewer than 150 visible draw calls on low quality, and no growth in geometry/texture counts during repeated visits. These are budgets, not a promise of 60 fps on every device. The automated desktop browser sampled about 50 fps on low quality during review, with transition spikes; physical mobile GPU and sustained driving profiling remain necessary.
 
 Browser review covered WebGL startup, destination/project navigation, workshop completion, settings, time selection, comfort mode, and the 390 × 844 layout. Node tests and production build pass. Keep the PR in draft until Keith reviews the private playable preview. GitHub Pages remains tied to merging `main`.
+
+## Rally car and meadow art pass
+
+The vehicle is now an original compact rally wagon, with rounded tangerine bodywork, cream trim, blue glazing, roof rack/spare, numbered door panels, and treaded wheels. Static body geometry is merged by material; steering pivots and wheel rotation are separate. The existing driving footprint is preserved.
+
+`js/surface-materials.js` shares small 256 × 256 procedural color/height maps for wood, stone, plaster, painted steel, rubber, and foliage. Maps use mipmaps, capped anisotropy, and separate color-space handling for color versus height data. Breaking crates preserves shared materials instead of disposing surfaces still used elsewhere.
+
+`js/grass.js` adds twelve meadow clusters using two instanced draws: ground cover and tapered grass blades. Density scales from 1,800 clumps on low to 7,600 on ultra. Placement excludes roads, the pond, and destination entrances. Comfort mode disables wind. Ground-cover lighting and the pond shader support the renderer’s logarithmic depth buffer.
+
+Art-pass validation: 12 tests cover the existing interactions plus grass placement exclusions, the vehicle footprint, body draw count, and independent wheel pivots. Browser visual review covers the new vehicle, lit ground cover, foliage, pond, and quality controls. The generated textures require no external downloads or third-party asset licenses. Physical-device performance still varies.

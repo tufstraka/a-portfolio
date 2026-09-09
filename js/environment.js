@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { surfaceMaterial } from './surface-materials.js';
+import { Grass } from './grass.js';
 
 const keys = [
   [0,0x101e3b,0x344461,0xadc7ff,.10,.55],
@@ -25,6 +27,7 @@ export class Environment {
     this.water = this.createWater();
     this.stars = this.createStars();
     this.createLandmarks();
+    this.grass=new Grass(engine);
     this.beacons=[];
     const geometry=new THREE.TorusGeometry(3.1,.06,5,40);
     engine.sections.forEach((section,index)=>{
@@ -39,9 +42,16 @@ export class Environment {
     const material=new THREE.ShaderMaterial({
       uniforms:{time:{value:0},night:{value:0}},
       vertexShader:`varying vec2 vUv; varying vec3 vWorld; uniform float time;
-      void main(){vUv=uv; vec3 p=position; p.z+=sin(p.x*.22+time*.7)*.10+cos(p.y*.26-time*.5)*.08; vec4 w=modelMatrix*vec4(p,1.);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;}`,
+      #include <common>
+      #include <logdepthbuf_pars_vertex>
+      void main(){vUv=uv; vec3 p=position; p.z+=sin(p.x*.22+time*.7)*.10+cos(p.y*.26-time*.5)*.08; vec4 w=modelMatrix*vec4(p,1.);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;
+      #include <logdepthbuf_vertex>
+      }`,
       fragmentShader:`varying vec2 vUv;varying vec3 vWorld;uniform float time;uniform float night;
-      void main(){float r=length(vUv-.5)*2.; if(r>1.)discard;float wave=sin(vUv.x*85.+time*.8+sin(vUv.y*48.+time))*.5+.5;
+      #include <logdepthbuf_pars_fragment>
+      void main(){
+      #include <logdepthbuf_fragment>
+      float r=length(vUv-.5)*2.; if(r>1.)discard;float wave=sin(vUv.x*85.+time*.8+sin(vUv.y*48.+time))*.5+.5;
       vec3 c=mix(vec3(.055,.31,.36),vec3(.19,.62,.64),wave*.24+smoothstep(.65,1.,r)*.48);
       float glint=pow(max(0.,sin(vUv.x*130.+vUv.y*90.+time)),32.)*.10;c+=glint;c=mix(c,c*vec3(.4,.58,.8),night*.65);
       gl_FragColor=vec4(c,1.);#include <tonemapping_fragment>\n#include <colorspace_fragment>}`.replace(';#include',';\n#include'),
@@ -51,7 +61,7 @@ export class Environment {
     mesh.rotation.x=-Math.PI/2;mesh.position.set(-58,.1,-57);mesh.userData.dynamic=true;
     this.engine.scene.add(mesh);
     // A physical shoreline keeps the pool from being a drive-through decal.
-    const stoneGeo=new THREE.DodecahedronGeometry(1.2,0),stoneMat=new THREE.MeshLambertMaterial({color:0xaaa28b});
+    const stoneGeo=new THREE.DodecahedronGeometry(1.2,0),stoneMat=surfaceMaterial('stone',this.engine.renderer);
     const shore=new THREE.InstancedMesh(stoneGeo,stoneMat,40),dummy=new THREE.Object3D();
     for(let i=0;i<40;i++){const a=i/40*Math.PI*2;dummy.position.set(-58+Math.cos(a)*23,.4,-57+Math.sin(a)*23);dummy.scale.set(1.3,.65,1);dummy.rotation.set(0,a,0);dummy.updateMatrix();shore.setMatrixAt(i,dummy.matrix);this.engine.collisionSystem.addTree({x:dummy.position.x,z:dummy.position.z});}
     shore.computeBoundingSphere();shore.castShadow=true;this.engine.scene.add(shore);return mesh;
@@ -69,7 +79,7 @@ export class Environment {
     const marks=new THREE.InstancedMesh(box,paint,32),dummy=new THREE.Object3D();
     for(let i=0;i<32;i++){dummy.position.set(-5,.06,74-i*6.4);dummy.scale.set(.18,.03,2);dummy.updateMatrix();marks.setMatrixAt(i,dummy.matrix);}
     marks.computeBoundingSphere();scene.add(marks);
-    const shell=new THREE.MeshLambertMaterial({color:0xe9d8b2});
+    const shell=surfaceMaterial('plaster',this.engine.renderer);
     const dark=new THREE.MeshLambertMaterial({color:0x263e47});
     this.engine.sections.forEach((section,i)=>{
       const x=section.position.x,z=section.position.z-14;
@@ -103,6 +113,7 @@ export class Environment {
     if(e.hemiLight){e.hemiLight.color.copy(a.top);e.hemiLight.intensity=.55;}
     const night=1-THREE.MathUtils.smoothstep(a.intensity,.12,1.2);
     this.water.material.uniforms.time.value=e.reducedMotion?0:e.state.time;
+    this.grass.update(e.state.time);
     this.water.material.uniforms.night.value=night;this.stars.material.opacity=night*.85;
     this.beacons.forEach((r,i)=>{r.material.opacity=e.state.sectionsVisited.has(e.sections[i].userData.title)?.25:.65+(e.reducedMotion?0:Math.sin(e.state.time*2+i)*.15);});
     const label=document.getElementById('worldTime');if(label)label.textContent=night>.7?'AFTER HOURS':this.time>.65?'GOLDEN HOUR':'DAYLIGHT';

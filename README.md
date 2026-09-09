@@ -61,3 +61,11 @@ The vehicle is now an original compact rally wagon, with rounded tangerine bodyw
 `js/grass.js` adds twelve meadow clusters using two instanced draws: ground cover and tapered grass blades. Density scales from 1,800 clumps on low to 7,600 on ultra. Placement excludes roads, the pond, and destination entrances. Comfort mode disables wind. Ground-cover lighting and the pond shader support the renderer’s logarithmic depth buffer.
 
 Art-pass validation: 12 tests cover the existing interactions plus grass placement exclusions, the vehicle footprint, body draw count, and independent wheel pivots. Browser visual review covers the new vehicle, lit ground cover, foliage, pond, and quality controls. The generated textures require no external downloads or third-party asset licenses. Physical-device performance still varies.
+
+## Living world and cleaner menus
+
+Grass now covers the surrounding landscape, with 6,000 / 12,000 / 18,000 / 24,000 clumps by quality tier. The two-draw grass system is retained. Twelve animated birds, bounded dust particles, reeds and lily pads add environmental detail; pond shading adds shoreline foam and layered ripples. Comfort mode freezes flight and wind and hides dust.
+
+The cockpit groups mission progress, relocates scores into Destinations, removes the duplicate content sidebar, and puts audio controls in one dock. Radio uses a native dialog; Settings groups advanced graphics controls in a disclosure and keeps focus within the panel while open.
+
+Radio includes Kevin MacLeod’s recorded “Local Forecast,” under CC BY 4.0, with visible attribution and `public/audio/CREDITS.txt`. The 128 kbps MP3 is approximately 2.65 MB and is loaded only when selected. It loops locally, honors master volume/mute, pauses on hidden tabs, and offers the built-in synth as a fallback. It is a curated recording, not a live broadcast. Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300010

@@ -27,13 +27,13 @@ export class Grass {
         transformed.z+=cos(grassTime+phase)*.08*position.y;`);
     };
     material.customProgramCacheKey=()=> 'meadow-wind-v1';
-    this.mesh=new THREE.InstancedMesh(blades,material,7600);this.mesh.name='Instanced meadow';this.mesh.userData.dynamic=true;
+    this.mesh=new THREE.InstancedMesh(blades,material,24000);this.mesh.name='Instanced meadow';this.mesh.userData.dynamic=true;
     const dummy=new THREE.Object3D(),color=new THREE.Color();let seed=71;
     const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
     // Interleave clusters so every quality tier covers the whole map.
-    const patches=[[-23,18,13],[25,24,14],[-23,-22,13],[27,-20,14],[-26,-91,16],[32,-94,15],[58,13,17],[-62,17,15],[24,79,15],[-26,79,14],[93,-65,13],[-95,-35,14]];
+    const patches=[];for(let x=-143;x<=143;x+=22)for(let z=-143;z<=99;z+=22)if(clearForGrass(x,z,engine.sections))patches.push([x,z,18]);
     let count=0;
-    for(let i=0;i<26000 && count<7600;i++) {
+    for(let i=0;i<90000 && count<24000;i++) {
       const [cx,cz,r]=patches[i%patches.length],a=random()*Math.PI*2,dist=Math.sqrt(random())*r;
       const x=cx+Math.cos(a)*dist,z=cz+Math.sin(a)*dist;
       if(!clearForGrass(x,z,engine.sections))continue;
@@ -60,7 +60,6 @@ export class Grass {
     turf.count=n;turf.computeBoundingSphere();engine.scene.add(turf);this.turf=turf;
     this.setQuality(engine.state.quality);
   }
-  setQuality(level){this.mesh.count=Math.min(this.maximum,{low:1800,medium:3600,high:6000,ultra:7600}[level]||3600);}
+  setQuality(level){this.mesh.count=Math.min(this.maximum,{low:6000,medium:12000,high:18000,ultra:24000}[level]||12000);}
   update(time){this.wind.value=this.engine.reducedMotion?0:time;}
 }
-

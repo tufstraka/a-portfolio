@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { surfaceMaterial } from './surface-materials.js';
 import { Grass } from './grass.js';
+import { Wildlife } from './wildlife.js';
 
 const keys = [
   [0,0x101e3b,0x344461,0xadc7ff,.10,.55],
@@ -28,6 +29,7 @@ export class Environment {
     this.stars = this.createStars();
     this.createLandmarks();
     this.grass=new Grass(engine);
+    this.wildlife=new Wildlife(engine);
     this.beacons=[];
     const geometry=new THREE.TorusGeometry(3.1,.06,5,40);
     engine.sections.forEach((section,index)=>{
@@ -54,6 +56,10 @@ export class Environment {
       float r=length(vUv-.5)*2.; if(r>1.)discard;float wave=sin(vUv.x*85.+time*.8+sin(vUv.y*48.+time))*.5+.5;
       vec3 c=mix(vec3(.055,.31,.36),vec3(.19,.62,.64),wave*.24+smoothstep(.65,1.,r)*.48);
       float glint=pow(max(0.,sin(vUv.x*130.+vUv.y*90.+time)),32.)*.10;c+=glint;c=mix(c,c*vec3(.4,.58,.8),night*.65);
+      float ripple=sin(r*95.-time*1.8+sin(vUv.x*30.))*.5+.5;
+      float foam=smoothstep(.88,1.,r)*smoothstep(.65,.95,ripple);
+      c=mix(c,vec3(.63,.83,.77),foam*.6);
+      c+=pow(max(0.,sin(vUv.y*180.+sin(vUv.x*75.+time)*2.-time*1.3)),20.)*.06*(1.-night);
       gl_FragColor=vec4(c,1.);#include <tonemapping_fragment>\n#include <colorspace_fragment>}`.replace(';#include',';\n#include'),
       side:THREE.DoubleSide
     });
@@ -112,6 +118,7 @@ export class Environment {
     e.ambientLight.color.setHex(0xd2dfeb);e.ambientLight.intensity=a.ambient;
     if(e.hemiLight){e.hemiLight.color.copy(a.top);e.hemiLight.intensity=.55;}
     const night=1-THREE.MathUtils.smoothstep(a.intensity,.12,1.2);
+    this.wildlife.update(e.state.time,night);
     this.water.material.uniforms.time.value=e.reducedMotion?0:e.state.time;
     this.grass.update(e.state.time);
     this.water.material.uniforms.night.value=night;this.stars.material.opacity=night*.85;

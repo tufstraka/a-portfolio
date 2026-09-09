@@ -1,3 +1,4 @@
+import { setupRadioMenu } from './radio-menu.js';
 import { createRallyCar } from './rally-car.js';
 import { surfaceMaterial } from './surface-materials.js';
 import { PORTFOLIO_DATA } from './portfolio-data.js';
@@ -1430,7 +1431,7 @@ class PortfolioEngine {
             this.initCockpit();
             this.environment = new Environment(this);
             this.discoveries = new Discoveries(this);
-            this.diagnostics = new Diagnostics();
+            this.diagnostics = new Diagnostics(); setupRadioMenu(this);
             this.applyQuality(this.state.quality);
             this.updateLoadingProgress(90);
 
@@ -3832,7 +3833,7 @@ class PortfolioEngine {
         if (e.code === 'KeyM') this.toggleMinimap();
         if (e.code === 'KeyT') this.cycleTimeOfDay(); // 🌅 Time of day
         if (e.code === 'KeyN') this.toggleNightMode(); // 🌙 Night mode
-        if (e.code === 'KeyR') this.cycleRadio(); // 📻 Radio
+        if (e.code === 'KeyR') this.openRadio(); // 📻 Radio
         if (e.code === 'KeyV') this.toggleMute(); // 🔊 Mute
 
         if (e.code === 'Escape') {
@@ -5606,11 +5607,11 @@ class PortfolioEngine {
         if (!this.muted) {
             this.audioContext.suspend();
             this.muted = true;
-            if (btn) { btn.textContent = '🔇'; btn.setAttribute('aria-pressed', 'true'); }
+            if (btn) { btn.textContent = '🔇'; btn.setAttribute('aria-pressed', 'true'); } this.syncMusic?.();
         } else {
             this.audioContext.resume();
             this.muted = false;
-            if (btn) { btn.textContent = '🔊'; btn.setAttribute('aria-pressed', 'false'); }
+            if (btn) { btn.textContent = '🔊'; btn.setAttribute('aria-pressed', 'false'); } this.syncMusic?.();
         }
     }
 
@@ -5628,7 +5629,7 @@ class PortfolioEngine {
         return document.getElementById('modalOverlay').classList.contains('active') ||
             document.getElementById('tutorialOverlay').classList.contains('active') ||
             document.getElementById('settingsPanel').classList.contains('active') ||
-            document.getElementById('destinationsDialog').open || document.getElementById('experimentDialog').open;
+            document.getElementById('destinationsDialog').open || document.getElementById('experimentDialog').open || document.getElementById('radioDialog').open;
     }
 
     resetInput() {
@@ -5718,7 +5719,7 @@ class PortfolioEngine {
         document.getElementById('volumeControl').oninput = e => {
             const value = Number(e.target.value) / 100;
             if (this.masterAudio) this.masterAudio.gain.setTargetAtTime(value, this.audioContext.currentTime, .05);
-            safeStorage.setItem('keith_volume', String(value));
+            safeStorage.setItem('keith_volume', String(value)); this.syncMusic?.();
         };
         document.getElementById('resetCar').onclick = () => {
             this.resetInput(); this.vehiclePhysics.reset(); this.car.position.set(0,.5,60);

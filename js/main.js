@@ -1,3 +1,4 @@
+import { createTrees } from './trees.js';
 import { setupRacingHud } from './racing-hud.js';
 import { setupRadioMenu } from './radio-menu.js';
 import { createRallyCar } from './rally-car.js';
@@ -3027,87 +3028,7 @@ class PortfolioEngine {
         this.freezeStaticObjects();
     }
 
-    createStylizedTrees(count) {
-        // Low-poly Bruno Simon style trees: cone + cylinder
-        const trunkMat = surfaceMaterial('bark',this.renderer);
-        const leaf1Mat = surfaceMaterial('foliage',this.renderer);
-        const leaf2Mat = surfaceMaterial('foliage',this.renderer);
-
-        const trunkGeo = new THREE.CylinderGeometry(0.25, 0.38, 3.5, 6);
-        const cone1Geo = new THREE.ConeGeometry(2.2, 3.5, 7);
-        const cone2Geo = new THREE.ConeGeometry(1.7, 2.8, 7);
-
-        const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-        const leaf1Inst = new THREE.InstancedMesh(cone1Geo, leaf1Mat, count);
-        const leaf2Inst = new THREE.InstancedMesh(cone2Geo, leaf2Mat, count);
-
-        const mat4 = new THREE.Matrix4();
-        const pos = new THREE.Vector3();
-        const rot = new THREE.Quaternion();
-        const scl = new THREE.Vector3();
-
-        let placed = 0;
-        let attempts = 0;
-        while (placed < count && attempts < count * 5) {
-            attempts++;
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 30 + Math.random() * 200;
-            const x = Math.sin(angle) * radius;
-            const z = Math.cos(angle) * radius;
-
-            // Keep driving lanes and the pool clear.
-            if (Math.abs(x)<9 || (Math.abs(z-50)<9 && Math.abs(x)<90) || (Math.abs(z+50)<9 && x>0 && x<80) || Math.hypot(x+58,z+57)<27) continue;
-            // Keep away from signs
-            let tooClose = false;
-            for (const s of this.sections) {
-                const dx = x - s.position.x, dz = z - s.position.z;
-                if (dx*dx + dz*dz < 400) { tooClose = true; break; }
-            }
-            if (tooClose) continue;
-
-            const s = 0.8 + Math.random() * 0.6;
-            rot.setFromAxisAngle(new THREE.Vector3(0,1,0), Math.random() * Math.PI * 2);
-
-            // Trunk
-            pos.set(x, 1.75 * s, z); scl.setScalar(s);
-            mat4.compose(pos, rot, scl);
-            trunkInst.setMatrixAt(placed, mat4);
-
-            // Lower cone
-            pos.set(x, 4.5 * s, z);
-            mat4.compose(pos, rot, scl);
-            leaf1Inst.setMatrixAt(placed, mat4);
-
-            // Upper cone
-            pos.set(x, 6.2 * s, z);
-            scl.setScalar(s * 0.8);
-            mat4.compose(pos, rot, scl);
-            leaf2Inst.setMatrixAt(placed, mat4);
-
-            this.collisionSystem.addTree({ x, z });
-            this.treePositions.push({ x, z });
-            placed++;
-        }
-
-        trunkInst.count = leaf1Inst.count = leaf2Inst.count = placed;
-        [trunkInst, leaf1Inst, leaf2Inst].forEach(mesh => mesh.computeBoundingSphere());
-        trunkInst.instanceMatrix.needsUpdate = true;
-        leaf1Inst.instanceMatrix.needsUpdate = true;
-        leaf2Inst.instanceMatrix.needsUpdate = true;
-
-        trunkInst.castShadow = true;
-        leaf1Inst.castShadow = true;
-        leaf2Inst.castShadow = true;
-
-        // Never frustum-cull InstancedMeshes — their position is (0,0,0),
-        // not where the instances actually are, causing all trees to vanish.
-        trunkInst.userData.cullable = false;
-        leaf1Inst.userData.cullable = false;
-        leaf2Inst.userData.cullable = false;
-
-        this.scene.add(trunkInst, leaf1Inst, leaf2Inst);
-        this.decorations.push(trunkInst, leaf1Inst, leaf2Inst);
-    }
+    createStylizedTrees(count) { createTrees(this,count); }
 
     createScatteredProps() {
         // Bruno Simon style: random rocks, low-poly cactus, small blocks scattered around

@@ -1,3 +1,8 @@
+import { createTrees } from './trees.js';
+import { setupRacingHud } from './racing-hud.js';
+import { setupRadioMenu } from './radio-menu.js';
+import { createRallyCar } from './rally-car.js';
+import { surfaceMaterial } from './surface-materials.js';
 import { PORTFOLIO_DATA } from './portfolio-data.js';
 import { Environment } from './environment.js';
 import { applyQuality as configureQuality } from './quality.js';
@@ -1428,7 +1433,7 @@ class PortfolioEngine {
             this.initCockpit();
             this.environment = new Environment(this);
             this.discoveries = new Discoveries(this);
-            this.diagnostics = new Diagnostics();
+            this.diagnostics = new Diagnostics(); setupRadioMenu(this); setupRacingHud(this);
             this.applyQuality(this.state.quality);
             this.updateLoadingProgress(90);
 
@@ -1775,43 +1780,9 @@ class PortfolioEngine {
     }
 
     createGround() {
-        // Bruno Simon style: large flat warm-sand ground plane
-        const size = 1200;
-        const geo = new THREE.PlaneGeometry(size, size, 1, 1);
-
-        // Paint a subtle sandy canvas texture
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-
-        // Base sand color
-        ctx.fillStyle = '#c9a96e';
-        ctx.fillRect(0, 0, 512, 512);
-
-        // Subtle noise / variation
-        for (let i = 0; i < 4000; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const r = 1 + Math.random() * 3;
-            const bright = Math.random() > 0.5;
-            ctx.fillStyle = bright ? 'rgba(255,220,150,0.12)' : 'rgba(150,100,40,0.08)';
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(20, 20);
-
-        const mat = new THREE.MeshLambertMaterial({ map: tex });
-        const ground = new THREE.Mesh(geo, mat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        this.scene.add(ground);
+        const ground=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),surfaceMaterial('terrain',this.renderer));
+        ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;this.scene.add(ground);
     }
-
     // stub — terrain replaced by flat ground above
     async createTerrain() {}
 
@@ -2471,383 +2442,8 @@ class PortfolioEngine {
     }
 
     async createVehicle() {
-        const carGroup = new THREE.Group();
-
-        // Realistic sports car with proper proportions
-        const bodyColor = 0xf39455;
-        const bodyMaterial = new THREE.MeshStandardMaterial({
-            color: bodyColor,
-            metalness: 0.12,
-            roughness: 0.38,
-            envMapIntensity: 1.5
-        });
-
-        // Secondary body material (darker accents)
-        const accentMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1a1a1a,
-            metalness: 0.6,
-            roughness: 0.4
-        });
-
-        // Main body - lower chassis with realistic shape
-        const lowerBodyGeom = new THREE.BoxGeometry(2.1, 0.5, 4.8);
-        const lowerBody = new THREE.Mesh(lowerBodyGeom, bodyMaterial);
-        lowerBody.position.set(0, 0.45, 0);
-        lowerBody.castShadow = true;
-        carGroup.add(lowerBody);
-
-        // Front fenders (wheel arches)
-        [-1, 1].forEach(side => {
-            const fenderGeom = new THREE.BoxGeometry(0.3, 0.35, 1.2);
-            const fender = new THREE.Mesh(fenderGeom, bodyMaterial);
-            fender.position.set(side * 1.05, 0.6, 1.4);
-            fender.castShadow = true;
-            carGroup.add(fender);
-        });
-
-        // Rear fenders (wider for sporty look)
-        [-1, 1].forEach(side => {
-            const rearFenderGeom = new THREE.BoxGeometry(0.35, 0.4, 1.3);
-            const rearFender = new THREE.Mesh(rearFenderGeom, bodyMaterial);
-            rearFender.position.set(side * 1.1, 0.6, -1.5);
-            rearFender.castShadow = true;
-            carGroup.add(rearFender);
-        });
-
-        // Hood with slope
-        const hoodGeom = new THREE.BoxGeometry(1.9, 0.25, 1.8);
-        const hood = new THREE.Mesh(hoodGeom, bodyMaterial);
-        hood.position.set(0, 0.75, 1.8);
-        hood.rotation.x = -0.08;
-        hood.castShadow = true;
-        carGroup.add(hood);
-
-        // Cabin/roof
-        const cabinGeom = new THREE.BoxGeometry(1.85, 0.7, 2.2);
-        const cabin = new THREE.Mesh(cabinGeom, bodyMaterial);
-        cabin.position.set(0, 1.05, -0.3);
-        cabin.castShadow = true;
-        carGroup.add(cabin);
-
-        // Trunk/rear
-        const trunkGeom = new THREE.BoxGeometry(1.9, 0.35, 1.0);
-        const trunk = new THREE.Mesh(trunkGeom, bodyMaterial);
-        trunk.position.set(0, 0.7, -1.9);
-        trunk.castShadow = true;
-        carGroup.add(trunk);
-
-        // Front grille
-        const grilleMaterial = new THREE.MeshStandardMaterial({
-            color: 0x0a0a0a,
-            metalness: 0.3,
-            roughness: 0.8
-        });
-        const grilleGeom = new THREE.BoxGeometry(1.4, 0.25, 0.05);
-        const grille = new THREE.Mesh(grilleGeom, grilleMaterial);
-        grille.position.set(0, 0.45, 2.43);
-        carGroup.add(grille);
-
-        // Front bumper
-        const bumperGeom = new THREE.BoxGeometry(2.1, 0.3, 0.3);
-        const frontBumper = new THREE.Mesh(bumperGeom, accentMaterial);
-        frontBumper.position.set(0, 0.3, 2.4);
-        frontBumper.castShadow = true;
-        carGroup.add(frontBumper);
-
-        // Rear bumper
-        const rearBumper = new THREE.Mesh(bumperGeom, accentMaterial);
-        rearBumper.position.set(0, 0.3, -2.4);
-        rearBumper.castShadow = true;
-        carGroup.add(rearBumper);
-
-        // Side skirts
-        [-1, 1].forEach(side => {
-            const skirtGeom = new THREE.BoxGeometry(0.15, 0.2, 3.5);
-            const skirt = new THREE.Mesh(skirtGeom, accentMaterial);
-            skirt.position.set(side * 1.05, 0.25, 0);
-            carGroup.add(skirt);
-        });
-
-        // Windshields - quality-dependent material
-        let glassMaterial;
-        if (this.state.quality === 'low' || this.state.quality === 'medium') {
-            glassMaterial = new THREE.MeshStandardMaterial({
-                color: 0x1a3a4a,
-                metalness: 0.2,
-                roughness: 0.1,
-                transparent: true,
-                opacity: 0.4
-            });
-        } else {
-            glassMaterial = new THREE.MeshPhysicalMaterial({
-                color: 0x1a3a4a,
-                metalness: 0.0,
-                roughness: 0.05,
-                transmission: 0.9,
-                thickness: 0.2,
-                transparent: true,
-                opacity: 0.35
-            });
-        }
-
-        // Front windshield (angled)
-        const frontGlassGeom = new THREE.PlaneGeometry(1.75, 1.0);
-        const frontGlass = new THREE.Mesh(frontGlassGeom, glassMaterial);
-        frontGlass.position.set(0, 1.2, 0.95);
-        frontGlass.rotation.x = 0.45;
-        carGroup.add(frontGlass);
-
-        // Rear windshield
-        const rearGlassGeom = new THREE.PlaneGeometry(1.6, 0.8);
-        const rearGlass = new THREE.Mesh(rearGlassGeom, glassMaterial);
-        rearGlass.position.set(0, 1.15, -1.45);
-        rearGlass.rotation.x = -0.4;
-        carGroup.add(rearGlass);
-
-        // Side windows
-        [-1, 1].forEach(side => {
-            const sideGlass = new THREE.Mesh(
-                new THREE.PlaneGeometry(2.0, 0.6),
-                glassMaterial
-            );
-            sideGlass.position.set(side * 0.95, 1.1, -0.3);
-            sideGlass.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-            carGroup.add(sideGlass);
-        });
-
-        // Door handles
-        const handleMaterial = new THREE.MeshStandardMaterial({
-            color: 0xC0C0C0,
-            metalness: 0.9,
-            roughness: 0.2
-        });
-        [-1, 1].forEach(side => {
-            const handleGeom = new THREE.BoxGeometry(0.02, 0.05, 0.2);
-            const handle = new THREE.Mesh(handleGeom, handleMaterial);
-            handle.position.set(side * 1.08, 0.85, 0.2);
-            carGroup.add(handle);
-        });
-
-        // Side mirrors
-        [-1, 1].forEach(side => {
-            const mirrorGroup = new THREE.Group();
-
-            const mirrorArm = new THREE.Mesh(
-                new THREE.BoxGeometry(0.25, 0.05, 0.05),
-                accentMaterial
-            );
-            mirrorArm.position.set(side * 0.12, 0, 0);
-            mirrorGroup.add(mirrorArm);
-
-            const mirrorHead = new THREE.Mesh(
-                new THREE.BoxGeometry(0.08, 0.12, 0.18),
-                accentMaterial
-            );
-            mirrorHead.position.set(side * 0.28, 0, 0);
-            mirrorGroup.add(mirrorHead);
-
-            // Mirror glass
-            const mirrorGlass = new THREE.Mesh(
-                new THREE.PlaneGeometry(0.06, 0.1),
-                new THREE.MeshStandardMaterial({
-                    color: 0x6688aa,
-                    metalness: 1.0,
-                    roughness: 0.0
-                })
-            );
-            mirrorGlass.position.set(side * 0.32, 0, 0);
-            mirrorGlass.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-            mirrorGroup.add(mirrorGlass);
-
-            mirrorGroup.position.set(side * 0.85, 1.05, 0.8);
-            carGroup.add(mirrorGroup);
-        });
-
-        // Realistic wheels with proper tire sidewalls
-        const wheelPositions = [
-            { x: -1.0, y: 0.38, z: 1.5 },  // Front left
-            { x: 1.0, y: 0.38, z: 1.5 },   // Front right
-            { x: -1.0, y: 0.38, z: -1.5 }, // Rear left
-            { x: 1.0, y: 0.38, z: -1.5 }   // Rear right
-        ];
-
-        const tireMaterial = new THREE.MeshStandardMaterial({
-            color: 0x1a1a1a,
-            roughness: 0.9,
-            metalness: 0.0
-        });
-
-        const rimMaterial = new THREE.MeshStandardMaterial({
-            color: 0x888888,
-            metalness: 0.95,
-            roughness: 0.15
-        });
-
-        this.wheels = [];
-        wheelPositions.forEach((pos, index) => {
-            const wheelGroup = new THREE.Group();
-
-            // Tire (outer rubber)
-            const tireGeom = new THREE.TorusGeometry(0.35, 0.12, 16, 32);
-            const tire = new THREE.Mesh(tireGeom, tireMaterial);
-            tire.rotation.y = Math.PI / 2;
-            wheelGroup.add(tire);
-
-            // Rim
-            const rimGeom = new THREE.CylinderGeometry(0.28, 0.28, 0.22, 24);
-            const rim = new THREE.Mesh(rimGeom, rimMaterial);
-            rim.rotation.z = Math.PI / 2;
-            wheelGroup.add(rim);
-
-            // Rim spokes (5-spoke design)
-            for (let i = 0; i < 5; i++) {
-                const spokeAngle = (i / 5) * Math.PI * 2;
-                const spokeGeom = new THREE.BoxGeometry(0.04, 0.22, 0.15);
-                const spoke = new THREE.Mesh(spokeGeom, rimMaterial);
-                spoke.position.set(
-                    Math.cos(spokeAngle) * 0.15,
-                    0,
-                    Math.sin(spokeAngle) * 0.15
-                );
-                spoke.rotation.y = spokeAngle;
-                wheelGroup.add(spoke);
-            }
-
-            // Center cap with logo indent
-            const capGeom = new THREE.CylinderGeometry(0.08, 0.08, 0.24, 16);
-            const cap = new THREE.Mesh(capGeom, rimMaterial);
-            cap.rotation.z = Math.PI / 2;
-            wheelGroup.add(cap);
-
-            // Brake caliper (visible through spokes)
-            const caliperGeom = new THREE.BoxGeometry(0.12, 0.08, 0.15);
-            const caliperMat = new THREE.MeshStandardMaterial({
-                color: 0xCC0000,  // Red brake calipers
-                metalness: 0.7,
-                roughness: 0.3
-            });
-            const caliper = new THREE.Mesh(caliperGeom, caliperMat);
-            caliper.position.set(pos.x > 0 ? 0.05 : -0.05, -0.12, 0);
-            wheelGroup.add(caliper);
-
-            wheelGroup.position.set(pos.x, pos.y, pos.z);
-            wheelGroup.userData.steering = index < 2;
-            wheelGroup.castShadow = true;
-
-            this.wheels.push(wheelGroup);
-            carGroup.add(wheelGroup);
-        });
-
-        // LED Headlights
-        const headlightMaterial = new THREE.MeshStandardMaterial({
-            color: 0xFFFFFF,
-            emissive: 0xFFFFFF,
-            emissiveIntensity: 2.0
-        });
-
-        [-0.6, 0.6].forEach(x => {
-            // Main headlight
-            const headlight = new THREE.Mesh(
-                new THREE.CircleGeometry(0.15, 24),
-                headlightMaterial
-            );
-            headlight.position.set(x, 0.55, 2.45);
-            carGroup.add(headlight);
-
-            // DRL strip
-            const drlGeom = new THREE.BoxGeometry(0.3, 0.03, 0.02);
-            const drl = new THREE.Mesh(drlGeom, headlightMaterial);
-            drl.position.set(x, 0.7, 2.45);
-            carGroup.add(drl);
-        });
-
-        // LED Taillights
-        const taillightMaterial = new THREE.MeshStandardMaterial({
-            color: 0xFF0000,
-            emissive: 0xFF0000,
-            emissiveIntensity: 1.0
-        });
-
-        [-0.6, 0.6].forEach(x => {
-            // Main taillight
-            const taillight = new THREE.Mesh(
-                new THREE.BoxGeometry(0.4, 0.12, 0.05),
-                taillightMaterial
-            );
-            taillight.position.set(x, 0.6, -2.45);
-            carGroup.add(taillight);
-        });
-
-        // Exhaust tips
-        const exhaustMaterial = new THREE.MeshStandardMaterial({
-            color: 0x333333,
-            metalness: 0.9,
-            roughness: 0.3
-        });
-        [-0.4, 0.4].forEach(x => {
-            const exhaustGeom = new THREE.CylinderGeometry(0.06, 0.07, 0.15, 16);
-            const exhaust = new THREE.Mesh(exhaustGeom, exhaustMaterial);
-            exhaust.rotation.x = Math.PI / 2;
-            exhaust.position.set(x, 0.25, -2.5);
-            carGroup.add(exhaust);
-        });
-
-        // Rear spoiler
-        const spoilerMat = new THREE.MeshStandardMaterial({
-            color: 0x1a1a1a,
-            metalness: 0.5,
-            roughness: 0.4
-        });
-
-        // Spoiler supports
-        [-0.5, 0.5].forEach(x => {
-            const supportGeom = new THREE.BoxGeometry(0.08, 0.35, 0.08);
-            const support = new THREE.Mesh(supportGeom, spoilerMat);
-            support.position.set(x, 1.0, -2.1);
-            carGroup.add(support);
-        });
-
-        // Spoiler wing
-        const spoilerWing = new THREE.Mesh(
-            new THREE.BoxGeometry(1.6, 0.08, 0.35),
-            spoilerMat
-        );
-        spoilerWing.position.set(0, 1.2, -2.15);
-        spoilerWing.rotation.x = -0.15;
-        carGroup.add(spoilerWing);
-
-        // Exhaust pipes
-        const exhaustMat = new THREE.MeshStandardMaterial({
-            color: 0x404040,
-            metalness: 0.9,
-            roughness: 0.3
-        });
-
-        [-0.4, 0.4].forEach(x => {
-            const exhaust = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.08, 0.08, 0.3, 16),
-                exhaustMat
-            );
-            exhaust.rotation.x = Math.PI / 2;
-            exhaust.position.set(x, 0.3, -2.4);
-            carGroup.add(exhaust);
-        });
-
-        // Mirrors
-        const mirrorMat = new THREE.MeshStandardMaterial({
-            color: bodyColor,
-            metalness: 0.95,
-            roughness: 0.2
-        });
-
-        [-1.1, 1.1].forEach(x => {
-            const mirror = new THREE.Mesh(
-                new THREE.BoxGeometry(0.15, 0.15, 0.3),
-                mirrorMat
-            );
-            mirror.position.set(x, 1.0, 0.8);
-            carGroup.add(mirror);
-        });
+        const {car:carGroup,wheels}=createRallyCar(this.renderer);
+        this.wheels=wheels;
 
         carGroup.position.set(0, 0.6, 60);
 
@@ -3172,7 +2768,7 @@ class PortfolioEngine {
         // Bruno Simon style: billboard signs on posts, not buildings
         // Each section gets: colored ground zone + billboard post + sign face with content
 
-        const postMat = new THREE.MeshLambertMaterial({ color: 0x8B6914 }); // wood
+        const postMat = surfaceMaterial('wood',this.renderer); // wood
         const frameMat = new THREE.MeshLambertMaterial({ color: 0xf0ece0 }); // off-white board
 
         Object.entries(PORTFOLIO_DATA).forEach(([title, data]) => {
@@ -3379,7 +2975,7 @@ class PortfolioEngine {
 
         // Post
         const postGeo = new THREE.CylinderGeometry(0.15, 0.18, 5, 8);
-        const postMat = new THREE.MeshLambertMaterial({ color: 0x8B6914 });
+        const postMat = surfaceMaterial('wood',this.renderer);
         const post = new THREE.Mesh(postGeo, postMat);
         post.position.set(0, 2.5, 0);
         group.add(post);
@@ -3432,91 +3028,11 @@ class PortfolioEngine {
         this.freezeStaticObjects();
     }
 
-    createStylizedTrees(count) {
-        // Low-poly Bruno Simon style trees: cone + cylinder
-        const trunkMat = new THREE.MeshLambertMaterial({ color: 0x8B5E3C });
-        const leaf1Mat = new THREE.MeshLambertMaterial({ color: 0x5a9e3a });
-        const leaf2Mat = new THREE.MeshLambertMaterial({ color: 0x3d7a25 });
-
-        const trunkGeo = new THREE.CylinderGeometry(0.25, 0.38, 3.5, 6);
-        const cone1Geo = new THREE.ConeGeometry(2.2, 3.5, 7);
-        const cone2Geo = new THREE.ConeGeometry(1.7, 2.8, 7);
-
-        const trunkInst = new THREE.InstancedMesh(trunkGeo, trunkMat, count);
-        const leaf1Inst = new THREE.InstancedMesh(cone1Geo, leaf1Mat, count);
-        const leaf2Inst = new THREE.InstancedMesh(cone2Geo, leaf2Mat, count);
-
-        const mat4 = new THREE.Matrix4();
-        const pos = new THREE.Vector3();
-        const rot = new THREE.Quaternion();
-        const scl = new THREE.Vector3();
-
-        let placed = 0;
-        let attempts = 0;
-        while (placed < count && attempts < count * 5) {
-            attempts++;
-            const angle = Math.random() * Math.PI * 2;
-            const radius = 30 + Math.random() * 200;
-            const x = Math.sin(angle) * radius;
-            const z = Math.cos(angle) * radius;
-
-            // Keep driving lanes and the pool clear.
-            if (Math.abs(x)<9 || (Math.abs(z-50)<9 && Math.abs(x)<90) || (Math.abs(z+50)<9 && x>0 && x<80) || Math.hypot(x+58,z+57)<27) continue;
-            // Keep away from signs
-            let tooClose = false;
-            for (const s of this.sections) {
-                const dx = x - s.position.x, dz = z - s.position.z;
-                if (dx*dx + dz*dz < 400) { tooClose = true; break; }
-            }
-            if (tooClose) continue;
-
-            const s = 0.8 + Math.random() * 0.6;
-            rot.setFromAxisAngle(new THREE.Vector3(0,1,0), Math.random() * Math.PI * 2);
-
-            // Trunk
-            pos.set(x, 1.75 * s, z); scl.setScalar(s);
-            mat4.compose(pos, rot, scl);
-            trunkInst.setMatrixAt(placed, mat4);
-
-            // Lower cone
-            pos.set(x, 4.5 * s, z);
-            mat4.compose(pos, rot, scl);
-            leaf1Inst.setMatrixAt(placed, mat4);
-
-            // Upper cone
-            pos.set(x, 6.2 * s, z);
-            scl.setScalar(s * 0.8);
-            mat4.compose(pos, rot, scl);
-            leaf2Inst.setMatrixAt(placed, mat4);
-
-            this.collisionSystem.addTree({ x, z });
-            this.treePositions.push({ x, z });
-            placed++;
-        }
-
-        trunkInst.count = leaf1Inst.count = leaf2Inst.count = placed;
-        [trunkInst, leaf1Inst, leaf2Inst].forEach(mesh => mesh.computeBoundingSphere());
-        trunkInst.instanceMatrix.needsUpdate = true;
-        leaf1Inst.instanceMatrix.needsUpdate = true;
-        leaf2Inst.instanceMatrix.needsUpdate = true;
-
-        trunkInst.castShadow = true;
-        leaf1Inst.castShadow = true;
-        leaf2Inst.castShadow = true;
-
-        // Never frustum-cull InstancedMeshes — their position is (0,0,0),
-        // not where the instances actually are, causing all trees to vanish.
-        trunkInst.userData.cullable = false;
-        leaf1Inst.userData.cullable = false;
-        leaf2Inst.userData.cullable = false;
-
-        this.scene.add(trunkInst, leaf1Inst, leaf2Inst);
-        this.decorations.push(trunkInst, leaf1Inst, leaf2Inst);
-    }
+    createStylizedTrees(count) { createTrees(this,count); }
 
     createScatteredProps() {
         // Bruno Simon style: random rocks, low-poly cactus, small blocks scattered around
-        const rockMat = new THREE.MeshLambertMaterial({ color: 0x9e8c78 });
+        const rockMat = surfaceMaterial('stone',this.renderer);
         const cactusMat = new THREE.MeshLambertMaterial({ color: 0x5a8a3c });
 
         const propPositions = [
@@ -3821,24 +3337,7 @@ class PortfolioEngine {
         const size = 1.1 + Math.random() * 0.3;
         const group = new THREE.Group();
 
-        // Wood planks — MeshLambertMaterial with painted canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = '#c8a060';  ctx.fillRect(0,0,128,128);
-        // plank lines
-        ctx.strokeStyle = '#7a5030'; ctx.lineWidth = 3;
-        [16,48,80,112].forEach(y => { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(128,y); ctx.stroke(); });
-        [32,96].forEach(x2 => { ctx.beginPath(); ctx.moveTo(x2,0); ctx.lineTo(x2,128); ctx.stroke(); });
-        // subtle grain
-        ctx.strokeStyle = 'rgba(100,60,20,0.18)'; ctx.lineWidth = 1;
-        for (let i = 0; i < 12; i++) {
-            const y0 = Math.random()*128;
-            ctx.beginPath(); ctx.moveTo(0,y0); ctx.lineTo(128,y0+Math.random()*8-4); ctx.stroke();
-        }
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        const mat = new THREE.MeshLambertMaterial({ map: tex });
+        const mat = surfaceMaterial('wood',this.renderer);
 
         const body = new THREE.Mesh(new THREE.BoxGeometry(size,size,size), mat);
         body.position.y = size/2;
@@ -3876,27 +3375,7 @@ class PortfolioEngine {
     spawnBarrel(x, z) {
         const group = new THREE.Group();
 
-        // Painted metal barrel
-        const canvas = document.createElement('canvas');
-        canvas.width = 64; canvas.height = 128;
-        const ctx = canvas.getContext('2d');
-        // body gradient
-        const grd = ctx.createLinearGradient(0,0,64,0);
-        grd.addColorStop(0,'#1a2a1a'); grd.addColorStop(0.4,'#2d4a2d');
-        grd.addColorStop(0.6,'#2d4a2d'); grd.addColorStop(1,'#1a2a1a');
-        ctx.fillStyle = grd; ctx.fillRect(0,0,64,128);
-        // hazard stripes
-        ctx.fillStyle = '#e8c020';
-        [20,55,90].forEach(y => ctx.fillRect(0,y,64,8));
-        // rivet dots
-        ctx.fillStyle = '#888'; 
-        [[8,10],[56,10],[8,118],[56,118]].forEach(([rx,ry]) => {
-            ctx.beginPath(); ctx.arc(rx,ry,3,0,Math.PI*2); ctx.fill();
-        });
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.colorSpace = THREE.SRGBColorSpace;
-
-        const bodyMat = new THREE.MeshLambertMaterial({ map: tex });
+        const bodyMat = surfaceMaterial('metal',this.renderer);
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.55,0.55,1.4,16), bodyMat);
         body.position.y = 0.7;
         body.castShadow = true;
@@ -4007,7 +3486,7 @@ class PortfolioEngine {
         this.scene.remove(obj);
         const idx = this.interactiveObjects.indexOf(obj);
         if (idx !== -1) this.interactiveObjects.splice(idx, 1);
-        obj.traverse(c => { if (c.isMesh) { c.geometry.dispose(); c.material.dispose(); }});
+        obj.traverse(c => { if (c.isMesh) { c.geometry.dispose(); if(!c.material.userData.sharedSurface)c.material.dispose(); }});
 
         this.spawnDustBurst(pos.x, 0.3, pos.z, 1.0);
         this.triggerScreenShake(0.4);
@@ -4028,7 +3507,7 @@ class PortfolioEngine {
                 if (data.life <= 0) {
                     this.scene.remove(obj);
                     this.interactiveObjects.splice(i, 1);
-                    obj.traverse(c => { if (c.isMesh) { c.geometry.dispose(); c.material.dispose(); }});
+                    obj.traverse(c => { if (c.isMesh) { c.geometry.dispose(); if(!c.material.userData.sharedSurface)c.material.dispose(); }});
                     continue;
                 }
                 if (data.life < 1.0) {
@@ -4242,7 +3721,7 @@ class PortfolioEngine {
         if (e.code === 'KeyM') this.toggleMinimap();
         if (e.code === 'KeyT') this.cycleTimeOfDay(); // 🌅 Time of day
         if (e.code === 'KeyN') this.toggleNightMode(); // 🌙 Night mode
-        if (e.code === 'KeyR') this.cycleRadio(); // 📻 Radio
+        if (e.code === 'KeyR') this.openRadio(); // 📻 Radio
         if (e.code === 'KeyV') this.toggleMute(); // 🔊 Mute
 
         if (e.code === 'Escape') {
@@ -5090,7 +4569,7 @@ class PortfolioEngine {
         this.state.isAirborne = physicsState.isAirborne;
 
         // Update UI
-        const speedKmh = Math.round(physicsState.speedKmh);
+        const speedKmh = Math.round(Math.abs(physicsState.speedKmh)); this.updateRacingHud?.();
         const speedEl = document.getElementById('speedValue');
         const boostEl = document.getElementById('speedBoost');
         const airborneEl = document.getElementById('speedAirborne');
@@ -5167,7 +4646,7 @@ class PortfolioEngine {
         if (!this.wheels || !this.car) return;
 
         // Calculate wheel rotation based on speed (distance traveled per frame)
-        const wheelRadius = 0.4;
+        const wheelRadius = 0.48;
         const speed = this.vehiclePhysics.speed;
         const rotationAmount = (speed * (this.frameDelta || 0)) / wheelRadius; // Assuming ~60fps
 
@@ -5180,13 +4659,7 @@ class PortfolioEngine {
                 wheel.rotation.y = steeringAngle;
             }
 
-            // Rolling rotation: cylinders are rotated 90° on Z to point along X axis
-            // So they roll around the X axis as the car moves forward/backward
-            wheel.children.forEach(mesh => {
-                if (mesh.geometry) {
-                    mesh.rotation.x += rotationAmount;
-                }
-            });
+            wheel.userData.spinner.rotation.x += rotationAmount;
         });
     }
 
@@ -6022,11 +5495,11 @@ class PortfolioEngine {
         if (!this.muted) {
             this.audioContext.suspend();
             this.muted = true;
-            if (btn) { btn.textContent = '🔇'; btn.setAttribute('aria-pressed', 'true'); }
+            if (btn) { btn.textContent = '🔇'; btn.setAttribute('aria-pressed', 'true'); } this.syncMusic?.();
         } else {
             this.audioContext.resume();
             this.muted = false;
-            if (btn) { btn.textContent = '🔊'; btn.setAttribute('aria-pressed', 'false'); }
+            if (btn) { btn.textContent = '🔊'; btn.setAttribute('aria-pressed', 'false'); } this.syncMusic?.();
         }
     }
 
@@ -6044,7 +5517,7 @@ class PortfolioEngine {
         return document.getElementById('modalOverlay').classList.contains('active') ||
             document.getElementById('tutorialOverlay').classList.contains('active') ||
             document.getElementById('settingsPanel').classList.contains('active') ||
-            document.getElementById('destinationsDialog').open || document.getElementById('experimentDialog').open;
+            document.getElementById('destinationsDialog').open || document.getElementById('experimentDialog').open || document.getElementById('radioDialog').open;
     }
 
     resetInput() {
@@ -6134,7 +5607,7 @@ class PortfolioEngine {
         document.getElementById('volumeControl').oninput = e => {
             const value = Number(e.target.value) / 100;
             if (this.masterAudio) this.masterAudio.gain.setTargetAtTime(value, this.audioContext.currentTime, .05);
-            safeStorage.setItem('keith_volume', String(value));
+            safeStorage.setItem('keith_volume', String(value)); this.syncMusic?.();
         };
         document.getElementById('resetCar').onclick = () => {
             this.resetInput(); this.vehiclePhysics.reset(); this.car.position.set(0,.5,60);
@@ -6235,6 +5708,7 @@ engine.init();
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
+    engine.car?.userData.environmentTarget?.dispose();
     if (engine.renderer) {
         engine.renderer.dispose();
     }

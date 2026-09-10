@@ -44,7 +44,7 @@
     }
     </script>
     <link rel="stylesheet" href="css/cockpit.css"><link rel="stylesheet" href="css/world.css">
-</head>
+<link rel="stylesheet" href="./css/clean-cockpit.css"><link rel="stylesheet" href="./css/racing-hud.css"></head>
 <body>
     <header class="world-header">
         <a class="pilot-brand" href="#" aria-label="Keith Kadima, home base"><span class="brand-mark">K<span>·</span></span><span>KEITH KADIMA<small>ENGINEERING / SECURITY / ANYWHERE</small></span></a>
@@ -68,6 +68,14 @@
     <div class="field-notes"><span id="discoveryCount">0 / 3 FIELD NOTES</span><button id="radioControl">Radio · off</button></div>
     <button id="discoveryAction" hidden>Discover</button>
     <dialog id="experimentDialog" aria-labelledby="experimentTitle"><button id="closeExperiment" aria-label="Close experiment">×</button><span class="eyebrow" id="experimentTitle"></span><h2 id="experimentLabel"></h2><p id="experimentDescription"></p><div id="experimentChoices"></div><p id="experimentResult" role="status"></p></dialog>
+    <dialog id="radioDialog" aria-labelledby="radioTitle">
+      <button id="closeRadio" aria-label="Close radio">×</button><p class="eyebrow">THE ROAD SOUNDTRACK</p><h2 id="radioTitle">Tune in. Wander on.</h2>
+      <p id="radioStatus" role="status">Choose your soundtrack.</p>
+      <button id="radioRecorded" class="station-card"><strong>Local Forecast</strong><span>Kevin MacLeod · Bright, laid-back jazz</span></button>
+      <button id="radioSynth" class="station-card"><strong>Lo-fi Circuit</strong><span>Built-in synth · Available offline</span></button>
+      <button id="radioStop" class="radio-stop">Stop music</button>
+      <p class="music-credit">“Local Forecast” by <a href="https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300010" target="_blank" rel="noopener">Kevin MacLeod</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a>. Audio encoding optimized; looped playback.</p>
+    </dialog>
     <!-- Loading Screen -->
     <div id="loadingScreen">
         <div class="loading-content">
@@ -258,7 +266,7 @@
     
     <!-- Settings Panel -->
     <div id="settingsPanel">
-        <h3 class="settings-title">Your experience</h3><div class="settings-group"><label class="settings-label" for="comfortMode">Comfort mode</label><input type="checkbox" id="comfortMode"><span class="settings-help">Steady camera, no extra motion</span></div><div class="settings-group"><label class="settings-label" for="timeSelect">Time of day</label><select class="settings-select" id="timeSelect"><option value="sunset">Golden hour</option><option value="day">Day</option><option value="night">Night</option><option value="dawn">Dawn</option></select></div><div class="settings-group"><label class="settings-label" for="volumeControl">Master volume</label><input id="volumeControl" type="range" min="0" max="100" value="45"></div><button id="resetCar" class="btn btn-primary">Reset car</button><details class="performance-details"><summary>Performance</summary><output id="performanceReadout">Measuring while you drive…</output><p>Local measurements only. No data is sent.</p></details>
+        <button id="closeSettings" aria-label="Close settings">×</button><h3 class="settings-title">Your experience</h3><div class="settings-group"><label class="settings-label" for="comfortMode">Comfort mode</label><input type="checkbox" id="comfortMode"><span class="settings-help">Steady camera, no extra motion</span></div><div class="settings-group"><label class="settings-label" for="timeSelect">Time of day</label><select class="settings-select" id="timeSelect"><option value="sunset">Golden hour</option><option value="day">Day</option><option value="night">Night</option><option value="dawn">Dawn</option></select></div><div class="settings-group"><label class="settings-label" for="volumeControl">Master volume</label><input id="volumeControl" type="range" min="0" max="100" value="45"></div><button id="resetCar" class="btn btn-primary">Reset car</button><details class="performance-details"><summary>Performance</summary><output id="performanceReadout">Measuring while you drive…</output><p>Local measurements only. No data is sent.</p></details>
         <div class="settings-group">
             <label class="settings-label" for="qualitySelect">Graphics Quality</label>
             <select class="settings-select" id="qualitySelect">

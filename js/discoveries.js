@@ -2,7 +2,7 @@ import * as THREE from 'three';
 const experiments={
   fixflow:{title:'FixFlow workshop',label:'A build becomes a bounty',description:'A fictional illustration of a CI payout workflow. No real payment is sent.',choices:['Run the build'],result:'Build passed → payout queued → receipt recorded. FixFlow connects CI outcomes with MNEE stablecoin bounty payouts.'},
   security:{title:'Security lab',label:'Who gets through the door?',description:'A fictional API accepts a user ID from the browser. Where should authorization be enforced?',choices:['In the browser','On the server, for every request','Only at sign-in'],correct:1,result:'Exactly. Verify the authenticated identity and its permission to the requested resource on every request.'},
-  radio:{title:'Signal found',label:'Tune into the world',description:'Two original synthesized stations live here. Choose a station with the Radio control in your cockpit.',choices:['Unlock the signal'],result:'Signal logged. Lo-fi Circuit and Retro Relay are available from the Radio button.'}
+  radio:{title:'Signal found',label:'Tune into the world',description:'A jazz recording and a built-in synth soundtrack live here. Open Radio in your cockpit to choose.',choices:['Unlock the signal'],result:'Signal logged. Local Forecast and Lo-fi Circuit are available from the Radio button.'}
 };
 export class Discoveries{
  constructor(e){this.engine=e;this.found=new Set();try{this.found=new Set(JSON.parse(localStorage.getItem('keith_discoveries_v1')||'[]'));}catch{}
@@ -30,4 +30,3 @@ export class Discoveries{
  }
  refresh(){document.getElementById('discoveryCount').textContent=`${this.found.size} / 3 FIELD NOTES`;}
 }
-

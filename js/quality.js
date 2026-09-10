@@ -7,6 +7,7 @@ export const QUALITY = {
 export function applyQuality(engine,level){
  const q=QUALITY[level];if(!q)return;
  engine.state.quality=level;const ratio=Math.min(window.devicePixelRatio||1,q.pixelRatio);
+ engine.environment?.grass.setQuality(level);
  engine.renderer.setPixelRatio(ratio);engine.composer.setPixelRatio(ratio);
  engine.renderer.shadowMap.enabled=q.shadows;
  if(engine.sunLight){engine.sunLight.castShadow=q.shadows;const shadow=engine.sunLight.shadow;

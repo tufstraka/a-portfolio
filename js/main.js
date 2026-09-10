@@ -1,3 +1,4 @@
+import { setupRacingHud } from './racing-hud.js';
 import { setupRadioMenu } from './radio-menu.js';
 import { createRallyCar } from './rally-car.js';
 import { surfaceMaterial } from './surface-materials.js';
@@ -1431,7 +1432,7 @@ class PortfolioEngine {
             this.initCockpit();
             this.environment = new Environment(this);
             this.discoveries = new Discoveries(this);
-            this.diagnostics = new Diagnostics(); setupRadioMenu(this);
+            this.diagnostics = new Diagnostics(); setupRadioMenu(this); setupRacingHud(this);
             this.applyQuality(this.state.quality);
             this.updateLoadingProgress(90);
 
@@ -1778,43 +1779,9 @@ class PortfolioEngine {
     }
 
     createGround() {
-        // Bruno Simon style: large flat warm-sand ground plane
-        const size = 1200;
-        const geo = new THREE.PlaneGeometry(size, size, 1, 1);
-
-        // Paint a subtle sandy canvas texture
-        const canvas = document.createElement('canvas');
-        canvas.width = canvas.height = 512;
-        const ctx = canvas.getContext('2d');
-
-        // Base sand color
-        ctx.fillStyle = '#c9a96e';
-        ctx.fillRect(0, 0, 512, 512);
-
-        // Subtle noise / variation
-        for (let i = 0; i < 4000; i++) {
-            const x = Math.random() * 512;
-            const y = Math.random() * 512;
-            const r = 1 + Math.random() * 3;
-            const bright = Math.random() > 0.5;
-            ctx.fillStyle = bright ? 'rgba(255,220,150,0.12)' : 'rgba(150,100,40,0.08)';
-            ctx.beginPath();
-            ctx.arc(x, y, r, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        const tex = new THREE.CanvasTexture(canvas);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        tex.repeat.set(20, 20);
-
-        const mat = new THREE.MeshLambertMaterial({ map: tex });
-        const ground = new THREE.Mesh(geo, mat);
-        ground.rotation.x = -Math.PI / 2;
-        ground.receiveShadow = true;
-        this.scene.add(ground);
+        const ground=new THREE.Mesh(new THREE.PlaneGeometry(1200,1200),surfaceMaterial('terrain',this.renderer));
+        ground.rotation.x=-Math.PI/2;ground.receiveShadow=true;this.scene.add(ground);
     }
-
     // stub — terrain replaced by flat ground above
     async createTerrain() {}
 
@@ -3062,7 +3029,7 @@ class PortfolioEngine {
 
     createStylizedTrees(count) {
         // Low-poly Bruno Simon style trees: cone + cylinder
-        const trunkMat = surfaceMaterial('wood',this.renderer);
+        const trunkMat = surfaceMaterial('bark',this.renderer);
         const leaf1Mat = surfaceMaterial('foliage',this.renderer);
         const leaf2Mat = surfaceMaterial('foliage',this.renderer);
 
@@ -4681,7 +4648,7 @@ class PortfolioEngine {
         this.state.isAirborne = physicsState.isAirborne;
 
         // Update UI
-        const speedKmh = Math.round(physicsState.speedKmh);
+        const speedKmh = Math.round(Math.abs(physicsState.speedKmh)); this.updateRacingHud?.();
         const speedEl = document.getElementById('speedValue');
         const boostEl = document.getElementById('speedBoost');
         const airborneEl = document.getElementById('speedAirborne');
@@ -5820,6 +5787,7 @@ engine.init();
 
 // Cleanup on page unload
 window.addEventListener('beforeunload', () => {
+    engine.car?.userData.environmentTarget?.dispose();
     if (engine.renderer) {
         engine.renderer.dispose();
     }

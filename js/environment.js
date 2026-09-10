@@ -74,7 +74,7 @@ export class Environment {
   }
   createLandmarks() {
     const scene=this.engine.scene;
-    const road=new THREE.MeshLambertMaterial({color:0x9a987e});
+    const road=surfaceMaterial('road',this.engine.renderer);
     const paint=new THREE.MeshBasicMaterial({color:0xf4e4b8});
     const box=new THREE.BoxGeometry(1,1,1);
     const part=(material,x,y,z,w,h,d)=>{const m=new THREE.Mesh(box,material);m.position.set(x,y,z);m.scale.set(w,h,d);m.receiveShadow=true;scene.add(m);return m;};

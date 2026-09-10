@@ -2,13 +2,20 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { surfaceMaterial } from './surface-materials.js';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 
 export function createRallyCar(renderer) {
   const car=new THREE.Group();car.name='Kadima Trail 07';
-  const paint=new THREE.MeshStandardMaterial({color:0xf18b42,roughness:.34,metalness:.12});
+  const paint=new THREE.MeshPhysicalMaterial({color:0xf18b42,roughness:.34,metalness:.12,clearcoat:.45,clearcoatRoughness:.25});
   const cream=new THREE.MeshStandardMaterial({color:0xf9edca,roughness:.45});
   const trim=new THREE.MeshStandardMaterial({color:0x203d43,roughness:.65});
   const glass=new THREE.MeshStandardMaterial({color:0x6ebbc6,roughness:.22,metalness:.15});
+  if(renderer.isWebGLRenderer){
+    const generator=new THREE.PMREMGenerator(renderer),room=new RoomEnvironment();
+    const target=generator.fromScene(room,.04);car.userData.environmentTarget=target;
+    for(const material of [paint,glass]){material.envMap=target.texture;material.envMapIntensity=.65;}
+    room.dispose();generator.dispose();
+  }
   const lamp=new THREE.MeshStandardMaterial({color:0xfff2bb,emissive:0xffce73,emissiveIntensity:.65});
   const red=new THREE.MeshStandardMaterial({color:0xec503c,emissive:0xd93823,emissiveIntensity:.5});
   const rubber=surfaceMaterial('rubber',renderer);

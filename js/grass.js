@@ -43,6 +43,7 @@ export class Grass {
     this.maximum=count;this.mesh.count=count;this.mesh.computeBoundingSphere();engine.scene.add(this.mesh);
     // Ground cover beneath the blades makes the meadow readable at a distance.
     const turfMaterial=new THREE.MeshLambertMaterial({color:0x64803c,side:THREE.DoubleSide});
+    new THREE.TextureLoader().load(new URL('./textures/meadow.webp',document.baseURI).href,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,2);t.anisotropy=Math.min(4,engine.renderer.capabilities.getMaxAnisotropy());turfMaterial.map=t;turfMaterial.color.setHex(0xaac17f);turfMaterial.needsUpdate=true;},undefined,()=>{});
     turfMaterial.onBeforeCompile=shader=>{
       shader.vertexShader='varying vec2 meadowUv;\n'+shader.vertexShader;
       shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nmeadowUv=uv;');
@@ -51,7 +52,7 @@ export class Grass {
         vec2 p=meadowUv-.5;float a=atan(p.y,p.x);float edge=.41+sin(a*7.)*.025+cos(a*11.)*.02;
         float grain=fract(sin(dot(floor(meadowUv*150.),vec2(12.9898,78.233)))*43758.5453);
         if(length(p)>edge-grain*.018)discard;
-        diffuseColor.rgb*=.85+grain*.25;`);
+        diffuseColor.rgb*=.95+sin(meadowUv.x*30.)*cos(meadowUv.y*25.)*.05;`);
     };
     turfMaterial.customProgramCacheKey=()=> 'meadow-ground-v1';
     // Small islands remain clear of driveways even at their widest edge.

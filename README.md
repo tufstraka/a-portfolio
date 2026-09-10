@@ -69,3 +69,11 @@ Grass now covers the surrounding landscape, with 6,000 / 12,000 / 18,000 / 24,00
 The cockpit groups mission progress, relocates scores into Destinations, removes the duplicate content sidebar, and puts audio controls in one dock. Radio uses a native dialog; Settings groups advanced graphics controls in a disclosure and keeps focus within the panel while open.
 
 Radio includes Kevin MacLeod’s recorded “Local Forecast,” under CC BY 4.0, with visible attribution and `public/audio/CREDITS.txt`. The 128 kbps MP3 is approximately 2.65 MB and is loaded only when selected. It loops locally, honors master volume/mute, pauses on hidden tabs, and offers the built-in synth as a fallback. It is a curated recording, not a live broadcast. Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300010
+
+## Racing instruments and scanned surfaces
+
+The HUD now uses a 0–240 km/h analog speedometer with a physics-driven needle and arc, a digital inset, N/D/R drive state, and actual boost/airborne indicators. A heading compass and circular minimap complete the driving instruments. Touch layouts retain room for steering and action controls, and reduced motion disables needle transitions.
+
+Scanned CC0 Poly Haven materials replace procedural wood, bark, rock, terrain and road surfaces. They use separate diffuse, OpenGL normal and roughness maps. A scanned meadow diffuse map removes the checker-like ground pattern. The maps are locally hosted 512px WebP files with mipmapping, bounded anisotropy and procedural fallbacks; credits and source URLs are in `public/textures/CREDITS.txt`. Road UVs use world coordinates to avoid stretching along long road segments. The rally car adds clear-coated paint and a small prefiltered reflection environment for paint/glass.
+
+Validation includes 13 tests, production build, browser visual review, and phone-width layout checks. These maps improve surface shading without adding displacement geometry or promising a particular frame rate.

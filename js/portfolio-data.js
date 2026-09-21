@@ -35,7 +35,7 @@ export const PORTFOLIO_DATA = {
     ]
   }},
   'Contact': { color: 0xf39455, icon: 'contact', position: { x: 70, z: 50 }, content: {
-    intro: 'Have a system to build, a security challenge, or an interesting idea? Let’s talk. Working from anywhere.',
+    intro: 'Have a system to build, a security challenge, or an interesting idea? Let’s talk.',
     sections: [
       { title: 'Start a conversation', items: ['keithkadima@gmail.com', 'linkedin.com/in/kadimakeith', 'github.com/tufstraka', '+254 701 746 774'] },
       { title: 'What I bring', items: ['Secure backend engineering and real-time systems', 'Fintech, payments, and cloud infrastructure', 'Security research and thoughtful technical ownership'] }

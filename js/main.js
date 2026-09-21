@@ -1,3 +1,5 @@
+import { TrailEffects } from './trail-effects.js';
+import { createTrailScenery } from './trail-scenery.js';
 import { CollisionSystem, MotionInterpolator, PHYSICS_STEP, carContact, slideVelocity } from './driving.js';
 import { iconSvg, drawIcon, setupIcons } from './icons.js';
 import { createTrees } from './trees.js';
@@ -1319,6 +1321,8 @@ class PortfolioEngine {
             this.initAnalytics();
             this.initCockpit();
             this.environment = new Environment(this);
+            createTrailScenery(this);
+            this.trailEffects = new TrailEffects(this);
             this.discoveries = new Discoveries(this);
             this.diagnostics = new Diagnostics(); setupRadioMenu(this); setupRacingHud(this);
             this.applyQuality(this.state.quality);
@@ -4246,6 +4250,7 @@ class PortfolioEngine {
         }
 
         this.updateDayNightCycle(delta);
+        this.trailEffects?.update(delta);
         this.updateHeadlights();
         this.discoveries?.update();
         if (this.frameCount % 6 === 0) this.renderer.shadowMap.needsUpdate = true;
@@ -4510,7 +4515,7 @@ class PortfolioEngine {
         if (!this.wheels || !this.car) return;
 
         // Calculate wheel rotation based on speed (distance traveled per frame)
-        const wheelRadius = 0.48;
+        const wheelRadius = 0.55;
         const speed = this.vehiclePhysics.speed;
         const rotationAmount = (speed * (this.frameDelta || 0)) / wheelRadius; // Assuming ~60fps
 

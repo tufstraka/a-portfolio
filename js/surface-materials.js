@@ -1,15 +1,16 @@
+import { textureUrls } from './asset-urls.js';
 import * as THREE from 'three';
 
-// Small, repeatable maps authored in code: no remote assets or texture downloads.
+// Local scanned maps with procedural fallback while textures load.
 const cache = new Map();
-const scanned={wood:'old_wood_floor',stone:'rock_01',terrain:'rocks_ground_02',road:'rocks_ground_02',bark:'bark_brown_01'};
+const scanned={wood:'old_wood_floor',stone:'rock_01',terrain:'rocks_ground_02',road:'rocks_ground_02',bark:'bark_brown_01',sand:'rocks_ground_02',mud:'rocks_ground_02'};
 export function surfaceMaterial(kind, renderer) {
   if (cache.has(kind)) return cache.get(kind);
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = 256;
   const ctx = canvas.getContext('2d');
   const pixels = ctx.createImageData(256, 256);
-  const base = {road:[145,147,143],wood:[157,110,65],bark:[117,92,65],terrain:[185,166,120], stone:[167,177,161], plaster:[227,218,192], rubber:[54,61,61],metal:[65,104,98],foliage:[95,132,67]}[kind];
+  const base = {sand:[188,157,105],mud:[71,49,30],road:[145,147,143],wood:[157,110,65],bark:[117,92,65],terrain:[185,166,120], stone:[167,177,161], plaster:[227,218,192], rubber:[54,61,61],metal:[65,104,98],foliage:[95,132,67]}[kind];
   for(let y=0;y<256;y++) for(let x=0;x<256;x++) {
     const noise = Math.sin(x*127.1+y*311.7)*43758.5453;
     const grain = noise-Math.floor(noise)-.5;
@@ -31,6 +32,7 @@ export function surfaceMaterial(kind, renderer) {
   // Color data and height data use different color-space interpretations.
   const height=map.clone();height.colorSpace=THREE.NoColorSpace;height.needsUpdate=true;
   const material=new THREE.MeshStandardMaterial({map,bumpMap:height,bumpScale:kind==='stone'?.10:kind==='foliage'?.012:.035,roughness:kind==='rubber'?.92:kind==='metal'?.67:.83,metalness:kind==='metal'?.22:0});
+  if(kind==='sand')material.color.setHex(0xe3ba72);if(kind==='mud'){material.color.setHex(0x49321c);material.roughness=.55;}
   material.userData.sharedSurface=true;cache.set(kind,material);
   if(kind==='road'){
     material.onBeforeCompile=s=>{
@@ -51,12 +53,12 @@ export function surfaceMaterial(kind, renderer) {
   if(scanned[kind]){
     const loader=new THREE.TextureLoader();
     // Keep the procedural fallback until each local scan is decoded successfully.
-    const load=(suffix,slot,colorSpace)=>loader.load(new URL(`./textures/${scanned[kind]}-${suffix}.webp`,document.baseURI).href,t=>{
+    const load=(suffix,slot,colorSpace)=>loader.load(textureUrls[`${scanned[kind]}-${suffix}.webp`],t=>{
       t.colorSpace=colorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
-      if(kind==='terrain')t.repeat.set(200,200);
+      if(kind==='terrain')t.repeat.set(200,200);if(kind==='sand'||kind==='mud')t.repeat.set(5,5);
       const previous=material[slot];material[slot]=t;if(previous&&previous!==material.bumpMap)previous.dispose();
       if(slot==='normalMap'){material.normalScale.set(.55,.55);material.bumpMap?.dispose();material.bumpMap=null;}
-      if(slot==='roughnessMap')material.roughness=1;
+      if(slot==='roughnessMap')material.roughness=kind==='mud'?.55:1;
       material.needsUpdate=true;
     },undefined,()=>{});
     load('Diffuse','map',THREE.SRGBColorSpace);load('nor_gl','normalMap',THREE.NoColorSpace);load('Rough','roughnessMap',THREE.NoColorSpace);

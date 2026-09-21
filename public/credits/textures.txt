@@ -1,0 +1,19 @@
+Scanned PBR surfaces from Poly Haven, released under CC0.
+All maps resized to 512 x 512 and encoded as WebP. Normal maps use OpenGL orientation.
+
+Old Wood Floor — Guillaume Monsergent
+https://polyhaven.com/a/old_wood_floor
+
+Rock 01 — Rob Tuytel
+https://polyhaven.com/a/rock_01
+
+Rocks Ground 02 — Rob Tuytel
+https://polyhaven.com/a/rocks_ground_02
+
+Bark Brown 01 — Rob Tuytel
+https://polyhaven.com/a/bark_brown_01
+
+Files retrieved from official api.polyhaven.com metadata and dl.polyhaven.org downloads.
+Included maps: Diffuse, nor_gl, Rough. No displacement geometry is applied.
+Aerial Grass Rock — Rob Tuytel; https://polyhaven.com/a/aerial_grass_rock (CC0). Diffuse only, resized and WebP encoded.
+

@@ -1,6 +1,9 @@
+import { surfaceAt } from './terrain-surfaces.js';
+import { textureUrls } from './asset-urls.js';
 import * as THREE from 'three';
 
 export function clearForGrass(x,z,sections) {
+  if(['mud','sand'].includes(surfaceAt(x,z)))return false;
   if(Math.abs(x)<9 || (Math.abs(z-50)<9 && Math.abs(x)<91) || (Math.abs(z+50)<9 && x>0 && x<83))return false;
   if(Math.hypot(x+58,z+57)<27)return false;
   return !sections.some(s=>Math.hypot(x-s.position.x,z-s.position.z)<13 || (Math.abs(x-s.position.x)<10 && Math.abs(z-s.position.z+14)<8));
@@ -43,7 +46,7 @@ export class Grass {
     this.maximum=count;this.mesh.count=count;this.mesh.computeBoundingSphere();engine.scene.add(this.mesh);
     // Ground cover beneath the blades makes the meadow readable at a distance.
     const turfMaterial=new THREE.MeshLambertMaterial({color:0x64803c,side:THREE.DoubleSide});
-    new THREE.TextureLoader().load(new URL('./textures/meadow.webp',document.baseURI).href,t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,2);t.anisotropy=Math.min(4,engine.renderer.capabilities.getMaxAnisotropy());turfMaterial.map=t;turfMaterial.color.setHex(0xaac17f);turfMaterial.needsUpdate=true;},undefined,()=>{});
+    new THREE.TextureLoader().load(textureUrls['meadow.webp'],t=>{t.colorSpace=THREE.SRGBColorSpace;t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(2,2);t.anisotropy=Math.min(4,engine.renderer.capabilities.getMaxAnisotropy());turfMaterial.map=t;turfMaterial.color.setHex(0xaac17f);turfMaterial.needsUpdate=true;},undefined,()=>{});
     turfMaterial.onBeforeCompile=shader=>{
       shader.vertexShader='varying vec2 meadowUv;\n'+shader.vertexShader;
       shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\nmeadowUv=uv;');

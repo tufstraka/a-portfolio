@@ -68,14 +68,24 @@ Grass now covers the surrounding landscape, with 6,000 / 12,000 / 18,000 / 24,00
 
 The cockpit groups mission progress, relocates scores into Destinations, removes the duplicate content sidebar, and puts audio controls in one dock. Radio uses a native dialog; Settings groups advanced graphics controls in a disclosure and keeps focus within the panel while open.
 
-Radio includes Kevin MacLeod’s recorded “Local Forecast,” under CC BY 4.0, with visible attribution and `public/audio/CREDITS.txt`. The 128 kbps MP3 is approximately 2.65 MB and is loaded only when selected. It loops locally, honors master volume/mute, pauses on hidden tabs, and offers the built-in synth as a fallback. It is a curated recording, not a live broadcast. Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300010
+Radio includes Kevin MacLeod’s recorded “Local Forecast,” under CC BY 4.0, with visible attribution and `assets/audio/CREDITS.txt`. The 128 kbps MP3 is approximately 2.65 MB and is loaded only when selected. It loops locally, honors master volume/mute, pauses on hidden tabs, and offers the built-in synth as a fallback. It is a curated recording, not a live broadcast. Source: https://incompetech.com/music/royalty-free/index.html?isrc=USUAN1300010
 
 ## Racing instruments and scanned surfaces
 
 The HUD now uses a 0–240 km/h analog speedometer with a physics-driven needle and arc, a digital inset, N/D/R drive state, and actual boost/airborne indicators. A heading compass and circular minimap complete the driving instruments. Touch layouts retain room for steering and action controls, and reduced motion disables needle transitions.
 
-Scanned CC0 Poly Haven materials replace procedural wood, bark, rock, terrain and road surfaces. They use separate diffuse, OpenGL normal and roughness maps. A scanned meadow diffuse map removes the checker-like ground pattern. The maps are locally hosted 512px WebP files with mipmapping, bounded anisotropy and procedural fallbacks; credits and source URLs are in `public/textures/CREDITS.txt`. Road UVs use world coordinates to avoid stretching along long road segments. The rally car adds clear-coated paint and a small prefiltered reflection environment for paint/glass.
+Scanned CC0 Poly Haven materials replace procedural wood, bark, rock, terrain and road surfaces. They use separate diffuse, OpenGL normal and roughness maps. A scanned meadow diffuse map removes the checker-like ground pattern. The maps are locally hosted 512px WebP files with mipmapping, bounded anisotropy and procedural fallbacks; credits and source URLs are in `assets/textures/CREDITS.txt`. Road UVs use world coordinates to avoid stretching along long road segments. The rally car adds clear-coated paint and a small prefiltered reflection environment for paint/glass.
 
 Validation includes 13 tests, production build, browser visual review, and phone-width layout checks. These maps improve surface shading without adding displacement geometry or promising a particular frame rate.
 
 Trees now use taller tapered trunks, four visible limbs and eight irregular canopy clusters per tree. Bark scans are retained, leaf shades and crown proportions vary, and placement preserves road/pond/landmark clearance. All trees share three instanced draw batches. Typical height is roughly 11–14 metres in world units.
+
+Texture and radio URLs are now module-relative assets, so the raw repository and Vite output both work under GitHub Pages subpaths. The Jeep-style Trail 07 adds an upright cabin, seven-slot grille, round lamps, a rear spare and exhaust. Mud/sand patches produce distance-based body dirt, wheel spray and bounded tire marks; exhaust and spray respect Comfort mode. Additional instanced rocks, fallen logs and plants add variety. License credits are also included in the built site's credits directory.
+
+## Water, workshop challenges and night driving
+
+The pond uses shallow/deep absorption colors, animated surface normals, view-dependent sky reflections, sun highlights and restrained shoreline ripples. These are analytic sky reflections, not expensive scene-reflection render passes. Reeds frame the edge. The workshop buildings have open vehicle bays, workbenches and wall-specific collision instead of solid building-sized blockers.
+
+Destinations → Play the workshops opens two four-stage, replayable challenges (delivery workflow and API access decisions). Nearby terminals also open with F. Incorrect decisions explain the issue without advancing progress; completion retains local discovery credit. All actions are simulated.
+
+Headlights work at every quality level. L cycles Auto → On → Off; Settings offers the same selector and remembers the preference. Both beams illuminate surfaces, the lenses glow when powered, and higher tiers add a single shadow map. H remains the horn. Grass uses narrow segmented blades, dark roots, lighter tips and layered wind gusts; quality controls density and Comfort mode freezes movement.

@@ -31,7 +31,7 @@ export function createTrees(engine,count){
    dummy.rotation.set(random()*.2,angle,random()*.2);dummy.scale.set((2.2+random()*.5)*scale,(2.1+random()*.65)*scale,(2.0+random()*.7)*scale);dummy.updateMatrix();crowns.setMatrixAt(placed*8+j,dummy.matrix);
    color.setHSL(.20+random()*.035,.20+random()*.12,.55+random()*.16);crowns.setColorAt(placed*8+j,color);
   }
-  engine.collisionSystem.addTree({x,z});engine.treePositions.push({x,z});placed++;
+  engine.collisionSystem.addTree({x,z}, .62*scale, 6*scale);engine.treePositions.push({x,z});placed++;
  }
  trunks.count=placed;branches.count=placed*4;crowns.count=placed*8;
  for(const mesh of [trunks,branches,crowns]){mesh.instanceMatrix.needsUpdate=true;mesh.computeBoundingSphere();mesh.castShadow=true;mesh.receiveShadow=true;mesh.userData.cullable=false;engine.scene.add(mesh);engine.decorations.push(mesh);}

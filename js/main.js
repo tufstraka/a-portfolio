@@ -1,3 +1,4 @@
+import { CollisionSystem, MotionInterpolator, PHYSICS_STEP, carContact, slideVelocity } from './driving.js';
 import { iconSvg, drawIcon, setupIcons } from './icons.js';
 import { createTrees } from './trees.js';
 import { setupRacingHud } from './racing-hud.js';
@@ -350,13 +351,9 @@ const CONFIG = {
     SUSPENSION_DAMPING: 4,       // Damping rate
 
     // Collision
-    CAR_COLLISION_RADIUS: 2.5,   // Bounding sphere for car
     CAR_LENGTH: 4.5,
     CAR_WIDTH: 2.0,
-    BUILDING_COLLISION_PADDING: 2,
-    TREE_COLLISION_RADIUS: 1.5,
     WORLD_BOUNDARY: 300,         // Invisible wall distance
-    COLLISION_BOUNCE: 0.3,       // How much car bounces back
 
     // Camera
     DEFAULT_CAMERA_DISTANCE: 18,
@@ -717,99 +714,6 @@ class AdaptiveQualityManager {
 
 }
 
-class CollisionSystem {
-    constructor() {
-        this.buildings = [];
-        this.trees = [];
-        this.worldBoundary = CONFIG.WORLD_BOUNDARY;
-    }
-
-    addBuilding(position, width, depth) {
-        this.buildings.push({
-            x: position.x,
-            z: position.z,
-            halfWidth: (width / 2) + CONFIG.BUILDING_COLLISION_PADDING,
-            halfDepth: (depth / 2) + CONFIG.BUILDING_COLLISION_PADDING,
-            type: 'building'
-        });
-    }
-
-    addTree(position) {
-        this.trees.push({
-            x: position.x,
-            z: position.z,
-            radius: CONFIG.TREE_COLLISION_RADIUS,
-            type: 'tree'
-        });
-    }
-
-    // Open world - no roads, uniform surface everywhere
-    isOnRoad(x, z) { return true; }
-
-    pointToSegmentDistance(px, pz, x1, z1, x2, z2) {
-        const dx = x2 - x1;
-        const dz = z2 - z1;
-        const lengthSq = dx * dx + dz * dz;
-
-        if (lengthSq === 0) return Math.sqrt((px - x1) ** 2 + (pz - z1) ** 2);
-
-        let t = Math.max(0, Math.min(1, ((px - x1) * dx + (pz - z1) * dz) / lengthSq));
-        const nearestX = x1 + t * dx;
-        const nearestZ = z1 + t * dz;
-
-        return Math.sqrt((px - nearestX) ** 2 + (pz - nearestZ) ** 2);
-    }
-
-    // Check collision and return push-back vector
-    checkCollision(x, z, radius) {
-        let pushX = 0;
-        let pushZ = 0;
-        let collided = false;
-
-        // World boundary
-        if (x < -this.worldBoundary) { pushX = (-this.worldBoundary - x) + 1; collided = true; }
-        if (x > this.worldBoundary) { pushX = (this.worldBoundary - x) - 1; collided = true; }
-        if (z < -this.worldBoundary) { pushZ = (-this.worldBoundary - z) + 1; collided = true; }
-        if (z > this.worldBoundary) { pushZ = (this.worldBoundary - z) - 1; collided = true; }
-
-        // Building collisions (AABB)
-        for (const building of this.buildings) {
-            const dx = x - building.x;
-            const dz = z - building.z;
-
-            const overlapX = building.halfWidth + radius - Math.abs(dx);
-            const overlapZ = building.halfDepth + radius - Math.abs(dz);
-
-            if (overlapX > 0 && overlapZ > 0) {
-                collided = true;
-                // Push out along the axis with least overlap
-                if (overlapX < overlapZ) {
-                    pushX += (dx > 0 ? overlapX : -overlapX);
-                } else {
-                    pushZ += (dz > 0 ? overlapZ : -overlapZ);
-                }
-            }
-        }
-
-        // Tree collisions (circle)
-        for (const tree of this.trees) {
-            const dx = x - tree.x;
-            const dz = z - tree.z;
-            const dist = Math.sqrt(dx * dx + dz * dz);
-            const minDist = tree.radius + radius;
-
-            if (dist < minDist && dist > 0) {
-                collided = true;
-                const overlap = minDist - dist;
-                pushX += (dx / dist) * overlap;
-                pushZ += (dz / dist) * overlap;
-            }
-        }
-
-        return { collided, pushX, pushZ };
-    }
-}
-
 // ============================================
 // REALISTIC VEHICLE PHYSICS
 // ============================================
@@ -1032,47 +936,28 @@ class VehiclePhysics {
         this.y = Math.max(this.y, Math.max(0, terrainHeight));
 
         // --- UPDATE HORIZONTAL POSITION ---
-        const prevX = this.x;
-        const prevZ = this.z;
-
         this.velocityX = Math.sin(this.rotation) * this.speed;
         this.velocityZ = Math.cos(this.rotation) * this.speed;
 
         this.x += this.velocityX * delta;
         this.z += this.velocityZ * delta;
 
-        // --- COLLISION DETECTION WITH REFLECTION BOUNCE ---
-        const collision = collisionSystem.checkCollision(this.x, this.z, CONFIG.CAR_COLLISION_RADIUS);
-
+        const collision = collisionSystem.checkCollision(this.x, this.z, this.rotation, this.y);
+        this.isColliding = collision.collided;
+        this.impactSpeed = 0;
         if (collision.collided) {
-            this.isColliding = true;
-
-            // Push car out
             this.x += collision.pushX;
             this.z += collision.pushZ;
-
-            // Reflection bounce: deflect velocity off collision normal
-            const normalLen = Math.sqrt(collision.pushX * collision.pushX + collision.pushZ * collision.pushZ);
-            if (normalLen > 0.001) {
-                const nx = collision.pushX / normalLen;
-                const nz = collision.pushZ / normalLen;
-                const dot = this.velocityX * nx + this.velocityZ * nz;
-                if (dot < 0) {
-                    this.velocityX -= 2 * dot * nx * CONFIG.COLLISION_BOUNCE;
-                    this.velocityZ -= 2 * dot * nz * CONFIG.COLLISION_BOUNCE;
-                    // Recalculate speed and rotation from reflected velocity
-                    this.speed = Math.sqrt(this.velocityX * this.velocityX + this.velocityZ * this.velocityZ) * Math.sign(this.speed);
-                    this.speed *= (1 - CONFIG.COLLISION_BOUNCE);
-                    this.rotation = Math.atan2(this.velocityX, this.velocityZ);
-                }
-            } else {
-                this.speed *= (1 - CONFIG.COLLISION_BOUNCE);
+            const response = slideVelocity(this.velocityX, this.velocityZ, collision.contacts);
+            this.impactSpeed = response.impact;
+            this.velocityX = response.vx; this.velocityZ = response.vz;
+            const magnitude = Math.hypot(response.vx, response.vz);
+            const reverse = this.speed < 0;
+            this.speed = magnitude * (reverse ? -1 : 1);
+            if (response.impact > .01 && magnitude > .1) {
+                const heading = Math.atan2(response.vx, response.vz) + (reverse ? Math.PI : 0);
+                this.rotation += Math.atan2(Math.sin(heading - this.rotation), Math.cos(heading - this.rotation));
             }
-
-            // Larger rotation on impact
-            this.rotation += (Math.random() - 0.5) * 0.25 * Math.min(Math.abs(this.speed) / CONFIG.MAX_SPEED, 1);
-        } else {
-            this.isColliding = false;
         }
 
         // --- SUSPENSION / BODY DYNAMICS ---
@@ -1102,6 +987,7 @@ class VehiclePhysics {
             speedKmh: Math.abs(this.speed * 3.6),
             isOnRoad: this.isOnRoad,
             isColliding: this.isColliding,
+            impactSpeed: this.impactSpeed,
             isGrounded: this.isGrounded,
             isAirborne: !this.isGrounded,
             landingImpact: this.landingImpact,
@@ -1309,7 +1195,7 @@ class PortfolioEngine {
         this.sky = null;
 
         // Physics & Collision Systems
-        this.collisionSystem = new CollisionSystem();
+        this.collisionSystem = new CollisionSystem(CONFIG.WORLD_BOUNDARY);
         this.vehiclePhysics = new VehiclePhysics();
 
         // Performance Optimization Systems
@@ -2917,7 +2803,8 @@ class PortfolioEngine {
             group.add(labelObj);
             group.userData.labelDiv = labelDiv;
 
-            this.collisionSystem.addBuilding(data.position, 10, 10);
+            // The destination is a raised sign: only its two visible posts block the car.
+            for (const offset of [-2.2, 2.2]) this.collisionSystem.addTree({ x: data.position.x + offset, z: data.position.z }, .18, 8);
             this.sections.push(group);
             this.buildings.push(group);
             this.scene.add(group);
@@ -3496,8 +3383,6 @@ class PortfolioEngine {
     updateInteractiveObjects(delta, carX, carZ, carSpeed, carRotation) {
         if (!this.interactiveObjects) return;
 
-        const carRadius = CONFIG.CAR_COLLISION_RADIUS;
-
         for (let i = this.interactiveObjects.length - 1; i >= 0; i--) {
             const obj = this.interactiveObjects[i];
             const data = obj.userData;
@@ -3520,22 +3405,18 @@ class PortfolioEngine {
             }
 
             // ── Car collision ───────────────────────────────────────────
-            const dx = obj.position.x - carX;
-            const dz = obj.position.z - carZ;
-            const distSq = dx*dx + dz*dz;
-            const collR = data.collisionRadius || 0.5;
-            const minDist = carRadius + collR;
-
-            if (distSq < minDist * minDist && Math.abs(carSpeed) > 1) {
-                const dist = Math.sqrt(distSq);
-                const nx = dist > 0.001 ? dx/dist : 1;
-                const nz = dist > 0.001 ? dz/dist : 0;
+            const contact = data.type !== 'debris' && this.vehiclePhysics.y < obj.position.y + (data.size || 1.5)
+                ? carContact(carX, carZ, carRotation, { x: obj.position.x, z: obj.position.z, radius: data.collisionRadius || .5 }) : null;
+            if (!contact) data.carContact = false;
+            if (contact && !data.carContact && Math.abs(carSpeed) > 1) {
+                data.carContact = true;
+                const nx = -contact.nx, nz = -contact.nz;
 
                 // Break crate on impact
                 if (data.breakable && !data.broken && Math.abs(carSpeed) > 4) {
                     this.breakCrate(obj);
                     // Push car back slightly
-                    if (this.vehiclePhysics) this.vehiclePhysics.speed *= 0.75;
+                    if (this.vehiclePhysics) this.vehiclePhysics.speed *= 0.97;
                     continue;
                 }
 
@@ -3548,12 +3429,8 @@ class PortfolioEngine {
                 data.angularVelZ = (Math.random()-0.5) * 8;
                 data.grounded = false;
 
-                // Push car back (solid collision)
-                if (this.vehiclePhysics) {
-                    this.vehiclePhysics.x -= nx * 0.15;
-                    this.vehiclePhysics.z -= nz * 0.15;
-                    this.vehiclePhysics.speed *= 0.85;
-                }
+                // One impact cost per contact; small movable props should not act like walls.
+                if (this.vehiclePhysics) this.vehiclePhysics.speed *= data.type === 'barrel' ? .94 : .99;
 
                 this.spawnDustBurst(obj.position.x, 0.1, obj.position.z, 0.3);
             }
@@ -3577,7 +3454,7 @@ class PortfolioEngine {
                 }
 
                 // Friction
-                const friction = data.grounded ? 0.94 : 0.995;
+                const friction = Math.pow(data.grounded ? 0.94 : 0.995, delta * 60);
                 data.velocityX *= friction;
                 data.velocityZ *= friction;
 
@@ -3990,14 +3867,15 @@ class PortfolioEngine {
         }
 
         document.getElementById('modalTitle').textContent = title;
+        document.getElementById('modal').dataset.section = title;
         document.getElementById('modalIcon').innerHTML = iconSvg(icon);
 
         let html = `<p class="modal-intro">${content.intro}</p>`;
 
-        content.sections.forEach(section => {
+        content.sections.forEach((section, index) => {
             html += `
                 <div class="modal-section">
-                    <h3 class="modal-section-title">${section.title}</h3>
+                    <div class="section-heading"><span class="section-number" aria-hidden="true">${String(index + 1).padStart(2, '0')}</span><h3 class="modal-section-title">${section.title}</h3></div>
                     <ul class="modal-list">
                         ${section.items.map(item => `<li>${item}</li>`).join('')}
                     </ul>
@@ -4303,13 +4181,19 @@ class PortfolioEngine {
         this.frameDelta = delta;
         this.state.time += delta;
 
+        if (!this.motion) { this.motion = new MotionInterpolator(); this.motion.reset(this.vehiclePhysics); }
         this.physicsAccumulator = Math.min((this.physicsAccumulator || 0) + delta, .1);
-        while (this.physicsAccumulator >= 1/60) {
-            this.updateMovement(1/60);
-            this.physicsAccumulator -= 1/60;
+        while (this.physicsAccumulator >= PHYSICS_STEP) {
+            this.updateMovement(PHYSICS_STEP);
+            this.motion.capture(this.vehiclePhysics);
+            this.physicsAccumulator -= PHYSICS_STEP;
         }
+        const pose = this.motion.sample(this.physicsAccumulator / PHYSICS_STEP);
+        this.car.position.set(pose.x, pose.y, pose.z);
+        this.car.rotation.set(pose.pitch, pose.yaw, pose.roll);
         this.updateCamera();
         this.updateWheels();
+        this.updateDrivingHud();
         this.checkSectionProximity();
         // Animate particles/signs only on medium+
         if (this.state.quality !== 'low') {
@@ -4346,17 +4230,6 @@ class PortfolioEngine {
             } else {
                 this.combo.driftAccum = 0;
             }
-        }
-
-        // Update interactive objects (cones, barrels)
-        if (this.car && this.interactiveObjects) {
-            this.updateInteractiveObjects(
-                delta,
-                this.car.position.x,
-                this.car.position.z,
-                this.state.carSpeed,
-                this.car.rotation.y
-            );
         }
 
         // Game Feel: Check achievements every 10 frames
@@ -4524,6 +4397,8 @@ class PortfolioEngine {
 
     updateMovement(delta) {
         this.updateCar(delta);
+        const p = this.vehiclePhysics;
+        this.updateInteractiveObjects(delta, p.x, p.z, p.speed, p.rotation);
     }
 
     updateCar(delta) {
@@ -4534,8 +4409,6 @@ class PortfolioEngine {
         this.state.input.brake = Math.max(this.touchInput?.brake || 0, (keys['KeyS'] || keys['ArrowDown']) ? 1 : 0);
         this.state.input.boost = keys['ShiftLeft'] || keys['ShiftRight'];
 
-        // Update engine sound
-        this.updateEngineSound();
 
         // Jump! (J key)
         if (keys['KeyJ'] && this.state.playerMode === 'driving') {
@@ -4569,31 +4442,10 @@ class PortfolioEngine {
         this.state.isBoosting = this.state.input.boost && this.state.input.throttle > 0;
         this.state.isAirborne = physicsState.isAirborne;
 
-        // Update UI
-        const speedKmh = Math.round(Math.abs(physicsState.speedKmh)); this.updateRacingHud?.();
-        const speedEl = document.getElementById('speedValue');
-        const boostEl = document.getElementById('speedBoost');
-        const airborneEl = document.getElementById('speedAirborne');
-
-        if (speedEl) {
-            speedEl.textContent = speedKmh;
-            //  GAME FEEL: Dynamic speed coloring
-            speedEl.classList.remove('fast', 'turbo');
-            if (this.state.isBoosting && speedKmh > 80) {
-                speedEl.classList.add('turbo');
-            } else if (speedKmh > 60) {
-                speedEl.classList.add('fast');
-            }
-        }
-        if (boostEl) boostEl.style.display = this.state.isBoosting ? 'inline-flex' : 'none';
-        if (airborneEl) airborneEl.style.display = physicsState.isAirborne ? 'inline-flex' : 'none';
-
-        // Visual feedback
-        this.setBoostLines(this.state.isBoosting && physicsState.speedKmh > 60);
-
         // Collision feedback - reflection bounce + sparks
-        if (physicsState.isColliding && Math.abs(physicsState.speed) > 5) {
-            const intensity = Math.min(Math.abs(physicsState.speed) / 20, 1);
+        if (physicsState.impactSpeed > 5 && this.state.time - (this.lastCollisionFeedback || -1) > .2) {
+            this.lastCollisionFeedback = this.state.time;
+            const intensity = Math.min(physicsState.impactSpeed / 20, 1);
             this.triggerScreenShake(0.3 * intensity);
             this.spawnDustBurst(this.car.position.x, 0.2, this.car.position.z, 0.5);
             this.playCollisionSound(intensity);
@@ -4641,6 +4493,17 @@ class PortfolioEngine {
                 }
             }
         }
+    }
+
+    updateDrivingHud() {
+        this.updateEngineSound();
+        this.updateRacingHud?.();
+        const speed = Math.round(Math.abs(this.vehiclePhysics.speed * 3.6));
+        const speedEl = document.getElementById('speedValue');
+        if (speedEl && speedEl.textContent !== String(speed)) speedEl.textContent = String(speed);
+        document.getElementById('speedBoost').style.display = this.state.isBoosting ? 'inline-flex' : 'none';
+        document.getElementById('speedAirborne').style.display = this.state.isAirborne ? 'inline-flex' : 'none';
+        this.setBoostLines(this.state.isBoosting && speed > 60);
     }
 
     updateWheels() {
@@ -5525,6 +5388,7 @@ class PortfolioEngine {
         this.state.keys = {};
         this.touchInput = {throttle:0,brake:0,steer:0};
         this.physicsAccumulator = 0;
+        this.motion = null;
         Object.assign(this.state.input, { throttle: 0, brake: 0, steer: 0, boost: false });
         this.state.holdingSpaceTime = 0;
         if (this.mouseCamera) this.mouseCamera.enabled = false;

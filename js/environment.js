@@ -69,7 +69,7 @@ export class Environment {
     // A physical shoreline keeps the pool from being a drive-through decal.
     const stoneGeo=new THREE.DodecahedronGeometry(1.2,0),stoneMat=surfaceMaterial('stone',this.engine.renderer);
     const shore=new THREE.InstancedMesh(stoneGeo,stoneMat,40),dummy=new THREE.Object3D();
-    for(let i=0;i<40;i++){const a=i/40*Math.PI*2;dummy.position.set(-58+Math.cos(a)*23,.4,-57+Math.sin(a)*23);dummy.scale.set(1.3,.65,1);dummy.rotation.set(0,a,0);dummy.updateMatrix();shore.setMatrixAt(i,dummy.matrix);this.engine.collisionSystem.addTree({x:dummy.position.x,z:dummy.position.z});}
+    for(let i=0;i<40;i++){const a=i/40*Math.PI*2;dummy.position.set(-58+Math.cos(a)*23,.4,-57+Math.sin(a)*23);dummy.scale.set(1.3,.65,1);dummy.rotation.set(0,a,0);dummy.updateMatrix();shore.setMatrixAt(i,dummy.matrix);this.engine.collisionSystem.addTree({x:dummy.position.x,z:dummy.position.z},.9,1.1);}
     shore.computeBoundingSphere();shore.castShadow=true;this.engine.scene.add(shore);return mesh;
   }
   createLandmarks() {
@@ -96,7 +96,7 @@ export class Environment {
       part(dark,x,height*.53,z+4.56,11,height*.55,.12);
       for(let j=0;j<4;j++)part(accent,x-4.5+j*3,height*.53,z+4.7,.12,height*.55,.16);
       part(accent,x+6,height+2,z,1,4,1);
-      this.engine.collisionSystem.addBuilding({x,z},16,10);
+      this.engine.collisionSystem.addBuilding({x,z},15,9,height);
     });
   }
   createStars(){

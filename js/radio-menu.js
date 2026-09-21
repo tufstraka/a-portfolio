@@ -10,7 +10,7 @@ export function setupRadioMenu(engine){
  document.getElementById('radioStop').onclick=()=>{stop();status.textContent='Radio off';};
  document.getElementById('radioSynth').onclick=()=>{stop();if(engine.muted)engine.toggleMute();engine.audioContext?.resume();engine.cycleRadio();status.textContent='Playing · Lo-fi Circuit';};
  document.getElementById('closeRadio').onclick=()=>dialog.close();
- engine.openRadio=()=>{engine.resetInput();dialog.showModal();};button.onclick=engine.openRadio;
+ engine.openRadio=()=>{engine.resetInput();if(document.getElementById('settingsPanel').classList.contains('active')){document.getElementById('settingsBtn').click();queueMicrotask(()=>dialog.showModal());}else dialog.showModal();};button.onclick=engine.openRadio;
  dialog.addEventListener('close',()=>document.getElementById('gameContainer').focus());
  document.addEventListener('visibilitychange',()=>{if(document.hidden)audio.pause();else if(engine.musicWanted)play();});
  audio.addEventListener('error',()=>{engine.musicWanted=false;status.textContent='Music unavailable. Try the built-in station.';});
@@ -20,8 +20,8 @@ export function setupRadioMenu(engine){
  const advanced=document.createElement('details');advanced.className='advanced-settings';const summary=document.createElement('summary');summary.textContent='Graphics & performance';advanced.append(summary);
  advanced.append(document.getElementById('qualitySelect').closest('.settings-group'),document.getElementById('effectsSelect').closest('.settings-group'),document.querySelector('.performance-details'));
  panel.append(advanced,document.getElementById('resetCar'));
- const siblings=[...document.body.children].filter(el=>el!==panel);let priorFocus;
- new MutationObserver(()=>{const open=panel.classList.contains('active');siblings.forEach(el=>el.inert=open);if(open){priorFocus=document.activeElement;document.getElementById('closeSettings').focus();}else priorFocus?.focus();}).observe(panel,{attributes:true,attributeFilter:['class']});
+ let priorFocus;
+ new MutationObserver(()=>{const open=panel.classList.contains('active');[...document.body.children].filter(el=>el!==panel).forEach(el=>el.inert=open);if(open){priorFocus=document.activeElement;document.getElementById('closeSettings').focus();}else priorFocus?.focus();}).observe(panel,{attributes:true,attributeFilter:['class']});
  panel.addEventListener('keydown',e=>{if(e.key!=='Tab')return;const nodes=[...panel.querySelectorAll('button,input,select,summary')].filter(el=>el.getClientRects().length);const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}});
 }
 

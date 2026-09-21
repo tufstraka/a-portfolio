@@ -1,0 +1,148 @@
+/* Shared interface colors: amber actions, cyan wayfinding, solid reading surfaces. */
+:root {
+    --ui-base: #101d30;
+    --ui-raised: #1b2e46;
+    --ui-hover: #253e59;
+    --ui-text: #f4f8ff;
+    --ui-muted: #bccce0;
+    --ui-amber: #ffc568;
+    --ui-cyan: #75e0f4;
+    --ui-border: #526a85;
+    --cockpit: var(--ui-base);
+    --panel: #101d30f2;
+    --line: var(--ui-border);
+    --lime: var(--ui-amber);
+    --muted: var(--ui-muted);
+}
+
+/* Content must remain legible over either daylight or night scenery. */
+#modalOverlay { padding: 20px; background: #060e1cb8; }
+#modal {
+    display: flex;
+    flex-direction: column;
+    width: min(740px, calc(100vw - 32px));
+    max-width: 740px;
+    max-height: calc(100dvh - 40px);
+    background: var(--ui-base);
+    color: var(--ui-text);
+    border: 1px solid var(--ui-border);
+    box-shadow: 0 24px 90px #0007;
+    color-scheme: dark;
+}
+.modal-header, .modal-footer { flex: none; border-color: var(--ui-border); }
+.modal-title {
+    font-family: 'Nunito', sans-serif;
+    font-size: clamp(24px, 4vw, 32px);
+    color: var(--ui-text);
+    text-transform: none;
+    letter-spacing: -.025em;
+}
+.modal-title-icon { font-size: 26px; }
+.modal-close {
+    flex: none;
+    color: var(--ui-text);
+    background: var(--ui-raised);
+    border: 1px solid var(--ui-border);
+    border-radius: 12px;
+}
+.modal-close:hover { background: var(--ui-hover); color: var(--ui-cyan); }
+.modal-body {
+    min-height: 0;
+    max-height: none;
+    overscroll-behavior: contain;
+    scrollbar-color: var(--ui-border) var(--ui-base);
+    scrollbar-width: thin;
+}
+.modal-content { color: var(--ui-text); font-size: 1rem; }
+.modal-intro {
+    color: var(--ui-muted);
+    font-size: 1.0625rem;
+    line-height: 1.7;
+    padding-bottom: 0;
+    border: 0;
+    margin-bottom: 24px;
+}
+.modal-section {
+    background: var(--ui-raised);
+    border: 1px solid var(--ui-border);
+    border-left: 3px solid var(--ui-cyan);
+    border-radius: 4px 14px 14px 4px;
+    padding: 22px;
+    margin-bottom: 16px;
+}
+.modal-section-title {
+    color: var(--ui-cyan);
+    font: 800 1.25rem/1.35 'Nunito', sans-serif;
+    text-transform: none;
+    letter-spacing: 0;
+    margin-bottom: 14px;
+}
+.modal-list { gap: 10px; }
+.modal-list li, .modal-list li:hover { color: var(--ui-text); font-size: 1rem; line-height: 1.65; }
+.modal-list li::before { color: var(--ui-cyan); flex: none; }
+.modal-list a, .project-link { color: var(--ui-cyan); overflow-wrap: anywhere; }
+.modal-list a:hover, .project-link:hover { color: #c2f5ff; text-decoration-thickness: 2px; transform: none; }
+.project-link { width: fit-content; padding: 10px 0; margin: 14px 0 0; }
+.modal-footer { padding: 16px 28px; }
+.btn-primary, .tutorial-start-btn {
+    background: var(--ui-amber);
+    color: var(--ui-base);
+    border: 1px solid var(--ui-amber);
+    box-shadow: none;
+    font-family: 'Nunito', sans-serif;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 800;
+}
+.btn-primary:hover, .tutorial-start-btn:hover {
+    background: #ffdb9b;
+    color: var(--ui-base);
+    border-color: #ffdb9b;
+    box-shadow: 0 4px 20px #ffc56820;
+}
+
+/* Carry the same palette through menus and the driving instruments. */
+.world-actions button, .brand-mark, .heading-compass, .mission-strip,
+.section-indicator-content { background: var(--panel); border-color: var(--ui-border); }
+.mission-strip, .section-indicator-content { border-left-color: var(--ui-amber); }
+.mission-label, .section-indicator-hint, .compass-marker { color: var(--ui-amber); }
+.brand-mark>span, .world-actions button span, .eyebrow, .mission-label,
+.tutorial-title em, .destination-list button>span, .direct-contact,
+.loading-content a, .no-script a { text-shadow: none; }
+.loading-bar { box-shadow: none; }
+.loading-logo span { color: var(--ui-amber) !important; }
+#settingsPanel, #radioDialog, #destinationsDialog, #experimentDialog {
+    color: var(--ui-text); background: var(--ui-base); border-color: var(--ui-border); color-scheme: dark;
+}
+.destination-list button, .station-card, .settings-select {
+    background: var(--ui-raised); color: var(--ui-text); border-color: var(--ui-border);
+}
+.world-actions button:hover, .destination-list button:hover, .station-card:hover {
+    background: var(--ui-hover); border-color: var(--ui-cyan); transform: none;
+}
+.destination-list small, .station-card span, .settings-help, #radioStatus,
+.music-credit, #settingsPanel details.advanced-settings { color: var(--ui-muted); font-size: .875rem; }
+.settings-label { color: var(--ui-text); }
+.direct-contact, .resume-download, .music-credit a, .radio-stop,
+.field-notes button, #experimentResult { color: var(--ui-cyan) !important; }
+#volumeControl { accent-color: var(--ui-amber); }
+#comfortMode:checked { background: #207786; }
+#experimentChoices button { background: var(--ui-amber); color: var(--ui-base); }
+#experimentChoices button:hover { background: #ffdb9b; }
+#discoveryAction { background: var(--ui-base); color: var(--ui-amber); border-color: var(--ui-amber); }
+#speedDisplay { background: radial-gradient(circle, #101d30f5 0%, #101d30e6 47%, #101d3000 69%); }
+.gauge-fill { stroke: var(--ui-cyan); }
+#speedNeedle path { fill: var(--ui-cyan); }
+#driveMode { color: var(--ui-cyan); }
+:is(button, a, select, input, summary):focus-visible {
+    outline: 3px solid var(--ui-cyan); outline-offset: 4px;
+}
+@media (max-width: 700px) {
+    #modalOverlay { padding: 12px; }
+    #modal { width: 100%; max-height: calc(100dvh - 24px); border-radius: 18px; }
+    .modal-header, .modal-body { padding: 18px; }
+    .modal-section { padding: 18px 16px; }
+    .modal-footer { padding: 14px 18px; }
+    .modal-footer .btn { width: 100%; }
+    .modal-intro { font-size: 1rem; }
+}

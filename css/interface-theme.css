@@ -1,4 +1,14 @@
 /* Shared interface colors: amber actions, cyan wayfinding, solid reading surfaces. */
+.ui-icon { width: 24px; height: 24px; display: inline-block; flex: none; vertical-align: middle; }
+.modal-title-icon { display: flex; color: var(--ui-cyan); }
+.modal-title-icon .ui-icon { width: 28px; height: 28px; }
+.sign-label-title { display: flex; align-items: center; justify-content: center; gap: 8px; }
+.sign-label-title .ui-icon { width: 18px; height: 18px; }
+#muteBtn, .mobile-btn { align-items: center; justify-content: center; }
+#muteBtn .sound-off, #muteBtn[aria-pressed="true"] .sound-on { display: none; }
+#muteBtn[aria-pressed="true"] .sound-off { display: inline; }
+.toast-icon { color: var(--ui-cyan); }
+.toast-icon .ui-icon { width: 28px; height: 28px; }
 :root {
     --ui-base: #101d30;
     --ui-raised: #1b2e46;

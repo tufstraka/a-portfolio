@@ -1,3 +1,4 @@
+import { iconSvg, drawIcon, setupIcons } from './icons.js';
 import { createTrees } from './trees.js';
 import { setupRacingHud } from './racing-hud.js';
 import { setupRadioMenu } from './radio-menu.js';
@@ -1460,7 +1461,7 @@ class PortfolioEngine {
                     this.showTutorial();
                 } else {
                     this.startLoop();
-                    this.showToast('🚗', 'Welcome Back!', 'Drive to any building to explore');
+                    this.showToast('car', 'Welcome Back!', 'Drive to any building to explore');
                 }
             }, 600);
 
@@ -1475,7 +1476,7 @@ class PortfolioEngine {
             const loadingContent = document.querySelector('.loading-content');
             if (loadingContent) {
                 loadingContent.innerHTML = `
-                    <div class="loading-logo">⚠️</div>
+                    <div class="loading-logo">${iconSvg('warning')}</div>
                     <h1 class="loading-title">Oops!</h1>
                     <p class="loading-subtitle">This world could not start on your device.</p><a href="mailto:keithkadima@gmail.com">Email Keith</a><br><a href="https://github.com/tufstraka">Explore my projects on GitHub</a><br><button onclick="location.reload()">Try again</button>
 
@@ -1489,13 +1490,13 @@ class PortfolioEngine {
 
         // Show random loading tips
         const tips = [
-            '💡 Use SHIFT for turbo boost!',
-            '🎮 Press J to jump over obstacles',
-            '🏢 Drive to buildings to see my work',
-            '🌅 Watch the day/night cycle',
-            '🎨 Graphics adapt to your device',
-            '🚗 Drift by turning sharply at speed',
-            '🗺️ Check the minimap for directions',
+            ' Use SHIFT for turbo boost!',
+            ' Press J to jump over obstacles',
+            ' Drive to buildings to see my work',
+            ' Watch the day/night cycle',
+            ' Graphics adapt to your device',
+            ' Drift by turning sharply at speed',
+            ' Check the minimap for directions',
             '⏎ Press SPACE near buildings to enter'
         ];
 
@@ -1534,7 +1535,7 @@ class PortfolioEngine {
 
         // Welcome message
         setTimeout(() => {
-            this.showToast('🎉', 'Let\'s Go!', 'Drive to the glowing buildings to explore');
+            this.showToast('flag', 'Let\'s Go!', 'Drive to the glowing buildings to explore');
         }, 500);
     }
 
@@ -1544,7 +1545,7 @@ class PortfolioEngine {
         const toastTitle = document.getElementById('toastTitle');
         const toastSubtitle = document.getElementById('toastSubtitle');
 
-        toastIcon.textContent = icon;
+        toastIcon.innerHTML = iconSvg(icon);
         toastTitle.textContent = title;
         toastSubtitle.textContent = subtitle;
 
@@ -1595,7 +1596,7 @@ class PortfolioEngine {
             this.state.time - this.state.boostStartTime > 3 &&
             !safeStorage.getItem('achievement_speedDemon')) {
             safeStorage.setItem('achievement_speedDemon', 'true');
-            this.showToast('🔥', 'Speed Demon!', 'Boosted for 3 seconds straight');
+            this.showToast('boost', 'Speed Demon!', 'Boosted for 3 seconds straight');
             // Achievement unlocked - subtle celebration
         }
 
@@ -1603,7 +1604,7 @@ class PortfolioEngine {
         if (this.state.sectionsVisited.size === 5 && 
             !safeStorage.getItem('achievement_explorer')) {
             safeStorage.setItem('achievement_explorer', 'true');
-            this.showToast('🏆', 'Explorer!', 'You\'ve visited every section');
+            this.showToast('flag', 'Explorer!', 'You\'ve visited every section');
             // Achievement unlocked - subtle celebration
         }
 
@@ -1617,7 +1618,7 @@ class PortfolioEngine {
             if (this.state.totalDistance > 1000 &&
                 !safeStorage.getItem('achievement_roadWarrior')) {
                 safeStorage.setItem('achievement_roadWarrior', 'true');
-                this.showToast('🛣️', 'Road Warrior!', 'Drove over 1000 units');
+                this.showToast('road', 'Road Warrior!', 'Drove over 1000 units');
             }
         }
 
@@ -2616,7 +2617,7 @@ class PortfolioEngine {
         osc.stop(this.audioContext.currentTime + 0.3);
     }
 
-    // ⚡ GAME FEEL: Particle system for landing dust/sparks
+    //  GAME FEEL: Particle system for landing dust/sparks
     spawnLandingParticles(count = 8) {
         if (!this.car || this.state.quality === 'low') return;
 
@@ -2819,7 +2820,7 @@ class PortfolioEngine {
             // Icon
             ctx.font = '64px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText(data.icon, 256, 90);
+            drawIcon(ctx, data.icon, 256, 66, 58);
 
             // Title
             ctx.fillStyle = '#ffffff';
@@ -2886,7 +2887,7 @@ class PortfolioEngine {
             const hexColor = '#' + new THREE.Color(data.color).getHexString();
             const introShort = data.content.intro.slice(0, 80) + (data.content.intro.length > 80 ? '…' : '');
             labelDiv.innerHTML = `
-                <div class="sign-label-title">${data.icon} ${title}</div>
+                <div class="sign-label-title">${iconSvg(data.icon)} ${title}</div>
                 <div class="sign-label-sub">${introShort}</div>
             `;
             labelDiv.style.cssText = `
@@ -3708,7 +3709,7 @@ class PortfolioEngine {
         if (e.code === 'KeyF') { this.discoveries?.open(this.discoveries.near); return; }
         if (e.repeat) return;
 
-        // 🥚 KONAMI CODE EASTER EGG
+        //  KONAMI CODE EASTER EGG
         this.checkKonamiCode(e.code);
 
         // Space is now handled by hold-to-enter in checkSectionProximity
@@ -3719,10 +3720,10 @@ class PortfolioEngine {
         if (e.code === 'KeyC') this.toggleCamera();
         if (e.code === 'KeyH') this.honk();
         if (e.code === 'KeyM') this.toggleMinimap();
-        if (e.code === 'KeyT') this.cycleTimeOfDay(); // 🌅 Time of day
-        if (e.code === 'KeyN') this.toggleNightMode(); // 🌙 Night mode
-        if (e.code === 'KeyR') this.openRadio(); // 📻 Radio
-        if (e.code === 'KeyV') this.toggleMute(); // 🔊 Mute
+        if (e.code === 'KeyT') this.cycleTimeOfDay(); //  Time of day
+        if (e.code === 'KeyN') this.toggleNightMode(); //  Night mode
+        if (e.code === 'KeyR') this.openRadio(); //  Radio
+        if (e.code === 'KeyV') this.toggleMute(); //  Mute
 
         if (e.code === 'Escape') {
             this.closeModal();
@@ -3735,7 +3736,7 @@ class PortfolioEngine {
         }
     }
 
-    // 🥚 KONAMI CODE: ↑↑↓↓←→←→BA
+    //  KONAMI CODE: ↑↑↓↓←→←→BA
     checkKonamiCode(code) {
         const konamiSequence = [
             'ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown',
@@ -3757,7 +3758,7 @@ class PortfolioEngine {
     }
 
     activateKonamiMode() {
-        // 🎮 SECRET UNLOCKED!
+        //  SECRET UNLOCKED!
         this.state.konamiActive = true;
 
         // Rainbow car!
@@ -3775,7 +3776,7 @@ class PortfolioEngine {
         CONFIG.JUMP_FORCE = 20;
 
         // Epic notification
-        this.showToast('🎮', 'KONAMI CODE!', 'Rainbow mode + Super boost activated!');
+        this.showToast('game', 'KONAMI CODE!', 'Rainbow mode + Super boost activated!');
 
         // Play victory sound
         if (this.audioContext) {
@@ -3795,7 +3796,7 @@ class PortfolioEngine {
         }
     }
 
-    // 🌅 DYNAMIC TIME OF DAY
+    //  DYNAMIC TIME OF DAY
     cycleTimeOfDay() {
         const times = ['dawn', 'day', 'sunset', 'night'];
         if (this.currentTimeIndex === undefined) this.currentTimeIndex = 1; // Start at day
@@ -3811,7 +3812,7 @@ class PortfolioEngine {
 
     setTimeOfDay(time) {
         this.environment?.setTime(time);
-        this.showToast('◷', time[0].toUpperCase() + time.slice(1), 'The world is changing around you.');
+        this.showToast('clock', time[0].toUpperCase() + time.slice(1), 'The world is changing around you.');
     }
 
     honk() {
@@ -3938,8 +3939,8 @@ class PortfolioEngine {
         const current = modes.indexOf(this.state.cameraMode);
         this.state.cameraMode = modes[(current + 1) % modes.length];
 
-        const icons = { 'follow': '📹', 'orbit': '🎬', 'first-person': '👁️' };
-        this.showNotification(`Camera: ${this.state.cameraMode} ${icons[this.state.cameraMode]}`);
+        const labels = { 'follow': 'Follow', 'orbit': 'Orbit', 'first-person': 'First person' };
+        this.showNotification(`Camera: ${labels[this.state.cameraMode]}`);
     }
 
     showNotification(text, subtext = null, color = null) {
@@ -3976,20 +3977,20 @@ class PortfolioEngine {
         if (!this.state.sectionsVisited.has(title)) {
             this.state.sectionsVisited.add(title);
             this.recordSectionVisit(title);
-            if (this.combo) this.combo.addScore(200, '🏢 EXPLORE');
+            if (this.combo) this.combo.addScore(200, ' EXPLORE');
 
             // Check if this was the first section
             if (this.state.sectionsVisited.size === 1 && 
                 !safeStorage.getItem('achievement_firstExplore')) {
                 safeStorage.setItem('achievement_firstExplore', 'true');
                 setTimeout(() => {
-                    this.showToast('🎯', 'First Discovery!', 'Keep exploring to find more');
+                    this.showToast('target', 'First Discovery!', 'Keep exploring to find more');
                 }, 500);
             }
         }
 
         document.getElementById('modalTitle').textContent = title;
-        document.getElementById('modalIcon').textContent = icon;
+        document.getElementById('modalIcon').innerHTML = iconSvg(icon);
 
         let html = `<p class="modal-intro">${content.intro}</p>`;
 
@@ -4006,7 +4007,7 @@ class PortfolioEngine {
 
         document.getElementById('modalContent').innerHTML = html;
         if (title === 'Projects') {
-            const link = document.createElement('a'); link.href = 'https://github.com/tufstraka'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Explore my public repositories ↗'; link.className = 'project-link'; document.getElementById('modalContent').appendChild(link);
+            const link = document.createElement('a'); link.href = 'https://github.com/tufstraka'; link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = 'Explore my public repositories '; link.className = 'project-link'; document.getElementById('modalContent').appendChild(link);
         }
         this.diagnostics?.record('open_' + title);
         this.playUiTone?.();
@@ -4182,7 +4183,7 @@ class PortfolioEngine {
         inner.innerHTML = `
             <div class="sidebar-header">
                 <div class="sidebar-color-bar" style="background:${colorHex}"></div>
-                <span class="sidebar-icon">${icon}</span>
+                <span class="sidebar-icon">${iconSvg(icon)}</span>
                 <span class="sidebar-title">${title}</span>
             </div>
             <p class="sidebar-intro">${content.intro}</p>
@@ -4326,20 +4327,20 @@ class PortfolioEngine {
             this.updateParticles(delta);
         }
 
-        // 🚗 DRIFT: Check for drifting and update smoke
+        //  DRIFT: Check for drifting and update smoke
         this.checkDrift();
         if (this.state.quality !== 'low') {
             this.updateDriftSmoke(delta);
         }
 
-        // 🎯 COMBO: Update scoring
+        //  COMBO: Update scoring
         if (this.combo) {
             this.combo.update(delta);
             // Drift scoring: 10pts/s while drifting
             if (this.vehiclePhysics && this.vehiclePhysics.isDrifting) {
                 this.combo.driftAccum += delta;
                 if (this.combo.driftAccum >= 0.5) {
-                    this.combo.addScore(10, '💨 DRIFT');
+                    this.combo.addScore(10, ' DRIFT');
                     this.combo.driftAccum = 0;
                 }
             } else {
@@ -4381,17 +4382,17 @@ class PortfolioEngine {
             this.updateSkidMarks();
         }
 
-        // 🎨 Update film grain time for animated noise
+        //  Update film grain time for animated noise
         if (this.filmGrainPass && this.filmGrainPass.enabled) {
             this.filmGrainPass.uniforms['time'].value = this.state.time;
         }
 
-        // 🎥 Update camera shake
+        //  Update camera shake
         if (this.cameraShake) {
             this.cameraShake.update(delta, this.state.time);
         }
 
-        // 🎥 Update motion blur based on speed
+        //  Update motion blur based on speed
         if (this.motionBlurPass && this.motionBlurPass.enabled) {
             const normalizedSpeed = Math.abs(this.state.carSpeed) / CONFIG.MAX_SPEED;
             this.motionBlurPass.uniforms['velocity'].value = normalizedSpeed * 0.8;
@@ -4416,7 +4417,7 @@ class PortfolioEngine {
         this.diagnostics?.frame(elapsed * 1000, this.renderer);
     }
 
-    // 🎯 PERFORMANCE: Frustum Culling - Only render what the camera sees
+    //  PERFORMANCE: Frustum Culling - Only render what the camera sees
     updateFrustumCulling() {
         if (!this.frustumCuller || !this.camera || !CONFIG.CULLING_ENABLED) return;
 
@@ -4541,8 +4542,8 @@ class PortfolioEngine {
             this.state.keys['KeyJ'] = false;
             const jumped = this.vehiclePhysics.jump();
             if (jumped) {
-                this.showToast('🦘', 'Jump!', '');
-                if (this.combo) this.combo.addScore(50, '⬆️ JUMP');
+                this.showToast('jump', 'Jump!', '');
+                if (this.combo) this.combo.addScore(50, ' JUMP');
             }
         }
 
@@ -4576,7 +4577,7 @@ class PortfolioEngine {
 
         if (speedEl) {
             speedEl.textContent = speedKmh;
-            // ⚡ GAME FEEL: Dynamic speed coloring
+            //  GAME FEEL: Dynamic speed coloring
             speedEl.classList.remove('fast', 'turbo');
             if (this.state.isBoosting && speedKmh > 80) {
                 speedEl.classList.add('turbo');
@@ -4607,9 +4608,9 @@ class PortfolioEngine {
             this.spawnLandingParticles(Math.ceil(intensity * 12));
             // Score for landing
             if (physicsState.isOnRoad && physicsState.landingImpact > 4) {
-                if (this.combo) this.combo.addScore(100, '🎯 PRECISION');
+                if (this.combo) this.combo.addScore(100, ' PRECISION');
             } else if (physicsState.landingImpact > 3) {
-                if (this.combo) this.combo.addScore(50, '🦘 LAND');
+                if (this.combo) this.combo.addScore(50, ' LAND');
             }
         }
         this.state.wasAirborne = physicsState.isAirborne;
@@ -4773,7 +4774,7 @@ class PortfolioEngine {
             });
         }
 
-        // 🌈 RAINBOW MODE (Konami code activated)
+        //  RAINBOW MODE (Konami code activated)
         if (this.state.rainbowMode && this.car) {
             const hue = (this.state.time * 50) % 360;
             this.car.traverse(child => {
@@ -4806,7 +4807,7 @@ class PortfolioEngine {
         }
     }
 
-    // 🚗 DRIFT DETECTION - now uses physics slip-angle data
+    //  DRIFT DETECTION - now uses physics slip-angle data
     checkDrift() {
         if (!this.vehiclePhysics || !this.car) return;
 
@@ -4838,7 +4839,7 @@ class PortfolioEngine {
             const driftDuration = this.state.time - (this.state.driftStartTime || 0);
             if (driftDuration > 2 && !safeStorage.getItem('achievement_driftKing')) {
                 safeStorage.setItem('achievement_driftKing', 'true');
-                this.showToast('💨', 'Drift King!', 'Held a drift for 2+ seconds');
+                this.showToast('drift', 'Drift King!', 'Held a drift for 2+ seconds');
             }
         } else {
             // Fade out tire audio
@@ -4980,7 +4981,7 @@ class PortfolioEngine {
                 const color = '#' + new THREE.Color(closest.userData.color).getHexString();
                 dot.style.backgroundColor = color;
                 dot.style.color = color;
-                title.textContent = `${closest.userData.icon} ${closest.userData.title}`;
+                title.textContent = closest.userData.title;
                 hint.textContent = matchMedia('(pointer: coarse), (max-width: 700px)').matches ? 'Tap ↵ to enter' : 'Hold SPACE to enter';
                 hint.style.display = 'inline';
                 indicator.style.display = 'block';
@@ -5080,7 +5081,7 @@ class PortfolioEngine {
             if (pos.x < -10 || pos.x > canvas.width + 10 || pos.y < -10 || pos.y > canvas.height + 10) return;
 
             const color = '#' + new THREE.Color(section.userData.color).getHexString();
-            const icon = section.userData.icon || '📍';
+            const icon = section.userData.icon || 'target';
 
             // Glow effect
             ctx.shadowColor = color;
@@ -5102,7 +5103,7 @@ class PortfolioEngine {
             ctx.font = '10px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText(icon, pos.x, pos.y);
+            drawIcon(ctx, icon, pos.x, pos.y, 13);
         });
 
         // Draw player (always at center)
@@ -5148,7 +5149,7 @@ class PortfolioEngine {
         const displayFps = Math.min(Math.max(this.fps, 0), 999);
         document.getElementById('fpsCounter').textContent = `${displayFps} FPS`;
 
-        // 🎯 PERFORMANCE: Record FPS for adaptive quality
+        //  PERFORMANCE: Record FPS for adaptive quality
         if (this.adaptiveQuality && !this.manualQuality) {
             this.adaptiveQuality.recordFPS(this.fps);
 
@@ -5161,7 +5162,7 @@ class PortfolioEngine {
                     document.getElementById('qualitySelect').value = newLevel;
                     this.applyQuality(newLevel);
 
-                    this.showToast('⚙️', 'Quality Adjusted', `Lowered to ${newLevel} for better performance`);
+                    this.showToast('settings', 'Quality Adjusted', `Lowered to ${newLevel} for better performance`);
                 }
             }
         }
@@ -5353,7 +5354,7 @@ class PortfolioEngine {
             const hintEl = indicator.querySelector('.section-indicator-hint');
             const dotEl = indicator.querySelector('.section-indicator-dot');
 
-            if (titleEl) titleEl.textContent = nearest.userData.icon + ' ' + nearest.userData.title;
+            if (titleEl) titleEl.textContent = nearest.userData.title;
             if (hintEl) hintEl.textContent = nearestDist < 15 ? 'Press SPACE to enter' : `${Math.round(nearestDist)}m away`;
             if (dotEl) dotEl.style.color = '#' + new THREE.Color(nearest.userData.color).getHexString();
 
@@ -5364,7 +5365,7 @@ class PortfolioEngine {
         }
     }
 
-    // 🎯 PERFORMANCE: Get renderer stats for debugging
+    //  PERFORMANCE: Get renderer stats for debugging
     getPerformanceStats() {
         if (!this.renderer) return {};
 
@@ -5396,7 +5397,7 @@ class PortfolioEngine {
             transition: opacity 0.3s;
         `;
         container.innerHTML = `
-            <span style="font-size:20px">🏎️</span>
+            ${iconSvg('car')}
             <div>
                 <div id="speedValue" style="font-size:22px;font-weight:bold;line-height:1">0</div>
                 <div style="font-size:10px;opacity:0.6">km/h</div>
@@ -5435,8 +5436,8 @@ class PortfolioEngine {
         if (this.radioGain) { this.radioGain.disconnect(); this.radioGain = null; }
 
         const names = ['Off', 'Lo-fi Circuit', 'Retro Relay'];
-        document.getElementById('radioControl').textContent = this.radioStation ? `♫ ${names[this.radioStation]}` : 'Radio · off';
-        this.showToast('📻', `Radio: ${names[this.radioStation]}`, 'Press R to change', 2000);
+        document.getElementById('radioControl').textContent = this.radioStation ? `${names[this.radioStation]}` : 'Radio · off';
+        this.showToast('radio', `Radio: ${names[this.radioStation]}`, 'Press R to change', 2000);
 
         if (this.radioStation === 0) return;
 
@@ -5495,11 +5496,11 @@ class PortfolioEngine {
         if (!this.muted) {
             this.audioContext.suspend();
             this.muted = true;
-            if (btn) { btn.textContent = '🔇'; btn.setAttribute('aria-pressed', 'true'); } this.syncMusic?.();
+            if (btn) { btn.setAttribute('aria-pressed', 'true'); } this.syncMusic?.();
         } else {
             this.audioContext.resume();
             this.muted = false;
-            if (btn) { btn.textContent = '🔊'; btn.setAttribute('aria-pressed', 'false'); } this.syncMusic?.();
+            if (btn) { btn.setAttribute('aria-pressed', 'false'); } this.syncMusic?.();
         }
     }
 
@@ -5569,7 +5570,7 @@ class PortfolioEngine {
         });
         this.renderer.domElement.addEventListener('webglcontextlost', e => {
             e.preventDefault(); this.resetInput();
-            this.showToast('↻', 'Graphics connection lost', 'Reload to restart. You can still use Destinations.', 15000);
+            this.showToast('reset', 'Graphics connection lost', 'Reload to restart. You can still use Destinations.', 15000);
         });
         this.renderer.domElement.addEventListener('pointerdown', () => {
             if (!this.isInterfaceOpen()) document.getElementById('gameContainer').focus();
@@ -5616,12 +5617,12 @@ class PortfolioEngine {
             document.getElementById('settingsPanel').classList.remove('active');
             document.getElementById('settingsBtn').setAttribute('aria-expanded','false');
             document.getElementById('gameContainer').focus();
-            this.showToast('↻','Back on the road','Your discoveries are safe.');
+            this.showToast('reset','Back on the road','Your discoveries are safe.');
         };
         document.getElementById('radioControl').onclick = () => {
             if (this.muted) this.toggleMute();
             this.audioContext?.resume(); this.cycleRadio();
-            document.getElementById('radioControl').textContent = ['Radio · off','♫ Lo-fi Circuit','♫ Retro Relay'][this.radioStation];
+            document.getElementById('radioControl').textContent = ['Radio · off','Lo-fi Circuit','Retro Relay'][this.radioStation];
             document.getElementById('gameContainer').focus();
         };
         document.querySelector('.pilot-brand').onclick = e => { e.preventDefault(); document.getElementById('resetCar').click(); };
@@ -5680,7 +5681,7 @@ class PortfolioEngine {
             const count = this.state.sectionsVisited.size;
             badge.textContent = `${count} / 5 DISCOVERED`;
             document.getElementById('missionText').textContent = count === 5 ? 'World explored. Let’s build the next one together.' : `${5 - count} stops left. Keep following your curiosity.`;
-            if (count === 5) badge.textContent = '✨ All explored!';
+            if (count === 5) badge.textContent = ' All explored!';
         }
         this.saveAnalytics();
     }
@@ -5694,7 +5695,7 @@ class PortfolioEngine {
                 sessionDuration: (Date.now() - this.analytics.startTime) / 1000
             };
             sessionStorage.setItem('portfolio_analytics', JSON.stringify(data));
-            console.log('📊 Portfolio Analytics:', data);
+            console.log(' Portfolio Analytics:', data);
         } catch(e) {}
     }
 }
@@ -5704,6 +5705,7 @@ class PortfolioEngine {
 // ============================================
 
 const engine = new PortfolioEngine();
+setupIcons();
 engine.init();
 
 // Cleanup on page unload

@@ -42,35 +42,52 @@ export class Environment {
   }
   createWater() {
     const material=new THREE.ShaderMaterial({
-      uniforms:{time:{value:0},night:{value:0}},
+      uniforms:{time:{value:0},night:{value:0},skyTop:{value:new THREE.Color(0x69b4dd)},skyHorizon:{value:new THREE.Color(0xdbe3c5)},sunColor:{value:new THREE.Color(0xfff4d9)},sunDirection:{value:new THREE.Vector3(1,1,1).normalize()}},
       vertexShader:`varying vec2 vUv; varying vec3 vWorld; uniform float time;
       #include <common>
       #include <logdepthbuf_pars_vertex>
-      void main(){vUv=uv; vec3 p=position; p.z+=sin(p.x*.22+time*.7)*.10+cos(p.y*.26-time*.5)*.08; vec4 w=modelMatrix*vec4(p,1.);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;
+      void main(){vUv=uv; vec3 p=position; p.z+=sin(p.x*.55+time*.7)*.035+cos(p.y*.72-time*.5)*.025; vec4 w=modelMatrix*vec4(p,1.);vWorld=w.xyz;gl_Position=projectionMatrix*viewMatrix*w;
       #include <logdepthbuf_vertex>
       }`,
       fragmentShader:`varying vec2 vUv;varying vec3 vWorld;uniform float time;uniform float night;
+      uniform vec3 skyTop;uniform vec3 skyHorizon;uniform vec3 sunColor;uniform vec3 sunDirection;
+      #include <common>
       #include <logdepthbuf_pars_fragment>
       void main(){
       #include <logdepthbuf_fragment>
-      float r=length(vUv-.5)*2.; if(r>1.)discard;float wave=sin(vUv.x*85.+time*.8+sin(vUv.y*48.+time))*.5+.5;
-      vec3 c=mix(vec3(.055,.31,.36),vec3(.19,.62,.64),wave*.24+smoothstep(.65,1.,r)*.48);
-      float glint=pow(max(0.,sin(vUv.x*130.+vUv.y*90.+time)),32.)*.10;c+=glint;c=mix(c,c*vec3(.4,.58,.8),night*.65);
-      float ripple=sin(r*95.-time*1.8+sin(vUv.x*30.))*.5+.5;
-      float foam=smoothstep(.88,1.,r)*smoothstep(.65,.95,ripple);
-      c=mix(c,vec3(.63,.83,.77),foam*.6);
-      c+=pow(max(0.,sin(vUv.y*180.+sin(vUv.x*75.+time)*2.-time*1.3)),20.)*.06*(1.-night);
-      gl_FragColor=vec4(c,1.);#include <tonemapping_fragment>\n#include <colorspace_fragment>}`.replace(';#include',';\n#include'),
+      vec2 p=(vUv-.5)*44.;float radius=length(p);if(radius>22.)discard;
+      float depth=smoothstep(0.,8.,22.-radius);
+      float a=p.x*.55+time*.7,b=p.y*.72-time*.5;
+      float fine=dot(p,vec2(1.7,1.2))+time*1.1;
+      vec3 normal=normalize(vec3(-.019*cos(a)-.025*cos(fine),1.,-.018*sin(b)-.018*cos(fine)));
+      vec3 viewDir=normalize(cameraPosition-vWorld);
+      vec3 reflected=reflect(-viewDir,normal);
+      float fresnel=.025+.975*pow(1.-max(dot(normal,viewDir),0.),5.);
+      vec3 sky=mix(skyHorizon,skyTop,smoothstep(0.,.8,reflected.y));
+      vec3 bed=mix(vec3(.25,.32,.22),vec3(.025,.15,.17),depth);
+      float caustic=pow(.5+.5*sin(p.x*2.1+sin(p.y*1.7+time*.6)+time*.4),6.);
+      bed+=vec3(.10,.13,.075)*caustic*(1.-depth)*(1.-night);
+      vec3 c=mix(bed*(1.-night*.62),sky,max(.20,fresnel*.85));
+      float highlight=pow(max(dot(reflected,sunDirection),0.),160.);
+      c+=sunColor*highlight*(1.-night)*.9;
+      float shore=(1.-smoothstep(.15,1.3,22.-radius))*(.5+.5*sin(radius*15.-time*.7+sin(p.x)));
+      c=mix(c,vec3(.61,.68,.56)*(1.-night*.55),shore*.22);
+      gl_FragColor=vec4(c,1.);
+      #include <tonemapping_fragment>
+      #include <colorspace_fragment>
+      }`,
       side:THREE.DoubleSide
     });
-    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(44,44,24,24),material);
-    mesh.rotation.x=-Math.PI/2;mesh.position.set(-58,.1,-57);mesh.userData.dynamic=true;
+    const mesh=new THREE.Mesh(new THREE.PlaneGeometry(44,44,48,48),material);
+    mesh.rotation.x=-Math.PI/2;mesh.position.set(-58,.22,-57);mesh.userData.dynamic=true;
     this.engine.scene.add(mesh);
     // A physical shoreline keeps the pool from being a drive-through decal.
     const stoneGeo=new THREE.DodecahedronGeometry(1.2,0),stoneMat=surfaceMaterial('stone',this.engine.renderer);
     const shore=new THREE.InstancedMesh(stoneGeo,stoneMat,40),dummy=new THREE.Object3D();
     for(let i=0;i<40;i++){const a=i/40*Math.PI*2;dummy.position.set(-58+Math.cos(a)*23,.4,-57+Math.sin(a)*23);dummy.scale.set(1.3,.65,1);dummy.rotation.set(0,a,0);dummy.updateMatrix();shore.setMatrixAt(i,dummy.matrix);this.engine.collisionSystem.addTree({x:dummy.position.x,z:dummy.position.z},.9,1.1);}
-    shore.computeBoundingSphere();shore.castShadow=true;this.engine.scene.add(shore);return mesh;
+    shore.computeBoundingSphere();shore.castShadow=true;this.engine.scene.add(shore);
+    const reeds=new THREE.InstancedMesh(new THREE.CylinderGeometry(.025,.055,1.5,4),new THREE.MeshStandardMaterial({color:0x6b7951,roughness:1}),96);
+    for(let i=0;i<96;i++){const a=i*2.399963,r=21.5+(i%5)*.25;dummy.position.set(-58+Math.cos(a)*r,.7,-57+Math.sin(a)*r);dummy.scale.set(1,.65+(i%7)*.11,1);dummy.rotation.set(.09*Math.sin(i),a,.12*Math.cos(i));dummy.updateMatrix();reeds.setMatrixAt(i,dummy.matrix);}reeds.computeBoundingSphere();this.engine.scene.add(reeds);return mesh;
   }
   createLandmarks() {
     const scene=this.engine.scene;
@@ -91,12 +108,24 @@ export class Environment {
       const x=section.position.x,z=section.position.z-14;
       const accent=new THREE.MeshLambertMaterial({color:section.userData.color});
       const height=7+(i%3)*2;
-      part(shell,x,height/2,z,15,height,9).castShadow=true;
-      part(accent,x,height+.3,z,16,.6,10).castShadow=true;
-      part(dark,x,height*.53,z+4.56,11,height*.55,.12);
-      for(let j=0;j<4;j++)part(accent,x-4.5+j*3,height*.53,z+4.7,.12,height*.55,.16);
-      part(accent,x+6,height+2,z,1,4,1);
-      this.engine.collisionSystem.addBuilding({x,z},15,9,height);
+      // Real open bay: collisions follow the walls, leaving a generous drive-in opening.
+      part(shell,x-7,height/2,z,.6,height,10).castShadow=true;
+      part(shell,x+7,height/2,z,.6,height,10).castShadow=true;
+      part(shell,x,height/2,z-4.7,14,height,.6).castShadow=true;
+      part(dark,x,.04,z,14,.08,10);
+      part(shell,x,height,z,14.8,.35,10.6).castShadow=true;
+      part(accent,x,height-.7,z+5.1,14.8,1,.25);
+      const light=new THREE.MeshStandardMaterial({color:0xffe4aa,emissive:0xffd397,emissiveIntensity:1.3});
+      part(light,x,height-.15,z+3,9,.06,.15);
+      for(const side of [-1,1]){
+        part(dark,x+side*5.5,1.1,z-2,2,2.2,2.4).castShadow=true;
+        part(accent,x+side*5.5,2.25,z-2,2.2,.15,2.6);
+        this.engine.collisionSystem.addBuilding({x:x+side*5.5,z:z-2},2,2.4,2.3);
+        part(paint,x+side*2.6,.1,z+1,.12,.02,7);
+      }
+      this.engine.collisionSystem.addBuilding({x:x-7,z},.6,10,height);
+      this.engine.collisionSystem.addBuilding({x:x+7,z},.6,10,height);
+      this.engine.collisionSystem.addBuilding({x,z:z-4.7},14,.6,height);
     });
   }
   createStars(){
@@ -121,7 +150,9 @@ export class Environment {
     this.wildlife.update(e.state.time,night);
     this.water.material.uniforms.time.value=e.reducedMotion?0:e.state.time;
     this.grass.update(e.state.time);
-    this.water.material.uniforms.night.value=night;this.stars.material.opacity=night*.85;
+    this.water.material.uniforms.night.value=night;
+    this.water.material.uniforms.skyTop.value.copy(a.top);this.water.material.uniforms.skyHorizon.value.copy(a.bottom);
+    this.water.material.uniforms.sunColor.value.copy(a.sun);this.water.material.uniforms.sunDirection.value.copy(e.sunLight.position).normalize();this.stars.material.opacity=night*.85;
     this.beacons.forEach((r,i)=>{r.material.opacity=e.state.sectionsVisited.has(e.sections[i].userData.title)?.25:.65+(e.reducedMotion?0:Math.sin(e.state.time*2+i)*.15);});
     const label=document.getElementById('worldTime');if(label)label.textContent=night>.7?'AFTER HOURS':this.time>.65?'GOLDEN HOUR':'DAYLIGHT';
   }

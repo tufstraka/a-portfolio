@@ -1,3 +1,4 @@
+import { Headlights } from './headlights.js';
 import { TrailEffects } from './trail-effects.js';
 import { createTrailScenery } from './trail-scenery.js';
 import { CollisionSystem, MotionInterpolator, PHYSICS_STEP, carContact, slideVelocity } from './driving.js';
@@ -1324,7 +1325,7 @@ class PortfolioEngine {
             createTrailScenery(this);
             this.trailEffects = new TrailEffects(this);
             this.discoveries = new Discoveries(this);
-            this.diagnostics = new Diagnostics(); setupRadioMenu(this); setupRacingHud(this);
+            this.diagnostics = new Diagnostics(); setupRadioMenu(this); setupRacingHud(this); this.headlights?.attachControls();
             this.applyQuality(this.state.quality);
             this.updateLoadingProgress(90);
 
@@ -2346,9 +2347,7 @@ class PortfolioEngine {
 
         // Add headlights to car
         // Headlights only on high/ultra (spotlights are expensive)
-        if (this.state.quality === 'high' || this.state.quality === 'ultra') {
-            this.createHeadlights();
-        }
+        this.createHeadlights();
 
         // Start ambient sounds
         this.startAmbientSounds();
@@ -3600,6 +3599,7 @@ class PortfolioEngine {
 
         if (e.code === 'KeyC') this.toggleCamera();
         if (e.code === 'KeyH') this.honk();
+        if (e.code === 'KeyL') this.headlights?.cycle();
         if (e.code === 'KeyM') this.toggleMinimap();
         if (e.code === 'KeyT') this.cycleTimeOfDay(); //  Time of day
         if (e.code === 'KeyN') this.toggleNightMode(); //  Night mode
@@ -5164,34 +5164,9 @@ class PortfolioEngine {
     // CAR HEADLIGHTS
     // ============================================
 
-    createHeadlights() {
-        if (!this.car) return;
+    createHeadlights() { this.headlights = new Headlights(this); }
 
-        // Left headlight
-        this.leftHeadlight = new THREE.SpotLight(0xffffcc, 0, 50, Math.PI / 6, 0.5);
-        this.leftHeadlight.position.set(-0.6, 0.5, 2.5);
-        this.car.add(this.leftHeadlight);
-        this.leftHeadlight.target.position.set(-0.6, 0, 10);
-        this.car.add(this.leftHeadlight.target);
-
-        // Right headlight
-        this.rightHeadlight = new THREE.SpotLight(0xffffcc, 0, 50, Math.PI / 6, 0.5);
-        this.rightHeadlight.position.set(0.6, 0.5, 2.5);
-        this.car.add(this.rightHeadlight);
-        this.rightHeadlight.target.position.set(0.6, 0, 10);
-        this.car.add(this.rightHeadlight.target);
-    }
-
-    updateHeadlights() {
-        if (!this.leftHeadlight || !this.rightHeadlight) return;
-
-        // Turn on headlights at night
-        const isNight = this.dayTime < 0.25 || this.dayTime > 0.75;
-        const intensity = isNight ? 2 : 0;
-
-        this.leftHeadlight.intensity = intensity;
-        this.rightHeadlight.intensity = intensity;
-    }
+    updateHeadlights() { this.headlights?.update(this.frameDelta || 1 / 60); }
 
     // ============================================
     // BUILDING PREVIEWS (on hover/approach)

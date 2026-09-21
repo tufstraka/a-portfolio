@@ -18,6 +18,7 @@ export function createRallyCar(renderer) {
     room.dispose();generator.dispose();
   }
   const lamp=new THREE.MeshStandardMaterial({color:0xfff2bb,emissive:0xffce73,emissiveIntensity:.65});
+  car.userData.headlightMaterial=lamp;
   const red=new THREE.MeshStandardMaterial({color:0xec503c,emissive:0xd93823,emissiveIntensity:.5});
   const dirt={mud:{value:0},sand:{value:0}};car.userData.dirt=dirt;
   const rubber=surfaceMaterial('rubber',renderer).clone();

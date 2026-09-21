@@ -81,3 +81,11 @@ Validation includes 13 tests, production build, browser visual review, and phone
 Trees now use taller tapered trunks, four visible limbs and eight irregular canopy clusters per tree. Bark scans are retained, leaf shades and crown proportions vary, and placement preserves road/pond/landmark clearance. All trees share three instanced draw batches. Typical height is roughly 11–14 metres in world units.
 
 Texture and radio URLs are now module-relative assets, so the raw repository and Vite output both work under GitHub Pages subpaths. The Jeep-style Trail 07 adds an upright cabin, seven-slot grille, round lamps, a rear spare and exhaust. Mud/sand patches produce distance-based body dirt, wheel spray and bounded tire marks; exhaust and spray respect Comfort mode. Additional instanced rocks, fallen logs and plants add variety. License credits are also included in the built site's credits directory.
+
+## Water, workshop challenges and night driving
+
+The pond uses shallow/deep absorption colors, animated surface normals, view-dependent sky reflections, sun highlights and restrained shoreline ripples. These are analytic sky reflections, not expensive scene-reflection render passes. Reeds frame the edge. The workshop buildings have open vehicle bays, workbenches and wall-specific collision instead of solid building-sized blockers.
+
+Destinations → Play the workshops opens two four-stage, replayable challenges (delivery workflow and API access decisions). Nearby terminals also open with F. Incorrect decisions explain the issue without advancing progress; completion retains local discovery credit. All actions are simulated.
+
+Headlights work at every quality level. L cycles Auto → On → Off; Settings offers the same selector and remembers the preference. Both beams illuminate surfaces, the lenses glow when powered, and higher tiers add a single shadow map. H remains the horn. Grass uses narrow segmented blades, dark roots, lighter tips and layered wind gusts; quality controls density and Comfort mode freezes movement.

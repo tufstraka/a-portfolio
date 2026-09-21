@@ -1,13 +1,13 @@
 // Public portfolio content, reconciled with Keith's supplied résumé.
 export const PORTFOLIO_DATA = {
-  'About Me': { color: 0xf39455, icon: '👋', position: { x: 0, z: 0 }, content: {
+  'About Me': { color: 0xf39455, icon: 'person', position: { x: 0, z: 0 }, content: {
     intro: 'I build systems that work—and think carefully about how they can fail. Software engineer, founder, and security researcher. Working from anywhere.',
     sections: [
       { title: 'Engineering with security built in', items: ['Production fintech and payment systems', 'Secure APIs, real-time services, and cloud infrastructure', 'Threat modelling, secure code review, and defense in depth'] },
       { title: 'Beyond the terminal', items: ['Chess, games, and creative experiments', 'Founder & Lead Backend Engineer at Locsafe', 'Open-source contributor: Go / google/go-containerregistry'] }
     ]
   }},
-  'Tech Stack': { color: 0x53bdb4, icon: '⚡', position: { x: 70, z: -50 }, content: {
+  'Tech Stack': { color: 0x53bdb4, icon: 'code', position: { x: 70, z: -50 }, content: {
     intro: 'A practical toolkit for building, operating, and securing production systems.',
     sections: [
       { title: 'Backend engineering', items: ['TypeScript / JavaScript, Golang, Python, PHP', 'REST, gRPC, WebSockets, microservices', 'PostgreSQL, MongoDB, query optimization', 'Rust: reading and reviewing code'] },
@@ -15,7 +15,7 @@ export const PORTFOLIO_DATA = {
       { title: 'Cloud & delivery', items: ['AWS: EKS, EC2, S3, IAM, CloudWatch', 'Docker, Linux, container hardening', 'GitHub Actions, SAST/DAST, dependency scanning', 'Prometheus, PagerDuty, monitoring and incident response'] }
     ]
   }},
-  'Projects': { color: 0xdcf572, icon: '🚀', position: { x: 0, z: -100 }, content: {
+  'Projects': { color: 0xdcf572, icon: 'projects', position: { x: 0, z: -100 }, content: {
     intro: 'Products built through Locsafe, a studio spanning fintech, Web3, and consumer safety. Explore the engineering behind each idea.',
     sections: [
       { title: 'FixFlow', items: ['Automated CI bounty payouts using MNEE stablecoin', 'Focus: connecting build outcomes with payment workflows', 'Studio responsibility: backend architecture, secure API design, and release reviews'] },
@@ -24,7 +24,7 @@ export const PORTFOLIO_DATA = {
       { title: 'Security research', items: ['Independent research across fintech and DeFi since 2025', 'Web applications, APIs, smart contracts, and cloud infrastructure', 'Focus: identifying vulnerabilities and helping teams remediate them'] }
     ]
   }},
-  'Experience': { color: 0x8eb7e8, icon: '💼', position: { x: -70, z: 50 }, content: {
+  'Experience': { color: 0x8eb7e8, icon: 'work', position: { x: -70, z: 50 }, content: {
     intro: 'From telecom reliability to secure payment workflows and building a product studio.',
     sections: [
       { title: 'Locsafe · Mar 2024–present', items: ['Founder & Lead Backend Engineer', 'Lead a distributed team across concurrent products', 'Threat modelling, secure WebSockets, RBAC, rate limiting, and audit logging', 'AWS / Docker deployments and internal release security reviews'] },
@@ -34,8 +34,8 @@ export const PORTFOLIO_DATA = {
       { title: 'Education & credentials', items: ['ALX Africa · Software Engineering · 2022–2023', 'AWS Cloud Practitioner', 'Information Security · freeCodeCamp', 'Google IT Support Professional Certificate', 'Software Engineer Certificate · HackerRank'] }
     ]
   }},
-  'Contact': { color: 0xf39455, icon: '💬', position: { x: 70, z: 50 }, content: {
-    intro: 'Have a system to build, a security challenge, or an interesting idea? Let’s talk. Working from anywhere.',
+  'Contact': { color: 0xf39455, icon: 'contact', position: { x: 70, z: 50 }, content: {
+    intro: 'Have a system to build, a security challenge, or an interesting idea? Let’s talk.',
     sections: [
       { title: 'Start a conversation', items: ['keithkadima@gmail.com', 'linkedin.com/in/kadimakeith', 'github.com/tufstraka', '+254 701 746 774'] },
       { title: 'What I bring', items: ['Secure backend engineering and real-time systems', 'Fintech, payments, and cloud infrastructure', 'Security research and thoughtful technical ownership'] }

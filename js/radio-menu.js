@@ -4,7 +4,7 @@ export function setupRadioMenu(engine){
  const stop=()=>{request++;audio.pause();engine.musicWanted=false;clearInterval(engine.radioInterval);engine.radioInterval=null;try{engine.radioOsc?.stop();}catch{}engine.radioStation=0;button.textContent='Radio';};
  const sync=()=>{audio.muted=!!engine.muted;audio.volume=Number(document.getElementById('volumeControl').value)/100*.55;};
  engine.syncMusic=sync;
- const play=async()=>{const token=++request;sync();try{await audio.play();if(token!==request)return;status.textContent='Playing · Local Forecast';button.textContent='♫ Radio';}catch{if(token!==request)return;engine.musicWanted=false;status.textContent='Unable to play. Try again, or choose a built-in station.';}};
+ const play=async()=>{const token=++request;sync();try{await audio.play();if(token!==request)return;status.textContent='Playing · Local Forecast';button.textContent='Radio · playing';}catch{if(token!==request)return;engine.musicWanted=false;status.textContent='Unable to play. Try again, or choose a built-in station.';}};
  document.getElementById('radioRecorded').onclick=()=>{stop();engine.musicWanted=true;if(!audio.src)audio.src=new URL('./audio/local-forecast.mp3',document.baseURI).href;play();};
  document.getElementById('radioStop').onclick=()=>{stop();status.textContent='Radio off';};
  document.getElementById('radioSynth').onclick=()=>{stop();if(engine.muted)engine.toggleMute();engine.audioContext?.resume();engine.cycleRadio();status.textContent='Playing · Lo-fi Circuit';};
